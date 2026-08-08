@@ -33,11 +33,26 @@ def main():
     exchange = Exchange(wallet, base_url, account_address=account_address)
 
     # 1. Check account state
-    state = info.user_state(account_address)
-    equity = float(state["marginSummary"]["accountValue"])
-    withdrawable = float(state.get("withdrawable", 0))
-    print(f"Account equity: ${equity:.2f}")
-    print(f"Withdrawable:   ${withdrawable:.2f}")
+state = info.user_state(account_address)
+equity = float(state["marginSummary"]["accountValue"])
+withdrawable = float(state.get("withdrawable", 0))
+
+# Unified Account: if perp balance shows zero, read USDC from spot state
+if equity < 10:
+    spot_state = info.spot_user_state(account_address)
+    usdc_balance = next(
+        (b for b in spot_state.get("balances", []) if b.get("coin") == "USDC"),
+        None,
+    )
+
+    if usdc_balance:
+        equity = float(usdc_balance.get("total", 0))
+        held = float(usdc_balance.get("hold", 0))
+        withdrawable = max(0.0, equity - held)
+        print("Using Unified Account USDC balance")
+
+print(f"Account equity: ${equity:.2f}")
+print(f"Withdrawable:   ${withdrawable:.2f}")
 
     # 2. Get BTC mid price
     mids = info.all_mids()
