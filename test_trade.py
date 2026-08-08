@@ -54,10 +54,10 @@ if equity < 10:
 print(f"Account equity: ${equity:.2f}")
 print(f"Withdrawable:   ${withdrawable:.2f}")
 
-    # 2. Get BTC mid price
-    mids = info.all_mids()
-    btc_mid = float(mids["BTC"])
-    print(f"BTC mid price: ${btc_mid:,.2f}")
+# 2. Get BTC mid price
+mids = info.all_mids()
+btc_mid = float(mids["BTC"])
+        print(f"BTC mid price: ${btc_mid:,.2f}")
 
     if equity < 10:
         print("\n⚠️  Account has insufficient balance for a test trade.")
