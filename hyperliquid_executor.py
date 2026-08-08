@@ -122,9 +122,21 @@ def get_client():
 
 
 def get_account_equity(info, address: str) -> float:
-    """Total account value in USDC."""
+    """Return account equity, including Unified Account USDC."""
     state = info.user_state(address)
-    return float(state["marginSummary"]["accountValue"])
+    equity = float(state["marginSummary"]["accountValue"])
+
+    if equity < 10:
+        spot_state = info.spot_user_state(address)
+        usdc_balance = next(
+            (b for b in spot_state.get("balances", []) if b.get("coin") == "USDC"),
+            None,
+        )
+
+        if usdc_balance:
+            equity = float(usdc_balance.get("total", 0))
+
+    return equity
 
 
 def get_open_positions(info, address: str) -> dict:
