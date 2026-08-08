@@ -59,7 +59,7 @@ mids = info.all_mids()
 btc_mid = float(mids["BTC"])
 print(f"BTC mid price: ${btc_mid:,.2f}")
 
-    if equity < 10:
+if equity < 10:
         print("\n⚠️  Account has insufficient balance for a test trade.")
         print("   To fund the testnet account, go to https://app.hyperliquid-testnet.xyz")
         print("   connect the main wallet, and use the faucet to deposit test USDC.")
