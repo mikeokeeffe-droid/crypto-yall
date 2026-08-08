@@ -83,7 +83,7 @@ def main():
         return
 
     # 3. Place a small BTC long
-    size = round(10 / btc_mid, 5)
+    size = round(15 / btc_mid, 5)
 
     print(f"\nPlacing test LONG: {size} BTC @ market")
 
