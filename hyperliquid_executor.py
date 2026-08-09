@@ -62,8 +62,9 @@ ASSETS = {
     "XRP-USD": "XRP",
 }
 
-STATE_FILENAME = "trading_state.json"
+STATE_FILENAME = "crypto_yall_state.json"
 POSITION_SIZE_PCT = 0.01  # 1% of segregated capital per trade
+MIN_ORDER_NOTIONAL = 12.0  # buffer above Hyperliquid $10 minimum
 
 
 # ── State Persistence (GitHub Gist) ─────────────────────────────────────────
@@ -293,33 +294,26 @@ def decide_trades(signals: dict, open_positions: dict, max_positions: int) -> li
         if existing:
             continue
 
-        if action_key in ("buy", "hold_long"):
-            reason = (
-                "BUY signal"
-                if action_key == "buy"
-                else "Sync to hold_long (strategy already in position)"
-            )
+        # Only open on a NEW entry signal.
+        # A hold_long / hold_short means the strategy was already in that
+        # position before this run; we do not "sync" into it mid-trade.
+        if action_key == "buy":
             open_candidates.append({
                 "ticker": ticker,
                 "hl_coin": hl_coin,
                 "action": "open_long",
                 "side": "long",
-                "reason": reason,
+                "reason": "BUY signal",
                 "confidence": info["bull_conf"],
             })
 
-        elif action_key in ("enter_short", "hold_short"):
-            reason = (
-                "ENTER SHORT signal"
-                if action_key == "enter_short"
-                else "Sync to hold_short (strategy already in position)"
-            )
+        elif action_key == "enter_short":
             open_candidates.append({
                 "ticker": ticker,
                 "hl_coin": hl_coin,
                 "action": "open_short",
                 "side": "short",
-                "reason": reason,
+                "reason": "ENTER SHORT signal",
                 "confidence": info["bear_conf"],
             })
 
@@ -359,7 +353,22 @@ def execute_trade(info, exchange, trade: dict, capital: float, leverage: float) 
         return _parse_response(trade, resp, info, coin)
 
     mid = get_mid_price(info, coin)
-    notional = capital * POSITION_SIZE_PCT * leverage
+    calculated_notional = capital * POSITION_SIZE_PCT * leverage
+    notional = max(calculated_notional, MIN_ORDER_NOTIONAL)
+
+    # Never let the minimum-order adjustment exceed the bot's available
+    # leveraged allocation for this trade.
+    max_notional = capital * max(leverage, 1.0)
+    if notional > max_notional:
+        return {
+            **trade,
+            "status": "skipped",
+            "reason": (
+                f"Allocated capital too small for ${MIN_ORDER_NOTIONAL:.2f} "
+                "minimum order"
+            ),
+        }
+
     raw_size = notional / mid
     sz_decimals = get_size_decimals(info, coin)
     size = round_size(raw_size, sz_decimals)
@@ -541,7 +550,8 @@ def _send_email(results: list[dict], status_summary: str):
     """
 
     msg = MIMEMultipart("alternative")
-    summary = f"{len(results)} trade(s)" if results else "No trades"
+    filled = sum(1 for r in results if r.get("status") == "filled")
+    summary = f"{filled} filled trade(s)" if results else "No trades"
     msg["Subject"] = f"[Crypto Y'all] Execution: {summary}"
     msg["From"] = user
     msg["To"] = ", ".join(recipient_list)
@@ -763,7 +773,16 @@ def main():
 
     save_trading_state(state)
 
-    summary = f"{len(results)} trade(s) executed | Equity: ${equity:,.2f}"
+    filled_count = sum(1 for r in results if r.get("status") == "filled")
+    error_count = sum(1 for r in results if r.get("status") == "error")
+    skipped_count = sum(1 for r in results if r.get("status") == "skipped")
+
+    summary = (
+        f"{filled_count} filled"
+        f" | {error_count} error(s)"
+        f" | {skipped_count} skipped"
+        f" | Equity: ${equity:,.2f}"
+    )
     send_execution_notifications(results, summary)
 
     print("Done")
