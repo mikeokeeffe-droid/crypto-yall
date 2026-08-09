@@ -511,14 +511,14 @@ def _send_telegram(results: list[dict], status_summary: str):
     lines.append(f"_{dt.datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}_")
     text = "\n".join(lines)
 
-    for chat_id in chat_ids:
-  resp = requests.post(
-    f"https://api.telegram.org/bot{token}/sendMessage",
-    json={"chat_id": chat_id, "text": text, "parse_mode": "Markdown"},
-    timeout=15,
-)
+for chat_id in chat_ids:
+    resp = requests.post(
+        f"https://api.telegram.org/bot{token}/sendMessage",
+        json={"chat_id": chat_id, "text": text, "parse_mode": "Markdown"},
+        timeout=15,
+    )
 
-print(f"Telegram response: {resp.status_code} {resp.text}")
+    print(f"Telegram response: {resp.status_code} {resp.text}")
 
 # ── Main ────────────────────────────────────────────────────────────────────
 
