@@ -3,7 +3,7 @@ hyperliquid_executor.py — Live trading executor for Hyperliquid DEX.
 
 Translates signals from signal_utils into actual trades on Hyperliquid.
 Runs daily via GitHub Actions, enforces risk guardrails, and sends
-execution notifications through notifier.py.
+execution notifications.
 
 Required environment variables:
     HL_PRIVATE_KEY      – API wallet private key (trading-only, no withdraw)
@@ -11,9 +11,9 @@ Required environment variables:
     HL_TESTNET          – "true" to use testnet, else mainnet
     SEGREGATED_CAPITAL  – USDC allocated to bot (e.g. "10000")
     DAILY_DD_PCT        – Max daily drawdown % before auto-pause (e.g. "5")
-    MAX_POSITIONS       – Max concurrent open positions (4 aggressive)
+    MAX_POSITIONS       – Max concurrent open positions
     KILL_SWITCH         – "OFF" to halt all trading, else trades enabled
-    GIST_TOKEN / GIST_ID – State persistence (same as notifier)
+    GIST_TOKEN / GIST_ID – State persistence
     GMAIL_USER / GMAIL_APP_PASSWORD / NOTIFY_EMAILS – email alerts
     TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID – telegram alerts
 """
@@ -73,6 +73,7 @@ def load_trading_state() -> dict:
     gist_id = os.environ.get("GIST_ID")
     if not gist_token or not gist_id:
         return {}
+
     resp = requests.get(
         f"https://api.github.com/gists/{gist_id}",
         headers={"Authorization": f"token {gist_token}"},
@@ -80,9 +81,11 @@ def load_trading_state() -> dict:
     )
     if resp.status_code != 200:
         return {}
+
     files = resp.json().get("files", {})
     if STATE_FILENAME not in files:
         return {}
+
     try:
         return json.loads(files[STATE_FILENAME]["content"])
     except Exception:
@@ -94,6 +97,7 @@ def save_trading_state(state: dict):
     gist_id = os.environ.get("GIST_ID")
     if not gist_token or not gist_id:
         return
+
     requests.patch(
         f"https://api.github.com/gists/{gist_id}",
         headers={"Authorization": f"token {gist_token}"},
@@ -132,7 +136,6 @@ def get_account_equity(info, address: str) -> float:
             (b for b in spot_state.get("balances", []) if b.get("coin") == "USDC"),
             None,
         )
-
         if usdc_balance:
             equity = float(usdc_balance.get("total", 0))
 
@@ -143,16 +146,19 @@ def get_open_positions(info, address: str) -> dict:
     """Return {coin: {size, entry_px, unrealized_pnl}} for open positions."""
     state = info.user_state(address)
     positions = {}
+
     for p in state.get("assetPositions", []):
         pos = p["position"]
         size = float(pos["szi"])
         if size == 0:
             continue
+
         positions[pos["coin"]] = {
             "size": size,  # signed: + long, - short
             "entry_px": float(pos["entryPx"]),
             "unrealized_pnl": float(pos["unrealizedPnl"]),
         }
+
     return positions
 
 
@@ -165,10 +171,10 @@ def coin_is_listed(info, coin: str) -> bool:
     return coin in info.all_mids()
 
 
-# ── Signal Computation (reuse notifier logic) ───────────────────────────────
+# ── Signal Computation ──────────────────────────────────────────────────────
 
 def compute_all_signals() -> dict:
-    """Return {ticker: {action_key, regime, price, bull_conf, signal}} — aggressive mode."""
+    """Return {ticker: {action, regime, price, bull_conf, signal}}."""
     all_data = fetch_data(tickers=list(ASSETS.keys()))
     current = {}
 
@@ -181,17 +187,23 @@ def compute_all_signals() -> dict:
             df = compute_all(raw)
             regimes, bull_probs, bear_probs = causal_hmm_regimes(df)
             profile = get_asset_profile(ticker)
+
             regime = regimes.iloc[-1] if len(regimes) > 0 else "Unknown"
             price = float(df["Close"].iloc[-1])
             bull_conf = float(bull_probs.iloc[-1]) if len(bull_probs) > 0 else 0.0
             bear_conf = float(bear_probs.iloc[-1]) if len(bear_probs) > 0 else 0.0
 
-            # Aggressive mode only (per call decision)
             sig = generate_signals(
-                df, regimes, bull_probs=bull_probs, bear_probs=bear_probs,
-                aggressive=True, bull_leverage=profile["max_bull_leverage"],
-                allow_short=profile["allow_short"], atr_mult=profile["atr_mult"],
+                df,
+                regimes,
+                bull_probs=bull_probs,
+                bear_probs=bear_probs,
+                aggressive=True,
+                bull_leverage=profile["max_bull_leverage"],
+                allow_short=profile["allow_short"],
+                atr_mult=profile["atr_mult"],
             )
+
             last = int(sig["Signal"].iloc[-1])
             prev = int(sig["Signal"].iloc[-2]) if len(sig) >= 2 else last
             action_key = classify_signal(last, prev, regime)
@@ -205,6 +217,7 @@ def compute_all_signals() -> dict:
                 "bear_conf": bear_conf,
                 "leverage": float(sig["Leverage"].iloc[-1]) if "Leverage" in sig.columns else 1.0,
             }
+
         except Exception as e:
             print(f"Error computing signal for {ticker}: {e}")
             continue
@@ -235,9 +248,9 @@ def decide_trades(signals: dict, open_positions: dict, max_positions: int) -> li
         is_long = current_pos["size"] > 0
         is_short = current_pos["size"] < 0
 
-        # Close conditions
         should_close = False
         reason = ""
+
         if action_key == "sell_exit" and is_long:
             should_close = True
             reason = "SELL / EXIT signal"
@@ -247,7 +260,6 @@ def decide_trades(signals: dict, open_positions: dict, max_positions: int) -> li
         elif action_key == "cover_short" and is_short:
             should_close = True
             reason = "COVER SHORT signal"
-        # If signal flipped direction, close existing
         elif action_key == "buy" and is_short:
             should_close = True
             reason = "Signal flipped long while short"
@@ -265,28 +277,28 @@ def decide_trades(signals: dict, open_positions: dict, max_positions: int) -> li
             })
 
     # Step 2: Determine which new positions to open
-    # Count positions we'll have AFTER closes
     closes_by_coin = {t["hl_coin"] for t in trades if t["action"] == "close"}
     remaining_positions = {
         c: p for c, p in open_positions.items() if c not in closes_by_coin
     }
     slots_available = max_positions - len(remaining_positions)
 
-    # Candidate opens, sorted by confidence (highest first)
     open_candidates = []
+
     for ticker, info in signals.items():
         hl_coin = HL_TICKER_MAP[ticker]
         action_key = info["action"]
 
-        # Skip if we already have a position in the right direction
         existing = remaining_positions.get(hl_coin)
         if existing:
             continue
 
-        # Open on fresh entry (buy/enter_short) OR sync when strategy
-        # says we should be holding long/short but we have no position.
         if action_key in ("buy", "hold_long"):
-            reason = "BUY signal" if action_key == "buy" else "Sync to hold_long (strategy already in position)"
+            reason = (
+                "BUY signal"
+                if action_key == "buy"
+                else "Sync to hold_long (strategy already in position)"
+            )
             open_candidates.append({
                 "ticker": ticker,
                 "hl_coin": hl_coin,
@@ -295,8 +307,13 @@ def decide_trades(signals: dict, open_positions: dict, max_positions: int) -> li
                 "reason": reason,
                 "confidence": info["bull_conf"],
             })
+
         elif action_key in ("enter_short", "hold_short"):
-            reason = "ENTER SHORT signal" if action_key == "enter_short" else "Sync to hold_short (strategy already in position)"
+            reason = (
+                "ENTER SHORT signal"
+                if action_key == "enter_short"
+                else "Sync to hold_short (strategy already in position)"
+            )
             open_candidates.append({
                 "ticker": ticker,
                 "hl_coin": hl_coin,
@@ -318,27 +335,29 @@ def round_size(size: float, sz_decimals: int) -> float:
     """Round position size down to the coin's size decimals."""
     if sz_decimals <= 0:
         return float(int(size))
+
     q = Decimal("1").scaleb(-sz_decimals)
     return float(Decimal(str(size)).quantize(q, rounding=ROUND_DOWN))
 
 
 def get_size_decimals(info, coin: str) -> int:
     meta = info.meta()
+
     for universe in meta.get("universe", []):
         if universe["name"] == coin:
             return int(universe["szDecimals"])
-    return 3  # safe default
+
+    return 3
 
 
 def execute_trade(info, exchange, trade: dict, capital: float, leverage: float) -> dict:
-    """Execute a single trade via Hyperliquid market order. Returns result dict."""
+    """Execute a single trade via Hyperliquid market order."""
     coin = trade["hl_coin"]
 
     if trade["action"] == "close":
         resp = exchange.market_close(coin)
         return _parse_response(trade, resp, info, coin)
 
-    # Open new position: size = (capital * 0.01 * leverage) / price
     mid = get_mid_price(info, coin)
     notional = capital * POSITION_SIZE_PCT * leverage
     raw_size = notional / mid
@@ -346,9 +365,12 @@ def execute_trade(info, exchange, trade: dict, capital: float, leverage: float) 
     size = round_size(raw_size, sz_decimals)
 
     if size <= 0:
-        return {**trade, "status": "skipped", "reason": "Size rounded to zero"}
+        return {
+            **trade,
+            "status": "skipped",
+            "reason": "Size rounded to zero",
+        }
 
-    # Set leverage before opening (cross margin)
     try:
         exchange.update_leverage(int(leverage), coin, True)
     except Exception as e:
@@ -356,15 +378,18 @@ def execute_trade(info, exchange, trade: dict, capital: float, leverage: float) 
 
     is_buy = trade["action"] == "open_long"
     resp = exchange.market_open(coin, is_buy, size)
+
     return _parse_response(trade, resp, info, coin)
 
 
 def _parse_response(trade: dict, resp: dict, info, coin: str) -> dict:
     """Extract fill info from Hyperliquid response."""
     result = {**trade}
+
     try:
         if resp.get("status") == "ok":
             statuses = resp["response"]["data"]["statuses"]
+
             for s in statuses:
                 if "filled" in s:
                     f = s["filled"]
@@ -373,18 +398,22 @@ def _parse_response(trade: dict, resp: dict, info, coin: str) -> dict:
                     result["fill_price"] = float(f["avgPx"])
                     result["oid"] = f.get("oid")
                     return result
-                elif "error" in s:
+
+                if "error" in s:
                     result["status"] = "error"
                     result["error"] = s["error"]
                     return result
+
             result["status"] = "unknown"
             result["raw"] = resp
         else:
             result["status"] = "error"
             result["error"] = resp.get("response", str(resp))
+
     except Exception as e:
         result["status"] = "error"
         result["error"] = f"Parse error: {e} | raw={resp}"
+
     return result
 
 
@@ -395,25 +424,33 @@ def check_kill_switch() -> bool:
     return os.environ.get("KILL_SWITCH", "ON").upper() == "OFF"
 
 
-def check_daily_drawdown(state: dict, current_equity: float, threshold_pct: float) -> tuple[bool, dict]:
-    """
-    Check if today's drawdown exceeds threshold.
-    Returns (should_halt, updated_state_fragment).
-    """
+def check_daily_drawdown(
+    state: dict,
+    current_equity: float,
+    threshold_pct: float,
+) -> tuple[bool, dict]:
+    """Check if today's drawdown exceeds threshold."""
     today = dt.date.today().isoformat()
     day_key = f"day_start_{today}"
     day_start = state.get(day_key)
 
     update = {}
+
     if day_start is None:
         update[day_key] = current_equity
         return False, update
 
-    drawdown_pct = (current_equity - day_start) / day_start * 100 if day_start > 0 else 0
+    drawdown_pct = (
+        (current_equity - day_start) / day_start * 100
+        if day_start > 0
+        else 0
+    )
 
     if drawdown_pct <= -threshold_pct:
         update["halted_today"] = today
-        update["halt_reason"] = f"Daily DD {drawdown_pct:.2f}% exceeded {-threshold_pct}%"
+        update["halt_reason"] = (
+            f"Daily DD {drawdown_pct:.2f}% exceeded {-threshold_pct}%"
+        )
         return True, update
 
     return False, update
@@ -426,13 +463,11 @@ def send_execution_notifications(results: list[dict], status_summary: str):
     if not results and not status_summary:
         return
 
-    # Email
     try:
         _send_email(results, status_summary)
     except Exception as e:
         print(f"Email send failed: {e}")
 
-    # Telegram
     try:
         _send_telegram(results, status_summary)
     except Exception as e:
@@ -447,16 +482,27 @@ def _send_email(results: list[dict], status_summary: str):
     user = os.environ.get("GMAIL_USER")
     password = os.environ.get("GMAIL_APP_PASSWORD")
     recipients = os.environ.get("NOTIFY_EMAILS", "")
+
     if not user or not password or not recipients:
         return
 
     recipient_list = [e.strip() for e in recipients.split(",")]
 
     rows = ""
+
     for r in results:
         status_color = "#1f883d" if r.get("status") == "filled" else "#cf222e"
-        fill_px = f"${r.get('fill_price', 0):,.2f}" if r.get("status") == "filled" else "—"
-        fill_sz = f"{r.get('fill_size', 0):.6g}" if r.get("status") == "filled" else "—"
+        fill_px = (
+            f"${r.get('fill_price', 0):,.2f}"
+            if r.get("status") == "filled"
+            else "—"
+        )
+        fill_sz = (
+            f"{r.get('fill_size', 0):.6g}"
+            if r.get("status") == "filled"
+            else "—"
+        )
+
         rows += f"""
         <tr>
             <td style="padding:10px;border-bottom:1px solid #e1e4e8;color:#1a1a1a;">{r['ticker']}</td>
@@ -467,12 +513,30 @@ def _send_email(results: list[dict], status_summary: str):
             <td style="padding:10px;border-bottom:1px solid #e1e4e8;color:#1a1a1a;">{r.get('reason', '')}</td>
         </tr>"""
 
+    table_or_empty = (
+        f"""
+        <table style="width:100%;border-collapse:collapse;margin-top:16px;background:#ffffff;">
+            <tr style="background:#f6f8fa;color:#57606a;text-transform:uppercase;font-size:0.75em;letter-spacing:0.5px;">
+                <th style="padding:10px;text-align:left;">Asset</th>
+                <th style="padding:10px;text-align:left;">Action</th>
+                <th style="padding:10px;text-align:left;">Status</th>
+                <th style="padding:10px;text-align:left;">Size</th>
+                <th style="padding:10px;text-align:left;">Fill Price</th>
+                <th style="padding:10px;text-align:left;">Reason</th>
+            </tr>
+            {rows}
+        </table>
+        """
+        if results
+        else '<p style="color:#1a1a1a;">No trades executed this cycle.</p>'
+    )
+
     html = f"""
     <div style="font-family:Arial,Helvetica,sans-serif;background:#ffffff;color:#1a1a1a;padding:24px;border:1px solid #e1e4e8;border-radius:8px;max-width:760px;">
         <h2 style="color:#0969da;margin:0 0 8px 0;">Crypto Y'all Trade Execution</h2>
         <p style="color:#57606a;margin:0 0 8px 0;">{dt.datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}</p>
         <p style="color:#1a1a1a;margin:0 0 16px 0;"><strong>Status:</strong> {status_summary}</p>
-        {f'<table style="width:100%;border-collapse:collapse;margin-top:16px;background:#ffffff;"><tr style="background:#f6f8fa;color:#57606a;text-transform:uppercase;font-size:0.75em;letter-spacing:0.5px;"><th style="padding:10px;text-align:left;">Asset</th><th style="padding:10px;text-align:left;">Action</th><th style="padding:10px;text-align:left;">Status</th><th style="padding:10px;text-align:left;">Size</th><th style="padding:10px;text-align:left;">Fill Price</th><th style="padding:10px;text-align:left;">Reason</th></tr>{rows}</table>' if results else '<p style="color:#1a1a1a;">No trades executed this cycle.</p>'}
+        {table_or_empty}
     </div>
     """
 
@@ -486,39 +550,64 @@ def _send_email(results: list[dict], status_summary: str):
     with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
         server.login(user, password)
         server.send_message(msg)
+
     print(f"Email sent to {recipient_list}")
 
 
 def _send_telegram(results: list[dict], status_summary: str):
     token = os.environ.get("TELEGRAM_BOT_TOKEN")
     chat_ids_raw = os.environ.get("TELEGRAM_CHAT_ID")
+
     if not token or not chat_ids_raw:
+        print("Telegram skipped: TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID missing")
         return
 
     chat_ids = [c.strip() for c in chat_ids_raw.split(",") if c.strip()]
 
-    lines = ["*Crypto Y'all Trade Execution*", "", f"Status: {status_summary}", ""]
+    lines = [
+        "*Crypto Y'all Trade Execution*",
+        "",
+        f"Status: {status_summary}",
+        "",
+    ]
+
     for r in results:
         status = r.get("status", "?").upper()
         lines.append(f"*{r['ticker']}* — {r['action']} [{status}]")
+
         if r.get("status") == "filled":
-            lines.append(f"  Size: {r.get('fill_size', 0):.6g} @ ${r.get('fill_price', 0):,.2f}")
+            lines.append(
+                f"  Size: {r.get('fill_size', 0):.6g} @ "
+                f"${r.get('fill_price', 0):,.2f}"
+            )
         elif r.get("error"):
             lines.append(f"  Error: {r['error']}")
+
         lines.append(f"  Reason: {r.get('reason', '')}")
         lines.append("")
 
     lines.append(f"_{dt.datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}_")
     text = "\n".join(lines)
 
-        for chat_id in chat_ids:
+    for chat_id in chat_ids:
         resp = requests.post(
             f"https://api.telegram.org/bot{token}/sendMessage",
-            json={"chat_id": chat_id, "text": text, "parse_mode": "Markdown"},
+            json={
+                "chat_id": chat_id,
+                "text": text,
+                "parse_mode": "Markdown",
+            },
             timeout=15,
         )
 
         print(f"Telegram response: {resp.status_code} {resp.text}")
+
+        if not resp.ok:
+            raise RuntimeError(
+                f"Telegram API error {resp.status_code}: {resp.text}"
+            )
+
+
 # ── Main ────────────────────────────────────────────────────────────────────
 
 def main():
@@ -527,7 +616,10 @@ def main():
     # Kill switch check
     if check_kill_switch():
         print("KILL_SWITCH is OFF — halting all trading")
-        send_execution_notifications([], "KILL SWITCH ACTIVE — no trades executed")
+        send_execution_notifications(
+            [],
+            "KILL SWITCH ACTIVE — no trades executed",
+        )
         sys.exit(0)
 
     try:
@@ -541,11 +633,18 @@ def main():
     state = load_trading_state()
     equity = get_account_equity(info, address)
     dd_threshold = float(os.environ.get("DAILY_DD_PCT", "5"))
-    halted, state_update = check_daily_drawdown(state, equity, dd_threshold)
+    halted, state_update = check_daily_drawdown(
+        state,
+        equity,
+        dd_threshold,
+    )
     state.update(state_update)
 
     if halted:
-        msg = f"Daily drawdown triggered — halting today. {state_update.get('halt_reason')}"
+        msg = (
+            "Daily drawdown triggered — halting today. "
+            f"{state_update.get('halt_reason')}"
+        )
         print(msg)
         send_execution_notifications([], msg)
         save_trading_state(state)
@@ -553,6 +652,7 @@ def main():
 
     # Check if already halted today
     today = dt.date.today().isoformat()
+
     if state.get("halted_today") == today:
         print(f"Already halted today: {state.get('halt_reason')}")
         sys.exit(0)
@@ -565,40 +665,72 @@ def main():
 
     # Filter out assets not listed on this Hyperliquid environment
     available = set(info.all_mids().keys())
-    signals = {t: s for t, s in signals.items() if HL_TICKER_MAP[t] in available}
+    signals = {
+        t: s
+        for t, s in signals.items()
+        if HL_TICKER_MAP[t] in available
+    }
+
     skipped = [t for t in ASSETS if t not in signals]
     if skipped:
         print(f"Skipping unavailable assets on this env: {skipped}")
 
     # Ownership tracking: only manage positions this bot opened.
-    # owned_coins is the set of coin symbols this bot currently holds.
     owned_coins = set(state.get("owned_coins", []))
 
-    # Reconcile: drop owned coins that no longer have a position on the exchange
-    # (e.g., another strategy or manual action closed them). This keeps state
-    # consistent with the actual Hyperliquid account.
+    # Reconcile stale ownership
     stale_owned = owned_coins - set(open_positions.keys())
     if stale_owned:
         print(f"Dropping stale owned coins (no position on exchange): {stale_owned}")
         owned_coins -= stale_owned
 
-    managed_positions = {c: p for c, p in open_positions.items() if c in owned_coins}
+    managed_positions = {
+        c: p
+        for c, p in open_positions.items()
+        if c in owned_coins
+    }
 
-    trades = decide_trades(signals, managed_positions, max_positions)
-    print(f"Decided on {len(trades)} trade(s) (own {len(owned_coins)} position(s))")
+    trades = decide_trades(
+        signals,
+        managed_positions,
+        max_positions,
+    )
+
+    print(
+        f"Decided on {len(trades)} trade(s) "
+        f"(own {len(owned_coins)} position(s))"
+    )
 
     results = []
+
     for trade in trades:
         sig_info = signals.get(trade["ticker"], {})
-        leverage = max(1.0, min(sig_info.get("leverage", 1.0), 3.0))
-        result = execute_trade(info, exchange, trade, capital, leverage)
+        leverage = max(
+            1.0,
+            min(sig_info.get("leverage", 1.0), 3.0),
+        )
+
+        result = execute_trade(
+            info,
+            exchange,
+            trade,
+            capital,
+            leverage,
+        )
+
         results.append(result)
-        print(f"  {result['ticker']} {result['action']}: {result.get('status')} "
-              f"{result.get('fill_size', '')} @ {result.get('fill_price', '')}")
+
+        print(
+            f"  {result['ticker']} {result['action']}: "
+            f"{result.get('status')} "
+            f"{result.get('fill_size', '')} @ "
+            f"{result.get('fill_price', '')}"
+        )
 
         # Update ownership on successful fills
         if result.get("status") == "filled":
             coin = result["hl_coin"]
+
             if result["action"] == "close":
                 owned_coins.discard(coin)
             else:
@@ -606,23 +738,34 @@ def main():
 
     # Append to trade history
     history = state.get("history", [])
+
     for r in results:
         history.append({
             "timestamp": dt.datetime.utcnow().isoformat() + "Z",
-            **{k: v for k, v in r.items() if k not in ("raw",)},
+            **{
+                k: v
+                for k, v in r.items()
+                if k not in ("raw",)
+            },
         })
-    state["history"] = history[-500:]  # keep last 500 trades
+
+    state["history"] = history[-500:]
     state["last_equity"] = equity
     state["last_run"] = dt.datetime.utcnow().isoformat() + "Z"
     state["owned_coins"] = sorted(owned_coins)
-    # Show only our positions on the dashboard
+
     latest_positions = get_open_positions(info, address)
-    state["open_positions"] = {c: p for c, p in latest_positions.items() if c in owned_coins}
+    state["open_positions"] = {
+        c: p
+        for c, p in latest_positions.items()
+        if c in owned_coins
+    }
 
     save_trading_state(state)
 
     summary = f"{len(results)} trade(s) executed | Equity: ${equity:,.2f}"
     send_execution_notifications(results, summary)
+
     print("Done")
 
 
