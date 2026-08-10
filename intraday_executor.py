@@ -42,6 +42,8 @@ from backtester import get_asset_profile
 
 STATE_FILENAME = "intraday_state.json"
 POSITION_SIZE_PCT = 0.01
+TESTNET_MIN_ORDER_NOTIONAL = 12.0
+MAINNET_MIN_ORDER_NOTIONAL = 10.0
 
 
 # ── State persistence (separate Gist from daily bot) ────────────────────────
@@ -49,18 +51,24 @@ POSITION_SIZE_PCT = 0.01
 def load_state() -> dict:
     gist_token = os.environ.get("GIST_TOKEN")
     gist_id = os.environ.get("INTRADAY_GIST_ID")
+
     if not gist_token or not gist_id:
         return {}
+
     resp = requests.get(
         f"https://api.github.com/gists/{gist_id}",
         headers={"Authorization": f"token {gist_token}"},
         timeout=15,
     )
+
     if resp.status_code != 200:
         return {}
+
     files = resp.json().get("files", {})
+
     if STATE_FILENAME not in files:
         return {}
+
     try:
         return json.loads(files[STATE_FILENAME]["content"])
     except Exception:
@@ -70,8 +78,10 @@ def load_state() -> dict:
 def save_state(state: dict):
     gist_token = os.environ.get("GIST_TOKEN")
     gist_id = os.environ.get("INTRADAY_GIST_ID")
+
     if not gist_token or not gist_id:
         return
+
     requests.patch(
         f"https://api.github.com/gists/{gist_id}",
         headers={"Authorization": f"token {gist_token}"},
@@ -84,23 +94,35 @@ def save_state(state: dict):
 
 def compute_intraday_signals() -> dict:
     """Fetch 1h candles and compute signals per asset."""
-    all_data = fetch_all_intraday(list(ASSETS.keys()), interval="1h", lookback_hours=1000)
+    all_data = fetch_all_intraday(
+        list(ASSETS.keys()),
+        interval="1h",
+        lookback_hours=1000,
+    )
     current = {}
 
     for ticker in ASSETS:
         try:
             df = all_data.get(ticker)
+
             if df is None or df.empty or len(df) < 50:
                 continue
 
             profile = get_asset_profile(ticker)
-            sig = generate_intraday_signals(df, allow_short=profile["allow_short"])
+            sig = generate_intraday_signals(
+                df,
+                allow_short=profile["allow_short"],
+            )
 
             last = int(sig["Signal"].iloc[-1])
             prev = int(sig["Signal"].iloc[-2]) if len(sig) >= 2 else last
             action = classify_intraday_signal(last, prev)
             price = float(df["Close"].iloc[-1])
-            osc = float(sig["TwoPole_Osc"].iloc[-1]) if "TwoPole_Osc" in sig.columns else 0.0
+            osc = (
+                float(sig["TwoPole_Osc"].iloc[-1])
+                if "TwoPole_Osc" in sig.columns
+                else 0.0
+            )
 
             current[ticker] = {
                 "signal": last,
@@ -108,15 +130,20 @@ def compute_intraday_signals() -> dict:
                 "price": price,
                 "osc": osc,
             }
+
         except Exception as e:
             print(f"Error on {ticker}: {e}")
 
     return current
 
 
-# ── Trade decisions ─────────────────────────────────────────────────────────
+# ── Trade decisions ────────────────────────────────────────────────────────
 
-def decide_trades(signals: dict, open_positions: dict, max_positions: int) -> list[dict]:
+def decide_trades(
+    signals: dict,
+    open_positions: dict,
+    max_positions: int,
+) -> list[dict]:
     """Decide trades given new signals vs current HL positions."""
     trades = []
 
@@ -124,71 +151,155 @@ def decide_trades(signals: dict, open_positions: dict, max_positions: int) -> li
     for ticker, info in signals.items():
         hl_coin = HL_SYMBOL_MAP[ticker]
         pos = open_positions.get(hl_coin)
+
         if pos is None:
             continue
+
         is_long = pos["size"] > 0
         is_short = pos["size"] < 0
-
         action = info["action"]
-        if (action == "sell_exit" and is_long) or \
-           (action == "cover_short" and is_short) or \
-           (action == "buy" and is_short) or \
-           (action == "enter_short" and is_long):
+
+        if (
+            (action == "sell_exit" and is_long)
+            or (action == "cover_short" and is_short)
+            or (action == "buy" and is_short)
+            or (action == "enter_short" and is_long)
+        ):
             trades.append({
-                "ticker": ticker, "hl_coin": hl_coin,
+                "ticker": ticker,
+                "hl_coin": hl_coin,
                 "action": "close",
                 "side": "long" if is_long else "short",
                 "reason": f"{action} signal",
             })
 
-    closes = {t["hl_coin"] for t in trades if t["action"] == "close"}
-    remaining = {c: p for c, p in open_positions.items() if c not in closes}
+    closes = {
+        t["hl_coin"]
+        for t in trades
+        if t["action"] == "close"
+    }
+
+    remaining = {
+        c: p
+        for c, p in open_positions.items()
+        if c not in closes
+    }
+
     slots = max_positions - len(remaining)
 
     # Open new positions, prioritized by oscillator magnitude
     candidates = []
+
     for ticker, info in signals.items():
         hl_coin = HL_SYMBOL_MAP[ticker]
+
         if hl_coin in remaining:
             continue
+
         action = info["action"]
-        # Open on fresh entry (buy/enter_short) OR sync when strategy
-        # says we should be holding but we have no position.
+
+        # Keep original project behavior:
+        # open on fresh entry OR sync when strategy says it should be holding.
         if action in ("buy", "hold_long"):
-            reason = "buy signal" if action == "buy" else "sync to hold_long"
+            reason = (
+                "buy signal"
+                if action == "buy"
+                else "sync to hold_long"
+            )
+
             candidates.append({
-                "ticker": ticker, "hl_coin": hl_coin,
-                "action": "open_long", "side": "long",
+                "ticker": ticker,
+                "hl_coin": hl_coin,
+                "action": "open_long",
+                "side": "long",
                 "reason": reason,
                 "priority": abs(info["osc"]),
             })
+
         elif action in ("enter_short", "hold_short"):
-            reason = "enter_short signal" if action == "enter_short" else "sync to hold_short"
+            reason = (
+                "enter_short signal"
+                if action == "enter_short"
+                else "sync to hold_short"
+            )
+
             candidates.append({
-                "ticker": ticker, "hl_coin": hl_coin,
-                "action": "open_short", "side": "short",
+                "ticker": ticker,
+                "hl_coin": hl_coin,
+                "action": "open_short",
+                "side": "short",
                 "reason": reason,
                 "priority": abs(info["osc"]),
             })
 
     candidates.sort(key=lambda c: c["priority"], reverse=True)
     trades.extend(candidates[:slots])
+
     return trades
 
 
-def execute_trade(info, exchange, trade: dict, capital: float, leverage: float) -> dict:
+def execute_trade(
+    info,
+    exchange,
+    trade: dict,
+    capital: float,
+    leverage: float,
+) -> dict:
     coin = trade["hl_coin"]
+
     if trade["action"] == "close":
         resp = exchange.market_close(coin)
         return _parse_response(trade, resp, info, coin)
 
     mid = get_mid_price(info, coin)
-    notional = capital * POSITION_SIZE_PCT * leverage
+    calculated_notional = capital * POSITION_SIZE_PCT * leverage
+    is_testnet = os.environ.get("HL_TESTNET", "true").lower() == "true"
+
+    if is_testnet:
+        # Testnet: use a small buffer above Hyperliquid's $10 minimum so
+        # low-capital validation trades can actually be accepted.
+        notional = max(
+            calculated_notional,
+            TESTNET_MIN_ORDER_NOTIONAL,
+        )
+    else:
+        # Mainnet: never silently increase real-money risk above the
+        # strategy's calculated position size.
+        if calculated_notional < MAINNET_MIN_ORDER_NOTIONAL:
+            return {
+                **trade,
+                "status": "skipped",
+                "reason": (
+                    f"Calculated order ${calculated_notional:.2f} is below "
+                    f"the ${MAINNET_MIN_ORDER_NOTIONAL:.2f} minimum"
+                ),
+            }
+
+        notional = calculated_notional
+
+    # Do not let the testnet minimum exceed the capital pool multiplied by
+    # the strategy leverage.
+    max_notional = capital * max(leverage, 1.0)
+
+    if notional > max_notional:
+        return {
+            **trade,
+            "status": "skipped",
+            "reason": (
+                f"Capital pool too small for ${notional:.2f} minimum order"
+            ),
+        }
+
     raw_size = notional / mid
     sz_decimals = get_size_decimals(info, coin)
     size = round_size(raw_size, sz_decimals)
+
     if size <= 0:
-        return {**trade, "status": "skipped", "reason": "Size rounded to zero"}
+        return {
+            **trade,
+            "status": "skipped",
+            "reason": "Size rounded to zero",
+        }
 
     try:
         exchange.update_leverage(int(leverage), coin, True)
@@ -197,35 +308,57 @@ def execute_trade(info, exchange, trade: dict, capital: float, leverage: float) 
 
     is_buy = trade["action"] == "open_long"
     resp = exchange.market_open(coin, is_buy, size)
+
     return _parse_response(trade, resp, info, coin)
 
 
 # ── Guardrails ──────────────────────────────────────────────────────────────
 
 def kill_switch_off() -> bool:
-    return os.environ.get("INTRADAY_KILL_SWITCH", "ON").upper() == "OFF"
+    """Return True when intraday trading is halted."""
+    return os.environ.get(
+        "INTRADAY_KILL_SWITCH",
+        "ON",
+    ).upper() == "OFF"
 
 
-def check_daily_drawdown(state: dict, equity: float, threshold: float) -> tuple[bool, dict]:
+def check_daily_drawdown(
+    state: dict,
+    equity: float,
+    threshold: float,
+) -> tuple[bool, dict]:
     today = dt.date.today().isoformat()
     key = f"day_start_{today}"
     start = state.get(key)
     update = {}
+
     if start is None:
         update[key] = equity
         return False, update
-    dd = (equity - start) / start * 100 if start > 0 else 0
+
+    dd = (
+        (equity - start) / start * 100
+        if start > 0
+        else 0
+    )
+
     if dd <= -threshold:
         update["halted_today"] = today
-        update["halt_reason"] = f"Intraday DD {dd:.2f}% exceeded {-threshold}%"
+        update["halt_reason"] = (
+            f"Intraday DD {dd:.2f}% exceeded {-threshold}%"
+        )
         return True, update
+
     return False, update
 
 
 # ── Main ────────────────────────────────────────────────────────────────────
 
 def main():
-    print(f"Intraday executor started at {dt.datetime.now(dt.UTC).isoformat()}")
+    print(
+        "Intraday executor started at "
+        f"{dt.datetime.now(dt.UTC).isoformat()}"
+    )
 
     if kill_switch_off():
         print("Intraday KILL_SWITCH is OFF — halting")
@@ -240,81 +373,194 @@ def main():
 
     state = load_state()
     equity = get_account_equity(info, address)
-    threshold = float(os.environ.get("INTRADAY_DD_PCT", "5"))
-    halted, state_update = check_daily_drawdown(state, equity, threshold)
+    threshold = float(
+        os.environ.get("INTRADAY_DD_PCT", "5")
+    )
+
+    halted, state_update = check_daily_drawdown(
+        state,
+        equity,
+        threshold,
+    )
+
     state.update(state_update)
 
     if halted:
-        msg = f"Intraday halted: {state_update.get('halt_reason')}"
+        msg = (
+            "Intraday halted: "
+            f"{state_update.get('halt_reason')}"
+        )
         print(msg)
         _send_email([], msg)
         save_state(state)
         sys.exit(0)
 
     today = dt.date.today().isoformat()
+
     if state.get("halted_today") == today:
-        print(f"Already halted today: {state.get('halt_reason')}")
+        print(
+            "Already halted today: "
+            f"{state.get('halt_reason')}"
+        )
         sys.exit(0)
 
     signals = compute_intraday_signals()
     open_positions = get_open_positions(info, address)
-    capital = float(os.environ.get("INTRADAY_CAPITAL", "5000"))
-    max_positions = int(os.environ.get("INTRADAY_MAX_POSITIONS", "2"))
+    capital = float(
+        os.environ.get("INTRADAY_CAPITAL", "5000")
+    )
+    max_positions = int(
+        os.environ.get("INTRADAY_MAX_POSITIONS", "2")
+    )
 
     # Filter out assets not listed on this Hyperliquid environment
     available = set(info.all_mids().keys())
-    signals = {t: s for t, s in signals.items() if HL_SYMBOL_MAP[t] in available}
-    skipped = [t for t in ASSETS if t not in signals]
-    if skipped:
-        print(f"Skipping unavailable assets on this env: {skipped}")
+
+    signals = {
+        t: s
+        for t, s in signals.items()
+        if HL_SYMBOL_MAP[t] in available
+    }
+
+    skipped_assets = [
+        t
+        for t in ASSETS
+        if t not in signals
+    ]
+
+    if skipped_assets:
+        print(
+            "Skipping unavailable assets on this env: "
+            f"{skipped_assets}"
+        )
 
     # Ownership tracking: only manage positions this bot opened
-    owned_coins = set(state.get("owned_coins", []))
+    owned_coins = set(
+        state.get("owned_coins", [])
+    )
 
-    # Reconcile: drop owned coins that no longer have a position on the exchange
-    stale_owned = owned_coins - set(open_positions.keys())
+    stale_owned = (
+        owned_coins
+        - set(open_positions.keys())
+    )
+
     if stale_owned:
-        print(f"Dropping stale owned coins (no position on exchange): {stale_owned}")
+        print(
+            "Dropping stale owned coins "
+            f"(no position on exchange): {stale_owned}"
+        )
         owned_coins -= stale_owned
 
-    managed_positions = {c: p for c, p in open_positions.items() if c in owned_coins}
+    managed_positions = {
+        c: p
+        for c, p in open_positions.items()
+        if c in owned_coins
+    }
 
-    trades = decide_trades(signals, managed_positions, max_positions)
-    print(f"Decided on {len(trades)} intraday trade(s) (own {len(owned_coins)} position(s))")
+    trades = decide_trades(
+        signals,
+        managed_positions,
+        max_positions,
+    )
+
+    print(
+        f"Decided on {len(trades)} intraday trade(s) "
+        f"(own {len(owned_coins)} position(s))"
+    )
 
     results = []
+
     for trade in trades:
-        leverage = 2.0  # Fixed 2x for intraday; more conservative than daily
-        result = execute_trade(info, exchange, trade, capital, leverage)
+        leverage = 2.0
+
+        result = execute_trade(
+            info,
+            exchange,
+            trade,
+            capital,
+            leverage,
+        )
+
         results.append(result)
-        print(f"  {result['ticker']} {result['action']}: {result.get('status')}")
+
+        print(
+            f"  {result['ticker']} "
+            f"{result['action']}: "
+            f"{result.get('status')}"
+        )
 
         if result.get("status") == "filled":
             coin = result["hl_coin"]
+
             if result["action"] == "close":
                 owned_coins.discard(coin)
             else:
                 owned_coins.add(coin)
 
     history = state.get("history", [])
+
     for r in results:
         history.append({
-            "timestamp": dt.datetime.now(dt.UTC).isoformat(),
-            **{k: v for k, v in r.items() if k != "raw"},
+            "timestamp": dt.datetime.now(
+                dt.UTC
+            ).isoformat(),
+            **{
+                k: v
+                for k, v in r.items()
+                if k != "raw"
+            },
         })
+
     state["history"] = history[-500:]
     state["last_equity"] = equity
-    state["last_run"] = dt.datetime.now(dt.UTC).isoformat()
-    state["owned_coins"] = sorted(owned_coins)
-    latest = get_open_positions(info, address)
-    state["open_positions"] = {c: p for c, p in latest.items() if c in owned_coins}
+    state["last_run"] = dt.datetime.now(
+        dt.UTC
+    ).isoformat()
+    state["owned_coins"] = sorted(
+        owned_coins
+    )
+
+    latest = get_open_positions(
+        info,
+        address,
+    )
+
+    state["open_positions"] = {
+        c: p
+        for c, p in latest.items()
+        if c in owned_coins
+    }
+
     state["last_signals"] = signals
     save_state(state)
 
-    summary = f"{len(results)} intraday trade(s) | Equity: ${equity:,.2f}"
+    filled_count = sum(
+        1
+        for r in results
+        if r.get("status") == "filled"
+    )
+    error_count = sum(
+        1
+        for r in results
+        if r.get("status") == "error"
+    )
+    skipped_count = sum(
+        1
+        for r in results
+        if r.get("status") == "skipped"
+    )
+
+    summary = (
+        f"{filled_count} intraday filled"
+        f" | {error_count} error(s)"
+        f" | {skipped_count} skipped"
+        f" | Equity: ${equity:,.2f}"
+    )
+
     if results:
         _send_email(results, summary)
         _send_telegram(results, summary)
+
     print("Done")
 
 
