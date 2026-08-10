@@ -43,6 +43,7 @@ from backtester import get_asset_profile
 STATE_FILENAME = "aggressive_state.json"
 POSITION_SIZE_PCT = 0.015  # 1.5% per trade — higher than standard intraday
 PYRAMID_SIZE_PCT = 0.005   # 0.5% extra per pyramid add (max 2 adds)
+TESTNET_MIN_ORDER_NOTIONAL = 12.0  # buffer above Hyperliquid $10 minimum
 
 
 # ── State persistence (separate Gist) ───────────────────────────────────────
@@ -209,7 +210,25 @@ def execute_trade(info, exchange, trade: dict, capital: float, leverage: float) 
     mid = get_mid_price(info, coin)
     # Pyramid adds use smaller size
     size_pct = PYRAMID_SIZE_PCT if trade["action"].startswith("pyramid_") else POSITION_SIZE_PCT
-    notional = capital * size_pct * leverage
+    requested_notional = capital * size_pct * leverage
+
+    # On testnet only, raise tiny test orders above Hyperliquid's $10 minimum.
+    # On mainnet, never silently increase real-money risk: skip undersized orders.
+    is_testnet = os.environ.get("HL_TESTNET", "true").lower() == "true"
+    if is_testnet and requested_notional < TESTNET_MIN_ORDER_NOTIONAL:
+        notional = TESTNET_MIN_ORDER_NOTIONAL
+    elif (not is_testnet) and requested_notional < 10.0:
+        return {
+            **trade,
+            "status": "skipped",
+            "reason": (
+                f"Calculated order ${requested_notional:.2f} is below "
+                "Hyperliquid's $10 minimum"
+            ),
+        }
+    else:
+        notional = requested_notional
+
     raw_size = notional / mid
     sz_decimals = get_size_decimals(info, coin)
     size = round_size(raw_size, sz_decimals)
@@ -345,7 +364,15 @@ def main():
     state["last_signals"] = signals
     save_state(state)
 
-    summary = f"{len(results)} aggressive trade(s) | Equity: ${equity:,.2f}"
+    filled_count = sum(1 for r in results if r.get("status") == "filled")
+    error_count = sum(1 for r in results if r.get("status") == "error")
+    skipped_count = sum(1 for r in results if r.get("status") == "skipped")
+    summary = (
+        f"{filled_count} aggressive filled"
+        f" | {error_count} error(s)"
+        f" | {skipped_count} skipped"
+        f" | Equity: ${equity:,.2f}"
+    )
     if results:
         _send_email(results, summary)
         _send_telegram(results, summary)
