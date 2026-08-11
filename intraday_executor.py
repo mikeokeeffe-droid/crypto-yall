@@ -463,6 +463,22 @@ def main():
         max_positions,
     )
 
+    # Cross-bot position lock:
+    # The three bots share one Hyperliquid account but keep separate state.
+    # Block this bot from opening a coin that is already present on the
+    # exchange unless this bot owns it.
+    foreign_coins = set(open_positions.keys()) - owned_coins
+    if foreign_coins:
+        print(
+            "Cross-bot lock: coins owned elsewhere: "
+            f"{sorted(foreign_coins)}"
+        )
+        trades = [
+            t for t in trades
+            if t["action"] == "close"
+            or t["hl_coin"] not in foreign_coins
+        ]
+
     print(
         f"Decided on {len(trades)} intraday trade(s) "
         f"(own {len(owned_coins)} position(s))"
