@@ -583,7 +583,7 @@ def _send_telegram(results: list[dict], status_summary: str):
 
     for r in results:
         status = r.get("status", "?").upper()
-        lines.append(f"*{r['ticker']}* — {r['action']} [{status}]")
+        lines.append(f"{r['ticker']} — {r['action']} [{status}]")
 
         if r.get("status") == "filled":
             lines.append(
@@ -596,7 +596,7 @@ def _send_telegram(results: list[dict], status_summary: str):
         lines.append(f"  Reason: {r.get('reason', '')}")
         lines.append("")
 
-    lines.append(f"_{dt.datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}_")
+    lines.append(dt.datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC"))
     text = "\n".join(lines)
 
     for chat_id in chat_ids:
@@ -605,7 +605,6 @@ def _send_telegram(results: list[dict], status_summary: str):
             json={
                 "chat_id": chat_id,
                 "text": text,
-                "parse_mode": "Markdown",
             },
             timeout=15,
         )
