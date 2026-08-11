@@ -326,6 +326,18 @@ def main():
     pyramid_state = state.get("pyramid_state", {})
 
     trades = decide_trades(signals, managed_positions, max_positions, pyramid_state)
+
+    # Cross-bot position lock:
+    # Never open/pyramid a coin already present on the shared Hyperliquid
+    # account unless this aggressive bot owns it.
+    foreign_coins = set(open_positions.keys()) - owned_coins
+    if foreign_coins:
+        print(f"Cross-bot lock: coins owned elsewhere: {sorted(foreign_coins)}")
+        trades = [
+            t for t in trades
+            if t["action"] == "close" or t["hl_coin"] not in foreign_coins
+        ]
+
     print(f"Decided on {len(trades)} aggressive trade(s) (own {len(owned_coins)} position(s))")
 
     results = []
