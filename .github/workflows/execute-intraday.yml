@@ -29,6 +29,7 @@ jobs:
           INTRADAY_DD_PCT: ${{ vars.INTRADAY_DD_PCT }}
           INTRADAY_MAX_POSITIONS: ${{ vars.INTRADAY_MAX_POSITIONS }}
           INTRADAY_KILL_SWITCH: ${{ vars.INTRADAY_KILL_SWITCH }}
+          INTRADAY_TEST_NOTIONAL: ${{ vars.INTRADAY_TEST_NOTIONAL }}
           GIST_TOKEN: ${{ secrets.GIST_TOKEN }}
           INTRADAY_GIST_ID: ${{ secrets.INTRADAY_GIST_ID }}
           GMAIL_USER: ${{ secrets.GMAIL_USER }}
