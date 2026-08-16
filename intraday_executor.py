@@ -253,6 +253,7 @@ def execute_trade(
 
     mid = get_mid_price(info, coin)
     calculated_notional = capital * POSITION_SIZE_PCT * leverage
+    test_notional = float(os.environ.get("INTRADAY_TEST_NOTIONAL", "0") or 0)
     is_testnet = os.environ.get("HL_TESTNET", "true").lower() == "true"
 
     if is_testnet:
@@ -263,6 +264,8 @@ def execute_trade(
             TESTNET_MIN_ORDER_NOTIONAL,
         )
     else:
+    if test_notional > 0:
+        calculated_notional = test_notional
         # Mainnet: never silently increase real-money risk above the
         # strategy's calculated position size.
         if calculated_notional < MAINNET_MIN_ORDER_NOTIONAL:
