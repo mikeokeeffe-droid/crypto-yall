@@ -264,8 +264,8 @@ def execute_trade(
             TESTNET_MIN_ORDER_NOTIONAL,
         )
     else:
-    if test_notional > 0:
-        calculated_notional = test_notional
+        if test_notional > 0:
+            calculated_notional = test_notional
         # Mainnet: never silently increase real-money risk above the
         # strategy's calculated position size.
         if calculated_notional < MAINNET_MIN_ORDER_NOTIONAL:
