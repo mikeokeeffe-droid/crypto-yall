@@ -211,10 +211,16 @@ def execute_trade(info, exchange, trade: dict, capital: float, leverage: float) 
     # Pyramid adds use smaller size
     size_pct = PYRAMID_SIZE_PCT if trade["action"].startswith("pyramid_") else POSITION_SIZE_PCT
     requested_notional = capital * size_pct * leverage
+    test_notional = float(os.environ.get("AGGRESSIVE_TEST_NOTIONAL", "0") or 0)
 
     # On testnet only, raise tiny test orders above Hyperliquid's $10 minimum.
     # On mainnet, never silently increase real-money risk: skip undersized orders.
     is_testnet = os.environ.get("HL_TESTNET", "true").lower() == "true"
+
+    # Optional controlled mainnet test size for NEW positions only.
+    # Pyramid adds keep their normal smaller strategy sizing.
+    if (not is_testnet) and test_notional > 0 and not trade["action"].startswith("pyramid_"):
+        requested_notional = test_notional
     if is_testnet and requested_notional < TESTNET_MIN_ORDER_NOTIONAL:
         notional = TESTNET_MIN_ORDER_NOTIONAL
     elif (not is_testnet) and requested_notional < 10.0:
