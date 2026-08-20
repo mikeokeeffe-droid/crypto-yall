@@ -1,0 +1,50 @@
+name: Manual Signal Check
+
+on:
+  workflow_dispatch: {}
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Show current signals
+        run: |
+          python - <<'PY'
+          from notifier import check_all_signals
+
+          signals = check_all_signals()
+
+          print("\n===== CURRENT SIGNALS =====\n")
+
+          for ticker in ["ETH-USD", "SOL-USD", "LINK-USD"]:
+              modes = signals.get(ticker)
+
+              if not modes:
+                  print(f"{ticker}: NO SIGNAL DATA")
+                  continue
+
+              for mode, info in modes.items():
+                  print(
+                      f"{ticker} | "
+                      f"{mode.upper()} | "
+                      f"signal={info['signal']} | "
+                      f"action={info['action']} | "
+                      f"regime={info['regime']} | "
+                      f"price=${info['price']:.2f} | "
+                      f"bull_conf={info['bull_conf']:.1%}"
+                  )
+
+              print()
+          PY
