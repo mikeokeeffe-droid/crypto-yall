@@ -435,30 +435,65 @@ def check_kill_switch() -> bool:
 
 def check_daily_drawdown(
     state: dict,
-    current_equity: float,
+    info,
+    address: str,
+    capital: float,
     threshold_pct: float,
 ) -> tuple[bool, dict]:
-    """Check if today's drawdown exceeds threshold."""
+    """
+    Check this bot's daily P&L against its own allocated capital.
+
+    Uses only positions listed in owned_coins plus realized P&L tracked by this
+    bot. This avoids false halts caused by deposits, withdrawals, or the other
+    bots sharing the same Hyperliquid account.
+    """
     today = dt.date.today().isoformat()
-    day_key = f"day_start_{today}"
-    day_start = state.get(day_key)
+    open_positions = get_open_positions(info, address)
+    owned_coins = set(state.get("owned_coins", []))
 
-    update = {}
+    realized_total = float(
+        state.get("realized_pnl_total", 0.0) or 0.0
+    )
+    unrealized = sum(
+        float(open_positions[coin].get("unrealized_pnl", 0.0) or 0.0)
+        for coin in owned_coins
+        if coin in open_positions
+    )
 
-    if day_start is None:
-        update[day_key] = current_equity
+    # Continuous bot-only P&L marker. When a position closes through this bot,
+    # its unrealized P&L is replaced by realized_pnl_total so the marker does
+    # not jump merely because the trade moved from open to closed.
+    pnl_marker = realized_total + unrealized
+    day_key = f"bot_day_start_pnl_{today}"
+    start_marker = state.get(day_key)
+
+    update = {
+        "last_bot_pnl_marker": pnl_marker,
+        "last_bot_unrealized_pnl": unrealized,
+        "last_bot_realized_pnl_total": realized_total,
+    }
+
+    if start_marker is None:
+        update[day_key] = pnl_marker
+        update["last_bot_daily_pnl"] = 0.0
+        update["last_bot_dd_pct"] = 0.0
         return False, update
 
+    daily_pnl = pnl_marker - float(start_marker)
     drawdown_pct = (
-        (current_equity - day_start) / day_start * 100
-        if day_start > 0
-        else 0
+        daily_pnl / capital * 100
+        if capital > 0
+        else 0.0
     )
+
+    update["last_bot_daily_pnl"] = daily_pnl
+    update["last_bot_dd_pct"] = drawdown_pct
 
     if drawdown_pct <= -threshold_pct:
         update["halted_today"] = today
         update["halt_reason"] = (
-            f"Daily DD {drawdown_pct:.2f}% exceeded {-threshold_pct}%"
+            f"Daily bot DD {drawdown_pct:.2f}% exceeded {-threshold_pct}% "
+            f"(daily P&L ${daily_pnl:.2f} on ${capital:.2f} capital)"
         )
         return True, update
 
@@ -638,13 +673,16 @@ def main():
         send_execution_notifications([], f"CLIENT INIT FAILED: {e}")
         sys.exit(1)
 
-    # Load state and check drawdown
+    # Load state and check this bot's own drawdown
     state = load_trading_state()
     equity = get_account_equity(info, address)
+    capital = float(os.environ.get("SEGREGATED_CAPITAL", "10000"))
     dd_threshold = float(os.environ.get("DAILY_DD_PCT", "5"))
     halted, state_update = check_daily_drawdown(
         state,
-        equity,
+        info,
+        address,
+        capital,
         dd_threshold,
     )
     state.update(state_update)
@@ -669,7 +707,6 @@ def main():
     # Compute signals and decide trades
     signals = compute_all_signals()
     open_positions = get_open_positions(info, address)
-    capital = float(os.environ.get("SEGREGATED_CAPITAL", "10000"))
     max_positions = int(os.environ.get("MAX_POSITIONS", "4"))
 
     # Filter out assets not listed on this Hyperliquid environment
@@ -753,6 +790,31 @@ def main():
             coin = result["hl_coin"]
 
             if result["action"] == "close":
+                previous = managed_positions.get(coin)
+
+                if previous is not None:
+                    entry_px = float(previous["entry_px"])
+                    fill_px = float(result.get("fill_price", entry_px))
+                    fill_size = abs(float(
+                        result.get("fill_size", previous["size"])
+                    ))
+
+                    if float(previous["size"]) > 0:
+                        realized_pnl = (fill_px - entry_px) * fill_size
+                    else:
+                        realized_pnl = (entry_px - fill_px) * fill_size
+
+                    result["realized_pnl"] = realized_pnl
+                    state["realized_pnl_total"] = (
+                        float(state.get("realized_pnl_total", 0.0) or 0.0)
+                        + realized_pnl
+                    )
+
+                    print(
+                        f"    Realized P&L: ${realized_pnl:.4f} "
+                        f"| bot total: ${state['realized_pnl_total']:.4f}"
+                    )
+
                 owned_coins.discard(coin)
             else:
                 owned_coins.add(coin)
