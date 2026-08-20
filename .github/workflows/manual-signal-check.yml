@@ -19,10 +19,18 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Show actual bot signals
+      - name: Show all bot signals and Hyperliquid positions
+        env:
+          HL_PRIVATE_KEY: ${{ secrets.HL_PRIVATE_KEY }}
+          HL_ACCOUNT_ADDRESS: ${{ secrets.HL_ACCOUNT_ADDRESS }}
+          HL_TESTNET: ${{ secrets.HL_TESTNET }}
         run: |
           python - <<'PY'
-          from hyperliquid_executor import compute_all_signals as compute_daily
+          from hyperliquid_executor import (
+              compute_all_signals as compute_daily,
+              get_client,
+              get_open_positions,
+          )
           from aggressive_executor import compute_aggressive_signals
           from intraday_executor import compute_intraday_signals
 
@@ -30,35 +38,59 @@ jobs:
           aggressive = compute_aggressive_signals()
           intraday = compute_intraday_signals()
 
-          print("\n===== ACTUAL BOT SIGNALS =====\n")
+          print("\n===== DAILY BOT SIGNALS =====\n")
 
-          eth = daily.get("ETH-USD")
-          if eth:
+          for ticker, data in sorted(daily.items()):
               print(
-                  f"ETH-USD | DAILY | "
-                  f"signal={eth['signal']} | "
-                  f"action={eth['action']} | "
-                  f"regime={eth['regime']} | "
-                  f"price=${eth['price']:.2f}"
+                  f"{ticker} | DAILY | "
+                  f"signal={data.get('signal')} | "
+                  f"action={data.get('action')} | "
+                  f"regime={data.get('regime')} | "
+                  f"price=${data.get('price', 0):.2f}"
               )
 
-          sol = aggressive.get("SOL-USD")
-          if sol:
+          print("\n===== AGGRESSIVE BOT SIGNALS — 30m =====\n")
+
+          for ticker, data in sorted(aggressive.items()):
               print(
-                  f"SOL-USD | AGGRESSIVE 30m | "
-                  f"signal={sol['signal']} | "
-                  f"action={sol['action']} | "
-                  f"price=${sol['price']:.2f} | "
-                  f"osc={sol['osc']:.4f}"
+                  f"{ticker} | AGGRESSIVE 30m | "
+                  f"signal={data.get('signal')} | "
+                  f"action={data.get('action')} | "
+                  f"price=${data.get('price', 0):.2f} | "
+                  f"osc={data.get('osc', 0):.4f}"
               )
 
-          link = intraday.get("LINK-USD")
-          if link:
+          print("\n===== INTRADAY BOT SIGNALS — 1h =====\n")
+
+          for ticker, data in sorted(intraday.items()):
               print(
-                  f"LINK-USD | INTRADAY 1h | "
-                  f"signal={link['signal']} | "
-                  f"action={link['action']} | "
-                  f"price=${link['price']:.2f} | "
-                  f"osc={link['osc']:.4f}"
+                  f"{ticker} | INTRADAY 1h | "
+                  f"signal={data.get('signal')} | "
+                  f"action={data.get('action')} | "
+                  f"price=${data.get('price', 0):.2f} | "
+                  f"osc={data.get('osc', 0):.4f}"
               )
+
+          print("\n===== HYPERLIQUID OPEN POSITIONS =====\n")
+
+          try:
+              info, exchange, address = get_client()
+              positions = get_open_positions(info, address)
+
+              if not positions:
+                  print("No open positions")
+              else:
+                  for coin, pos in sorted(positions.items()):
+                      side = "LONG" if pos["size"] > 0 else "SHORT"
+
+                      print(
+                          f"{coin} | {side} | "
+                          f"size={abs(pos['size'])} | "
+                          f"entry=${pos['entry_px']:.4f} | "
+                          f"uPnL=${pos['unrealized_pnl']:.2f}"
+                      )
+
+          except Exception as e:
+              print(f"Could not load Hyperliquid positions: {e}")
+
           PY
