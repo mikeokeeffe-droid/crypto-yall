@@ -1,50 +1,43 @@
-name: Manual Signal Check
-
-on:
-  workflow_dispatch: {}
-
-jobs:
-  check:
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-          cache: pip
-
-      - name: Install dependencies
-        run: pip install -r requirements.txt
-
-      - name: Show current signals
+      - name: Show actual bot signals
         run: |
           python - <<'PY'
-          from notifier import check_all_signals
+          from hyperliquid_executor import compute_all_signals as compute_daily
+          from aggressive_executor import compute_aggressive_signals
+          from intraday_executor import compute_intraday_signals
 
-          signals = check_all_signals()
+          daily = compute_daily()
+          aggressive = compute_aggressive_signals()
+          intraday = compute_intraday_signals()
 
-          print("\n===== CURRENT SIGNALS =====\n")
+          print("\n===== ACTUAL BOT SIGNALS =====\n")
 
-          for ticker in ["ETH-USD", "SOL-USD", "LINK-USD"]:
-              modes = signals.get(ticker)
+          eth = daily.get("ETH-USD")
+          if eth:
+              print(
+                  f"ETH-USD | DAILY | "
+                  f"signal={eth['signal']} | "
+                  f"action={eth['action']} | "
+                  f"regime={eth['regime']} | "
+                  f"price=${eth['price']:.2f}"
+              )
 
-              if not modes:
-                  print(f"{ticker}: NO SIGNAL DATA")
-                  continue
+          sol = aggressive.get("SOL-USD")
+          if sol:
+              print(
+                  f"SOL-USD | AGGRESSIVE 30m | "
+                  f"signal={sol['signal']} | "
+                  f"action={sol['action']} | "
+                  f"price=${sol['price']:.2f} | "
+                  f"osc={sol['osc']:.4f}"
+              )
 
-              for mode, info in modes.items():
-                  print(
-                      f"{ticker} | "
-                      f"{mode.upper()} | "
-                      f"signal={info['signal']} | "
-                      f"action={info['action']} | "
-                      f"regime={info['regime']} | "
-                      f"price=${info['price']:.2f} | "
-                      f"bull_conf={info['bull_conf']:.1%}"
-                  )
-
-              print()
+          link = intraday.get("LINK-USD")
+          if link:
+              print(
+                  f"LINK-USD | INTRADAY 1h | "
+                  f"signal={link['signal']} | "
+                  f"action={link['action']} | "
+                  f"price=${link['price']:.2f} | "
+                  f"osc={link['osc']:.4f}"
+              )
           PY
