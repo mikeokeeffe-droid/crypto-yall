@@ -50,6 +50,7 @@ HL_TICKER_MAP = {
     "LINK-USD": "LINK",
     "SUI20947-USD": "SUI",
     "XRP-USD": "XRP",
+    "ONDO-USD": "ONDO",
 }
 
 ASSETS = {
@@ -60,6 +61,7 @@ ASSETS = {
     "LINK-USD": "Chainlink (LINK)",
     "SUI20947-USD": "Sui (SUI)",
     "XRP-USD": "XRP",
+    "ONDO-USD": "ONDO",
 }
 
 STATE_FILENAME = "crypto_yall_state.json"
