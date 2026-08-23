@@ -654,6 +654,54 @@ def _send_telegram(results: list[dict], status_summary: str):
             )
 
 
+
+def update_peak_tracking(state: dict, positions: dict, owned_coins: set[str]) -> None:
+    """
+    Track the best unrealized profit seen for each currently owned position.
+
+    Observation-only: this does not open, close, resize, or otherwise
+    change any trade.
+    """
+    peak_pnl = {
+        str(k): float(v)
+        for k, v in (state.get("peak_pnl", {}) or {}).items()
+    }
+    peak_return_pct = {
+        str(k): float(v)
+        for k, v in (state.get("peak_return_pct", {}) or {}).items()
+    }
+
+    for coin in list(peak_pnl):
+        if coin not in owned_coins:
+            peak_pnl.pop(coin, None)
+    for coin in list(peak_return_pct):
+        if coin not in owned_coins:
+            peak_return_pct.pop(coin, None)
+
+    for coin in owned_coins:
+        pos = positions.get(coin)
+        if not pos:
+            continue
+
+        current_pnl = float(pos.get("unrealized_pnl", 0.0) or 0.0)
+        peak_pnl[coin] = max(
+            float(peak_pnl.get(coin, 0.0) or 0.0),
+            current_pnl,
+        )
+
+        entry_px = float(pos.get("entry_px", 0.0) or 0.0)
+        size = abs(float(pos.get("size", 0.0) or 0.0))
+        if entry_px > 0 and size > 0:
+            current_return_pct = current_pnl / (entry_px * size) * 100.0
+            peak_return_pct[coin] = max(
+                float(peak_return_pct.get(coin, 0.0) or 0.0),
+                current_return_pct,
+            )
+
+    state["peak_pnl"] = peak_pnl
+    state["peak_return_pct"] = peak_return_pct
+
+
 # ── Main ────────────────────────────────────────────────────────────────────
 
 def main():
@@ -738,6 +786,9 @@ def main():
         if c in owned_coins
     }
 
+    # Observation-only peak-profit tracking for currently owned positions.
+    update_peak_tracking(state, managed_positions, owned_coins)
+
     trades = decide_trades(
         signals,
         managed_positions,
@@ -807,6 +858,25 @@ def main():
                         realized_pnl = (entry_px - fill_px) * fill_size
 
                     result["realized_pnl"] = realized_pnl
+
+                    peak_pnl = float(
+                        (state.get("peak_pnl", {}) or {}).get(coin, 0.0) or 0.0
+                    )
+                    peak_return_pct = float(
+                        (state.get("peak_return_pct", {}) or {}).get(coin, 0.0) or 0.0
+                    )
+                    entry_notional = entry_px * fill_size
+                    realized_return_pct = (
+                        realized_pnl / entry_notional * 100.0
+                        if entry_notional > 0
+                        else 0.0
+                    )
+
+                    result["peak_unrealized_pnl"] = peak_pnl
+                    result["peak_return_pct"] = peak_return_pct
+                    result["realized_return_pct"] = realized_return_pct
+                    result["profit_giveback"] = peak_pnl - realized_pnl
+
                     state["realized_pnl_total"] = (
                         float(state.get("realized_pnl_total", 0.0) or 0.0)
                         + realized_pnl
@@ -814,10 +884,14 @@ def main():
 
                     print(
                         f"    Realized P&L: ${realized_pnl:.4f} "
+                        f"| peak: ${peak_pnl:.4f} "
+                        f"| giveback: ${result['profit_giveback']:.4f} "
                         f"| bot total: ${state['realized_pnl_total']:.4f}"
                     )
 
                 owned_coins.discard(coin)
+                state.setdefault("peak_pnl", {}).pop(coin, None)
+                state.setdefault("peak_return_pct", {}).pop(coin, None)
             else:
                 owned_coins.add(coin)
 
@@ -845,6 +919,9 @@ def main():
         for c, p in latest_positions.items()
         if c in owned_coins
     }
+
+    # Refresh peaks after any fills so newly opened positions are tracked too.
+    update_peak_tracking(state, state["open_positions"], owned_coins)
 
     save_trading_state(state)
 
