@@ -580,7 +580,7 @@ def _send_email(results: list[dict], status_summary: str):
     html = f"""
     <div style="font-family:Arial,Helvetica,sans-serif;background:#ffffff;color:#1a1a1a;padding:24px;border:1px solid #e1e4e8;border-radius:8px;max-width:760px;">
         <h2 style="color:#0969da;margin:0 0 8px 0;">Crypto Y'all Trade Execution</h2>
-        <p style="color:#57606a;margin:0 0 8px 0;">{dt.datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}</p>
+        <p style="color:#57606a;margin:0 0 8px 0;">{dt.datetime.now(dt.UTC).strftime('%Y-%m-%d %H:%M UTC')}</p>
         <p style="color:#1a1a1a;margin:0 0 16px 0;"><strong>Status:</strong> {status_summary}</p>
         {table_or_empty}
     </div>
@@ -633,7 +633,7 @@ def _send_telegram(results: list[dict], status_summary: str):
         lines.append(f"  Reason: {r.get('reason', '')}")
         lines.append("")
 
-    lines.append(dt.datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC"))
+    lines.append(dt.datetime.now(dt.UTC).strftime("%Y-%m-%d %H:%M UTC"))
     text = "\n".join(lines)
 
     for chat_id in chat_ids:
@@ -657,7 +657,7 @@ def _send_telegram(results: list[dict], status_summary: str):
 # ── Main ────────────────────────────────────────────────────────────────────
 
 def main():
-    print(f"Trade executor started at {dt.datetime.utcnow().isoformat()}Z")
+    print(f"Trade executor started at {dt.datetime.now(dt.UTC).isoformat()}")
 
     # Kill switch check
     if check_kill_switch():
@@ -826,7 +826,7 @@ def main():
 
     for r in results:
         history.append({
-            "timestamp": dt.datetime.utcnow().isoformat() + "Z",
+            "timestamp": dt.datetime.now(dt.UTC).isoformat(),
             **{
                 k: v
                 for k, v in r.items()
@@ -836,7 +836,7 @@ def main():
 
     state["history"] = history[-500:]
     state["last_equity"] = equity
-    state["last_run"] = dt.datetime.utcnow().isoformat() + "Z"
+    state["last_run"] = dt.datetime.now(dt.UTC).isoformat()
     state["owned_coins"] = sorted(owned_coins)
 
     latest_positions = get_open_positions(info, address)
