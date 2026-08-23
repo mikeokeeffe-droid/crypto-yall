@@ -99,14 +99,24 @@ def save_trading_state(state: dict):
     gist_token = os.environ.get("GIST_TOKEN")
     gist_id = os.environ.get("GIST_ID")
     if not gist_token or not gist_id:
-        return
+        raise RuntimeError(
+            "Cannot save daily state: GIST_TOKEN or GIST_ID is missing"
+        )
 
-    requests.patch(
+    resp = requests.patch(
         f"https://api.github.com/gists/{gist_id}",
         headers={"Authorization": f"token {gist_token}"},
         json={"files": {STATE_FILENAME: {"content": json.dumps(state, indent=2)}}},
         timeout=15,
     )
+
+    if not resp.ok:
+        raise RuntimeError(
+            f"Failed to save daily state to Gist: "
+            f"HTTP {resp.status_code} {resp.text}"
+        )
+
+    print("Daily state saved successfully")
 
 
 # ── Hyperliquid Client ──────────────────────────────────────────────────────
