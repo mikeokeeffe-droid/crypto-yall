@@ -181,7 +181,7 @@ def send_email(transitions: list[dict]):
     html = f"""
     <div style="font-family:Arial,Helvetica,sans-serif;background:#ffffff;color:#1a1a1a;padding:24px;border:1px solid #e1e4e8;border-radius:8px;max-width:760px;">
         <h2 style="color:#0969da;margin:0 0 8px 0;">Crypto Y'all Signal Alert</h2>
-        <p style="color:#57606a;margin:0 0 16px 0;">{dt.datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}</p>
+        <p style="color:#57606a;margin:0 0 16px 0;">{dt.datetime.now(dt.UTC).strftime('%Y-%m-%d %H:%M UTC')}</p>
         <table style="width:100%;border-collapse:collapse;margin-top:16px;background:#ffffff;">
             <tr style="background:#f6f8fa;color:#57606a;text-transform:uppercase;font-size:0.75em;letter-spacing:0.5px;">
                 <th style="padding:10px;text-align:left;">Asset</th>
@@ -228,7 +228,7 @@ def send_telegram(transitions: list[dict]):
         lines.append(f"  Price: ${t['price']:,.2f} | Previous: {t['prev_action'] or 'N/A'}")
         lines.append("")
 
-    lines.append(f"_{dt.datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}_")
+    lines.append(f"_{dt.datetime.now(dt.UTC).strftime('%Y-%m-%d %H:%M UTC')}_")
 
     text = "\n".join(lines)
     for chat_id in chat_ids:
@@ -246,7 +246,7 @@ def send_telegram(transitions: list[dict]):
 # ── Main ─────────────────────────────────────────────────────────────────────
 
 def main():
-    print(f"Signal check started at {dt.datetime.utcnow().isoformat()}Z")
+    print(f"Signal check started at {dt.datetime.now(dt.UTC).isoformat()}")
 
     previous = load_state()
     current = check_all_signals()
@@ -268,7 +268,7 @@ def main():
 
     # Save current state
     state = {
-        "last_checked": dt.datetime.utcnow().isoformat() + "Z",
+        "last_checked": dt.datetime.now(dt.UTC).isoformat(),
         "signals": current,
     }
     save_state(state)
