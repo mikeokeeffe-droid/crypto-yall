@@ -148,6 +148,87 @@ def update_peak_tracking(state: dict, positions: dict, owned_coins: set[str]) ->
     state["peak_return_pct"] = peak_return_pct
 
 
+
+def update_flat_tracking(state: dict, signals: dict, owned_coins: set[str]) -> None:
+    """
+    Passively track how long an owned Intraday position remains on a flat signal.
+
+    This is observation-only. It does not open, close, resize, rotate, or
+    otherwise change any trade.
+
+    flat_count counts distinct UTC hourly checks, so manually running the
+    workflow more than once in the same hour will not inflate the count.
+    """
+    flat_count = {
+        str(k): int(v)
+        for k, v in (state.get("flat_count", {}) or {}).items()
+    }
+    flat_since = {
+        str(k): str(v)
+        for k, v in (state.get("flat_since", {}) or {}).items()
+    }
+    flat_last_counted_hour = {
+        str(k): str(v)
+        for k, v in (state.get("flat_last_counted_hour", {}) or {}).items()
+    }
+
+    # Remove tracking for positions this bot no longer owns.
+    for store in (flat_count, flat_since, flat_last_counted_hour):
+        for coin in list(store):
+            if coin not in owned_coins:
+                store.pop(coin, None)
+
+    signal_by_coin = {}
+    for ticker, info in signals.items():
+        coin = HL_SYMBOL_MAP.get(ticker)
+        if coin:
+            signal_by_coin[coin] = info
+
+    now = dt.datetime.now(dt.UTC)
+    now_iso = now.isoformat()
+    hour_key = now.strftime("%Y-%m-%dT%H:00Z")
+
+    for coin in owned_coins:
+        info = signal_by_coin.get(coin)
+
+        # If signal data is unavailable, preserve the existing observation
+        # rather than incorrectly resetting it.
+        if info is None:
+            continue
+
+        action = info.get("action")
+
+        if action == "flat":
+            if coin not in flat_since:
+                flat_since[coin] = now_iso
+
+            # Count only once per UTC hour.
+            if flat_last_counted_hour.get(coin) != hour_key:
+                flat_count[coin] = int(flat_count.get(coin, 0) or 0) + 1
+                flat_last_counted_hour[coin] = hour_key
+
+            print(
+                f"Flat tracking: {coin} "
+                f"count={flat_count.get(coin, 0)} "
+                f"since={flat_since.get(coin)}"
+            )
+        else:
+            # A non-flat signal ends the consecutive flat run.
+            if coin in flat_count or coin in flat_since:
+                print(
+                    f"Flat tracking reset: {coin} "
+                    f"action={action}"
+                )
+
+            flat_count.pop(coin, None)
+            flat_since.pop(coin, None)
+            flat_last_counted_hour.pop(coin, None)
+
+    state["flat_count"] = flat_count
+    state["flat_since"] = flat_since
+    state["flat_last_counted_hour"] = flat_last_counted_hour
+
+
 # ── Signal computation ─────────────────────────────────────────────────────
 
 def compute_intraday_signals() -> dict:
@@ -557,8 +638,9 @@ def main():
         if c in owned_coins
     }
 
-    # Observation-only peak-profit tracking for currently owned positions.
+    # Observation-only tracking for currently owned positions.
     update_peak_tracking(state, managed_positions, owned_coins)
+    update_flat_tracking(state, signals, owned_coins)
 
     trades = decide_trades(
         signals,
@@ -662,6 +744,9 @@ def main():
                 owned_coins.discard(coin)
                 state.setdefault("peak_pnl", {}).pop(coin, None)
                 state.setdefault("peak_return_pct", {}).pop(coin, None)
+                state.setdefault("flat_count", {}).pop(coin, None)
+                state.setdefault("flat_since", {}).pop(coin, None)
+                state.setdefault("flat_last_counted_hour", {}).pop(coin, None)
             else:
                 owned_coins.add(coin)
 
