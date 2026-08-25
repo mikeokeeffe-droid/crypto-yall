@@ -1,8 +1,6 @@
 name: Execute Intraday
 
 on:
-  schedule:
-    - cron: '5 * * * *'       # Every hour at :05 UTC
   workflow_dispatch: {}
 
 jobs:
