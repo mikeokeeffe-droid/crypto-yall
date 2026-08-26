@@ -42,6 +42,10 @@ def fetch_candles(
 
     Returns DataFrame with columns [Open, High, Low, Close, Volume] and a
     DatetimeIndex (UTC, timezone-naive to match daily loader).
+
+    Only fully closed candles are returned. Hyperliquid can include the
+    currently-forming candle in candleSnapshot results, so unfinished candles
+    are discarded before the strategy sees them.
     """
     coin = HL_SYMBOL_MAP.get(ticker, ticker)
     end_ms = int(time.time() * 1000)
@@ -72,12 +76,50 @@ def fetch_candles(
     if not candles:
         return pd.DataFrame(columns=["Open", "High", "Low", "Close", "Volume"])
 
+    # Use only fully closed candles.
+    # Hyperliquid can return the candle that is still forming.
+    closed_candles = []
+
+    for candle in candles:
+        candle_end_ms = candle.get("T")
+
+        if candle_end_ms is None:
+            continue
+
+        if int(candle_end_ms) <= end_ms:
+            closed_candles.append(candle)
+
+    discarded = len(candles) - len(closed_candles)
+
+    if discarded:
+        print(
+            f"Discarded {discarded} unfinished "
+            f"{interval} candle(s) for {coin}"
+        )
+
+    candles = closed_candles
+
+    if not candles:
+        return pd.DataFrame(
+            columns=["Open", "High", "Low", "Close", "Volume"]
+        )
+
     df = pd.DataFrame(candles)
     df["timestamp"] = pd.to_datetime(df["t"], unit="ms")
-    df = df.rename(columns={"o": "Open", "h": "High", "l": "Low", "c": "Close", "v": "Volume"})
+    df = df.rename(
+        columns={
+            "o": "Open",
+            "h": "High",
+            "l": "Low",
+            "c": "Close",
+            "v": "Volume",
+        }
+    )
     df = df[["timestamp", "Open", "High", "Low", "Close", "Volume"]]
+
     for col in ["Open", "High", "Low", "Close", "Volume"]:
         df[col] = df[col].astype(float)
+
     df = df.set_index("timestamp").sort_index()
     df.index.name = "Date"
     return df
@@ -90,10 +132,18 @@ def fetch_all_intraday(
 ) -> dict[str, pd.DataFrame]:
     """Fetch candles for multiple tickers."""
     data = {}
+
     for t in tickers:
         try:
-            data[t] = fetch_candles(t, interval=interval, lookback_hours=lookback_hours)
+            data[t] = fetch_candles(
+                t,
+                interval=interval,
+                lookback_hours=lookback_hours,
+            )
         except Exception as e:
             print(f"Error fetching {t}: {e}")
-            data[t] = pd.DataFrame(columns=["Open", "High", "Low", "Close", "Volume"])
+            data[t] = pd.DataFrame(
+                columns=["Open", "High", "Low", "Close", "Volume"]
+            )
+
     return data
