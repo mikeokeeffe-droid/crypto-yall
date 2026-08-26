@@ -3,9 +3,17 @@ name: Execute Aggressive
 on:
   workflow_dispatch: {}
 
+permissions:
+  contents: read
+
+concurrency:
+  group: execute-aggressive-live
+  cancel-in-progress: false
+
 jobs:
   trade:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
 
