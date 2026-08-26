@@ -10,7 +10,7 @@ import os
 import requests
 
 
-DAILY_STATE_FILE = "trading_state.json"
+DAILY_STATE_FILE = "crypto_yall_state.json"
 INTRADAY_STATE_FILE = "intraday_state.json"
 AGGRESSIVE_STATE_FILE = "aggressive_state.json"
 
