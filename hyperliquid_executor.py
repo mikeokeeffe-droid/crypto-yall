@@ -766,6 +766,50 @@ def _send_telegram(results: list[dict], status_summary: str):
                 f"  Size: {r.get('fill_size', 0):.6g} @ "
                 f"${r.get('fill_price', 0):,.2f}"
             )
+
+            # On a completed close, show the trade's realized result.
+            # Intraday and Aggressive use this same Telegram function, so
+            # this automatically applies to all three live bots.
+            if r.get("action") == "close" and "realized_pnl" in r:
+                realized_pnl = float(r.get("realized_pnl", 0.0) or 0.0)
+                pnl_sign = "+" if realized_pnl >= 0 else ""
+                lines.append(
+                    f"  Net P/L: {pnl_sign}${realized_pnl:.4f}"
+                )
+
+                if "trading_fees" in r:
+                    trading_fees = float(
+                        r.get("trading_fees", 0.0) or 0.0
+                    )
+                    lines.append(
+                        f"  Trading fees: ${trading_fees:.4f}"
+                    )
+
+                if "gross_closed_pnl" in r:
+                    gross_pnl = float(
+                        r.get("gross_closed_pnl", 0.0) or 0.0
+                    )
+                    gross_sign = "+" if gross_pnl >= 0 else ""
+                    lines.append(
+                        f"  Gross P/L: {gross_sign}${gross_pnl:.4f}"
+                    )
+
+                if "peak_unrealized_pnl" in r:
+                    peak_pnl = float(
+                        r.get("peak_unrealized_pnl", 0.0) or 0.0
+                    )
+                    lines.append(
+                        f"  Peak unrealized: ${peak_pnl:.4f}"
+                    )
+
+                if "profit_giveback" in r:
+                    giveback = float(
+                        r.get("profit_giveback", 0.0) or 0.0
+                    )
+                    lines.append(
+                        f"  Profit giveback: ${giveback:.4f}"
+                    )
+
         elif r.get("error"):
             lines.append(f"  Error: {r['error']}")
 
