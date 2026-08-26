@@ -18,6 +18,11 @@ def main():
     account_address = os.environ.get("HL_ACCOUNT_ADDRESS")
     is_testnet = os.environ.get("HL_TESTNET", "true").lower() == "true"
 
+    if not is_testnet:
+        print("SAFETY STOP: Test Trade is disabled on MAINNET.")
+        print("No order was placed.")
+        return
+
     if not priv_key or not account_address:
         print("ERROR: HL_PRIVATE_KEY and HL_ACCOUNT_ADDRESS must be set")
         return
