@@ -1,11 +1,19 @@
 name: Execute Trades
 
 on:
-  workflow_dispatch: {}       # Manual trigger for testing
+  workflow_dispatch: {}       # Manual/API trigger
+
+permissions:
+  contents: read
+
+concurrency:
+  group: execute-trades-live
+  cancel-in-progress: false
 
 jobs:
   trade:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
 
