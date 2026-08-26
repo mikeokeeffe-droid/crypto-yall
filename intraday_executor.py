@@ -36,6 +36,8 @@ from hyperliquid_executor import (
     _parse_response,
     _send_email,
     _send_telegram,
+    get_order_fill_totals,
+    find_latest_open_history_record,
 )
 from backtester import get_asset_profile
 
@@ -96,7 +98,6 @@ def load_state() -> dict:
 
     print("Intraday state loaded successfully")
     return state
-
 
 def save_state(state: dict):
     gist_token = os.environ.get("GIST_TOKEN")
@@ -171,7 +172,6 @@ def update_peak_tracking(state: dict, positions: dict, owned_coins: set[str]) ->
     state["peak_return_pct"] = peak_return_pct
 
 
-
 def update_flat_tracking(state: dict, signals: dict, owned_coins: set[str]) -> None:
     """
     Passively track how long an owned Intraday position remains on a flat signal.
@@ -195,7 +195,6 @@ def update_flat_tracking(state: dict, signals: dict, owned_coins: set[str]) -> N
         for k, v in (state.get("flat_last_counted_hour", {}) or {}).items()
     }
 
-    # Remove tracking for positions this bot no longer owns.
     for store in (flat_count, flat_since, flat_last_counted_hour):
         for coin in list(store):
             if coin not in owned_coins:
@@ -213,9 +212,6 @@ def update_flat_tracking(state: dict, signals: dict, owned_coins: set[str]) -> N
 
     for coin in owned_coins:
         info = signal_by_coin.get(coin)
-
-        # If signal data is unavailable, preserve the existing observation
-        # rather than incorrectly resetting it.
         if info is None:
             continue
 
@@ -225,7 +221,6 @@ def update_flat_tracking(state: dict, signals: dict, owned_coins: set[str]) -> N
             if coin not in flat_since:
                 flat_since[coin] = now_iso
 
-            # Count only once per UTC hour.
             if flat_last_counted_hour.get(coin) != hour_key:
                 flat_count[coin] = int(flat_count.get(coin, 0) or 0) + 1
                 flat_last_counted_hour[coin] = hour_key
@@ -236,7 +231,6 @@ def update_flat_tracking(state: dict, signals: dict, owned_coins: set[str]) -> N
                 f"since={flat_since.get(coin)}"
             )
         else:
-            # A non-flat signal ends the consecutive flat run.
             if coin in flat_count or coin in flat_since:
                 print(
                     f"Flat tracking reset: {coin} "
@@ -716,6 +710,19 @@ def main():
         if result.get("status") == "filled":
             coin = result["hl_coin"]
 
+            fill_totals = get_order_fill_totals(
+                info,
+                address,
+                result.get("oid"),
+                coin,
+            )
+
+            if fill_totals is not None:
+                result["exchange_fee"] = fill_totals["fee"]
+                result["exchange_closed_pnl"] = fill_totals["closed_pnl"]
+                result["exchange_fill_count"] = fill_totals["fill_count"]
+                result["fee_tokens"] = fill_totals["fee_tokens"]
+
             if result["action"] == "close":
                 previous = managed_positions.get(coin)
 
@@ -727,17 +734,73 @@ def main():
                     ))
 
                     if float(previous["size"]) > 0:
-                        realized_pnl = (fill_px - entry_px) * fill_size
+                        fallback_gross_pnl = (
+                            fill_px - entry_px
+                        ) * fill_size
                     else:
-                        realized_pnl = (entry_px - fill_px) * fill_size
+                        fallback_gross_pnl = (
+                            entry_px - fill_px
+                        ) * fill_size
 
+                    if fill_totals is not None:
+                        gross_closed_pnl = fill_totals["closed_pnl"]
+                        closing_fee = fill_totals["fee"]
+                        pnl_source = "hyperliquid_closedPnl"
+                    else:
+                        gross_closed_pnl = fallback_gross_pnl
+                        closing_fee = 0.0
+                        pnl_source = "price_fallback"
+
+                    history_so_far = state.get("history", []) or []
+                    opening_record = find_latest_open_history_record(
+                        history_so_far,
+                        coin,
+                    )
+
+                    opening_fee = 0.0
+                    opening_fee_found = False
+
+                    if opening_record is not None:
+                        if "exchange_fee" in opening_record:
+                            opening_fee = float(
+                                opening_record.get("exchange_fee", 0.0) or 0.0
+                            )
+                            opening_fee_found = True
+                        elif opening_record.get("oid") is not None:
+                            opening_totals = get_order_fill_totals(
+                                info,
+                                address,
+                                opening_record.get("oid"),
+                                coin,
+                            )
+                            if opening_totals is not None:
+                                opening_fee = opening_totals["fee"]
+                                opening_fee_found = True
+
+                    trading_fees = opening_fee + closing_fee
+                    realized_pnl = gross_closed_pnl - trading_fees
+
+                    result["gross_closed_pnl"] = gross_closed_pnl
+                    result["opening_fee"] = opening_fee
+                    result["closing_fee"] = closing_fee
+                    result["trading_fees"] = trading_fees
                     result["realized_pnl"] = realized_pnl
+                    result["pnl_source"] = pnl_source
+                    result["fee_data_complete"] = (
+                        fill_totals is not None and opening_fee_found
+                    )
 
                     peak_pnl = float(
-                        (state.get("peak_pnl", {}) or {}).get(coin, 0.0) or 0.0
+                        (state.get("peak_pnl", {}) or {}).get(
+                            coin,
+                            0.0,
+                        ) or 0.0
                     )
                     peak_return_pct = float(
-                        (state.get("peak_return_pct", {}) or {}).get(coin, 0.0) or 0.0
+                        (state.get("peak_return_pct", {}) or {}).get(
+                            coin,
+                            0.0,
+                        ) or 0.0
                     )
                     entry_notional = entry_px * fill_size
                     realized_return_pct = (
@@ -757,12 +820,25 @@ def main():
                     )
 
                     print(
-                        f"    Realized P&L: ${realized_pnl:.4f} "
+                        f"    Hyperliquid gross P&L: "
+                        f"${gross_closed_pnl:.4f} "
+                        f"| trading fees: ${trading_fees:.4f} "
+                        f"(open ${opening_fee:.4f} + "
+                        f"close ${closing_fee:.4f})"
+                    )
+                    print(
+                        f"    Net realized P&L: ${realized_pnl:.4f} "
                         f"| peak: ${peak_pnl:.4f} "
                         f"| giveback: ${result['profit_giveback']:.4f} "
                         f"| bot total: "
                         f"${state['realized_pnl_total']:.4f}"
                     )
+
+                    if not result["fee_data_complete"]:
+                        print(
+                            "    Note: fee history was incomplete; "
+                            "net P&L may omit an older opening fee"
+                        )
 
                 owned_coins.discard(coin)
                 state.setdefault("peak_pnl", {}).pop(coin, None)
