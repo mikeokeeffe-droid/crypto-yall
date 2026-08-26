@@ -38,6 +38,9 @@ from hyperliquid_executor import (
     _send_telegram,
     get_order_fill_totals,
     find_latest_open_history_record,
+    get_position_funding,
+    record_position_open_time,
+    clear_position_open_time,
 )
 from backtester import get_asset_profile
 
@@ -647,6 +650,8 @@ def main():
             "Dropping stale owned coins "
             f"(no position on exchange): {stale_owned}"
         )
+        for stale_coin in stale_owned:
+            clear_position_open_time(state, stale_coin)
         owned_coins -= stale_owned
 
     managed_positions = {
@@ -722,6 +727,7 @@ def main():
                 result["exchange_closed_pnl"] = fill_totals["closed_pnl"]
                 result["exchange_fill_count"] = fill_totals["fill_count"]
                 result["fee_tokens"] = fill_totals["fee_tokens"]
+                result["fill_time_ms"] = fill_totals["first_time"]
 
             if result["action"] == "close":
                 previous = managed_positions.get(coin)
@@ -778,14 +784,46 @@ def main():
                                 opening_fee_found = True
 
                     trading_fees = opening_fee + closing_fee
-                    realized_pnl = gross_closed_pnl - trading_fees
+
+                    funding_info = get_position_funding(
+                        state,
+                        info,
+                        address,
+                        coin,
+                        (
+                            fill_totals.get("last_time")
+                            if fill_totals is not None
+                            else None
+                        ),
+                    )
+                    funding_pnl = float(
+                        funding_info.get("funding_pnl", 0.0) or 0.0
+                    )
+
+                    # Final realized trade result:
+                    # exchange closed P&L - trading fees + funding.
+                    realized_pnl = (
+                        gross_closed_pnl
+                        - trading_fees
+                        + funding_pnl
+                    )
 
                     result["gross_closed_pnl"] = gross_closed_pnl
                     result["opening_fee"] = opening_fee
                     result["closing_fee"] = closing_fee
                     result["trading_fees"] = trading_fees
+                    result["funding_pnl"] = funding_pnl
+                    result["funding_count"] = funding_info["funding_count"]
+                    result["funding_data_complete"] = (
+                        funding_info["funding_data_complete"]
+                    )
+                    result["funding_start_time_ms"] = (
+                        funding_info["funding_start_time_ms"]
+                    )
                     result["realized_pnl"] = realized_pnl
-                    result["pnl_source"] = pnl_source
+                    result["pnl_source"] = (
+                        f"{pnl_source}+userFunding"
+                    )
                     result["fee_data_complete"] = (
                         fill_totals is not None and opening_fee_found
                     )
@@ -824,7 +862,8 @@ def main():
                         f"${gross_closed_pnl:.4f} "
                         f"| trading fees: ${trading_fees:.4f} "
                         f"(open ${opening_fee:.4f} + "
-                        f"close ${closing_fee:.4f})"
+                        f"close ${closing_fee:.4f}) "
+                        f"| funding: ${funding_pnl:+.4f}"
                     )
                     print(
                         f"    Net realized P&L: ${realized_pnl:.4f} "
@@ -840,7 +879,14 @@ def main():
                             "net P&L may omit an older opening fee"
                         )
 
+                    if not result["funding_data_complete"]:
+                        print(
+                            "    Note: funding history start time was "
+                            "incomplete; funding P&L may be understated"
+                        )
+
                 owned_coins.discard(coin)
+                clear_position_open_time(state, coin)
                 state.setdefault("peak_pnl", {}).pop(coin, None)
                 state.setdefault("peak_return_pct", {}).pop(coin, None)
                 state.setdefault("flat_count", {}).pop(coin, None)
@@ -848,6 +894,11 @@ def main():
                 state.setdefault("flat_last_counted_hour", {}).pop(coin, None)
             else:
                 owned_coins.add(coin)
+                record_position_open_time(
+                    state,
+                    coin,
+                    fill_totals,
+                )
 
     history = state.get("history", [])
 
