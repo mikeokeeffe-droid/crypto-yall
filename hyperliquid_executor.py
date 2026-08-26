@@ -524,6 +524,12 @@ def get_order_fill_totals(
                 if fill.get("feeToken")
             })
 
+            fill_times = [
+                int(fill.get("time", 0) or 0)
+                for fill in matching
+                if int(fill.get("time", 0) or 0) > 0
+            ]
+
             return {
                 "closed_pnl": sum(
                     float(fill.get("closedPnl", 0.0) or 0.0)
@@ -535,6 +541,8 @@ def get_order_fill_totals(
                 ),
                 "fee_tokens": fee_tokens,
                 "fill_count": len(matching),
+                "first_time": min(fill_times) if fill_times else None,
+                "last_time": max(fill_times) if fill_times else None,
             }
 
         if attempt < attempts - 1:
@@ -565,6 +573,172 @@ def find_latest_open_history_record(history: list[dict], coin: str) -> dict | No
             break
 
     return None
+
+
+
+def _history_time_ms(item: dict) -> int | None:
+    """Return a history item's best available timestamp in milliseconds."""
+    fill_time_ms = item.get("fill_time_ms")
+    if fill_time_ms is not None:
+        try:
+            value = int(fill_time_ms)
+            if value > 0:
+                return value
+        except (TypeError, ValueError):
+            pass
+
+    raw = item.get("timestamp")
+    if not raw:
+        return None
+
+    try:
+        parsed = dt.datetime.fromisoformat(str(raw).replace("Z", "+00:00"))
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=dt.UTC)
+        return int(parsed.timestamp() * 1000)
+    except (TypeError, ValueError):
+        return None
+
+
+def get_position_open_time_ms(
+    state: dict,
+    coin: str,
+) -> tuple[int | None, bool]:
+    """
+    Return the current position's opening time in milliseconds.
+
+    New positions use the persisted exchange fill time. Existing positions
+    created before this upgrade fall back to trade history.
+    """
+    stored = (state.get("position_opened_at_ms", {}) or {}).get(coin)
+    if stored is not None:
+        try:
+            stored_ms = int(stored)
+            if stored_ms > 0:
+                return stored_ms, True
+        except (TypeError, ValueError):
+            pass
+
+    fallback_ms = None
+    history = state.get("history", []) or []
+
+    for item in reversed(history):
+        if item.get("hl_coin") != coin:
+            continue
+        if item.get("status") != "filled":
+            continue
+
+        action = item.get("action")
+
+        if action == "close":
+            break
+
+        if action in (
+            "open_long",
+            "open_short",
+            "pyramid_long",
+            "pyramid_short",
+        ):
+            item_ms = _history_time_ms(item)
+            if item_ms is not None:
+                fallback_ms = item_ms
+
+            if action in ("open_long", "open_short"):
+                return item_ms, item_ms is not None
+
+    # If old history was truncated and only a pyramid record remains, use the
+    # earliest available point but mark the funding result incomplete.
+    return fallback_ms, False
+
+
+def record_position_open_time(
+    state: dict,
+    coin: str,
+    fill_totals: dict | None,
+) -> None:
+    """Persist the opening exchange-fill time for funding attribution."""
+    opened = state.setdefault("position_opened_at_ms", {})
+
+    if coin in opened:
+        return
+
+    fill_time = None
+    if fill_totals is not None:
+        fill_time = fill_totals.get("first_time")
+
+    if fill_time is None:
+        fill_time = int(dt.datetime.now(dt.UTC).timestamp() * 1000)
+
+    opened[coin] = int(fill_time)
+
+
+def clear_position_open_time(state: dict, coin: str) -> None:
+    """Remove funding-attribution state after a completed close."""
+    state.setdefault("position_opened_at_ms", {}).pop(coin, None)
+
+
+def get_position_funding(
+    state: dict,
+    info,
+    address: str,
+    coin: str,
+    end_time_ms: int | None = None,
+) -> dict:
+    """
+    Sum Hyperliquid funding received/paid while this bot owned the position.
+
+    Positive USDC means funding received; negative USDC means funding paid.
+    Cross-bot coin locking makes the coin's funding attributable to the bot
+    that owns that position during this window.
+    """
+    start_time_ms, start_complete = get_position_open_time_ms(state, coin)
+
+    if start_time_ms is None:
+        return {
+            "funding_pnl": 0.0,
+            "funding_count": 0,
+            "funding_data_complete": False,
+            "funding_start_time_ms": None,
+        }
+
+    if end_time_ms is None:
+        end_time_ms = int(dt.datetime.now(dt.UTC).timestamp() * 1000)
+
+    try:
+        records = info.user_funding_history(
+            address,
+            int(start_time_ms),
+            int(end_time_ms),
+        )
+    except Exception as e:
+        print(
+            f"Warning: could not read Hyperliquid funding for "
+            f"{coin}: {e}"
+        )
+        return {
+            "funding_pnl": 0.0,
+            "funding_count": 0,
+            "funding_data_complete": False,
+            "funding_start_time_ms": start_time_ms,
+        }
+
+    matching = []
+    for record in records or []:
+        delta = record.get("delta", {}) or {}
+        if delta.get("coin") == coin:
+            matching.append(record)
+
+    funding_pnl = sum(
+        float((record.get("delta", {}) or {}).get("usdc", 0.0) or 0.0)
+        for record in matching
+    )
+
+    return {
+        "funding_pnl": funding_pnl,
+        "funding_count": len(matching),
+        "funding_data_complete": bool(start_complete),
+        "funding_start_time_ms": start_time_ms,
+    }
 
 
 # ── Guardrails ──────────────────────────────────────────────────────────────
@@ -783,6 +957,15 @@ def _send_telegram(results: list[dict], status_summary: str):
                     )
                     lines.append(
                         f"  Trading fees: ${trading_fees:.4f}"
+                    )
+
+                if "funding_pnl" in r:
+                    funding_pnl = float(
+                        r.get("funding_pnl", 0.0) or 0.0
+                    )
+                    funding_sign = "+" if funding_pnl >= 0 else ""
+                    lines.append(
+                        f"  Funding: {funding_sign}${funding_pnl:.4f}"
                     )
 
                 if "gross_closed_pnl" in r:
@@ -1040,6 +1223,7 @@ def main():
                 result["exchange_closed_pnl"] = fill_totals["closed_pnl"]
                 result["exchange_fill_count"] = fill_totals["fill_count"]
                 result["fee_tokens"] = fill_totals["fee_tokens"]
+                result["fill_time_ms"] = fill_totals["first_time"]
 
             if result["action"] == "close":
                 previous = managed_positions.get(coin)
@@ -1102,14 +1286,46 @@ def main():
                                 opening_fee_found = True
 
                     trading_fees = opening_fee + closing_fee
-                    realized_pnl = gross_closed_pnl - trading_fees
+
+                    funding_info = get_position_funding(
+                        state,
+                        info,
+                        address,
+                        coin,
+                        (
+                            fill_totals.get("last_time")
+                            if fill_totals is not None
+                            else None
+                        ),
+                    )
+                    funding_pnl = float(
+                        funding_info.get("funding_pnl", 0.0) or 0.0
+                    )
+
+                    # Final trade result:
+                    # exchange closed P&L - trading fees + funding received/paid.
+                    realized_pnl = (
+                        gross_closed_pnl
+                        - trading_fees
+                        + funding_pnl
+                    )
 
                     result["gross_closed_pnl"] = gross_closed_pnl
                     result["opening_fee"] = opening_fee
                     result["closing_fee"] = closing_fee
                     result["trading_fees"] = trading_fees
+                    result["funding_pnl"] = funding_pnl
+                    result["funding_count"] = funding_info["funding_count"]
+                    result["funding_data_complete"] = (
+                        funding_info["funding_data_complete"]
+                    )
+                    result["funding_start_time_ms"] = (
+                        funding_info["funding_start_time_ms"]
+                    )
                     result["realized_pnl"] = realized_pnl
-                    result["pnl_source"] = pnl_source
+                    result["pnl_source"] = (
+                        f"{pnl_source}+userFunding"
+                    )
                     result["fee_data_complete"] = (
                         fill_totals is not None and opening_fee_found
                     )
@@ -1153,7 +1369,8 @@ def main():
                         f"${gross_closed_pnl:.4f} "
                         f"| trading fees: ${trading_fees:.4f} "
                         f"(open ${opening_fee:.4f} + "
-                        f"close ${closing_fee:.4f})"
+                        f"close ${closing_fee:.4f}) "
+                        f"| funding: ${funding_pnl:+.4f}"
                     )
                     print(
                         f"    Net realized P&L: ${realized_pnl:.4f} "
@@ -1170,11 +1387,23 @@ def main():
                             "net P&L may omit an older opening fee"
                         )
 
+                    if not result["funding_data_complete"]:
+                        print(
+                            "    Note: funding history start time was "
+                            "incomplete; funding P&L may be understated"
+                        )
+
                 owned_coins.discard(coin)
+                clear_position_open_time(state, coin)
                 state.setdefault("peak_pnl", {}).pop(coin, None)
                 state.setdefault("peak_return_pct", {}).pop(coin, None)
             else:
                 owned_coins.add(coin)
+                record_position_open_time(
+                    state,
+                    coin,
+                    fill_totals,
+                )
 
     # Append to trade history
     history = state.get("history", [])
