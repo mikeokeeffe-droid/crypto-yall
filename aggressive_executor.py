@@ -36,6 +36,7 @@ from hyperliquid_executor import (
     _parse_response,
     _send_email,
     _send_telegram,
+    get_order_fill_totals,
 )
 from backtester import get_asset_profile
 
@@ -167,6 +168,73 @@ def update_peak_tracking(state: dict, positions: dict, owned_coins: set[str]) ->
 
     state["peak_pnl"] = peak_pnl
     state["peak_return_pct"] = peak_return_pct
+
+
+def get_position_entry_fees(
+    state: dict,
+    info,
+    address: str,
+    coin: str,
+) -> tuple[float, bool]:
+    """
+    Sum all trading fees paid to build the current Aggressive position.
+
+    Includes the original open plus any pyramid adds since the last completed
+    close. Older history entries that do not yet contain exchange_fee are
+    backfilled from Hyperliquid using their saved order ID.
+    """
+    history = state.get("history", []) or []
+    relevant = []
+
+    for item in reversed(history):
+        if item.get("hl_coin") != coin:
+            continue
+        if item.get("status") != "filled":
+            continue
+
+        action = item.get("action")
+
+        if action == "close":
+            break
+
+        if action in (
+            "open_long",
+            "open_short",
+            "pyramid_long",
+            "pyramid_short",
+        ):
+            relevant.append(item)
+
+    if not relevant:
+        return 0.0, False
+
+    total_fee = 0.0
+    complete = True
+
+    for item in relevant:
+        if "exchange_fee" in item:
+            total_fee += float(item.get("exchange_fee", 0.0) or 0.0)
+            continue
+
+        oid = item.get("oid")
+        if oid is None:
+            complete = False
+            continue
+
+        totals = get_order_fill_totals(
+            info,
+            address,
+            oid,
+            coin,
+        )
+
+        if totals is None:
+            complete = False
+            continue
+
+        total_fee += totals["fee"]
+
+    return total_fee, complete
 
 
 # ── Signal computation ─────────────────────────────────────────────────────
@@ -519,6 +587,23 @@ def main():
 
         if result.get("status") == "filled":
             coin = result["hl_coin"]
+
+            # Store Hyperliquid's exact fee / closedPnl for every order.
+            # This includes opening orders and pyramid adds so the eventual
+            # close can calculate complete round-trip trading costs.
+            fill_totals = get_order_fill_totals(
+                info,
+                address,
+                result.get("oid"),
+                coin,
+            )
+
+            if fill_totals is not None:
+                result["exchange_fee"] = fill_totals["fee"]
+                result["exchange_closed_pnl"] = fill_totals["closed_pnl"]
+                result["exchange_fill_count"] = fill_totals["fill_count"]
+                result["fee_tokens"] = fill_totals["fee_tokens"]
+
             if result["action"] == "close":
                 previous = managed_positions.get(coin)
 
@@ -529,18 +614,59 @@ def main():
                         result.get("fill_size", previous["size"])
                     ))
 
+                    # Price-based fallback only. Hyperliquid closedPnl is
+                    # preferred because it reflects the exchange's own fill
+                    # accounting across the whole position.
                     if float(previous["size"]) > 0:
-                        realized_pnl = (fill_px - entry_px) * fill_size
+                        fallback_gross_pnl = (
+                            fill_px - entry_px
+                        ) * fill_size
                     else:
-                        realized_pnl = (entry_px - fill_px) * fill_size
+                        fallback_gross_pnl = (
+                            entry_px - fill_px
+                        ) * fill_size
 
+                    if fill_totals is not None:
+                        gross_closed_pnl = fill_totals["closed_pnl"]
+                        closing_fee = fill_totals["fee"]
+                        pnl_source = "hyperliquid_closedPnl"
+                    else:
+                        gross_closed_pnl = fallback_gross_pnl
+                        closing_fee = 0.0
+                        pnl_source = "price_fallback"
+
+                    entry_fees, entry_fees_complete = get_position_entry_fees(
+                        state,
+                        info,
+                        address,
+                        coin,
+                    )
+
+                    trading_fees = entry_fees + closing_fee
+                    realized_pnl = gross_closed_pnl - trading_fees
+
+                    result["gross_closed_pnl"] = gross_closed_pnl
+                    result["entry_and_pyramid_fees"] = entry_fees
+                    result["closing_fee"] = closing_fee
+                    result["trading_fees"] = trading_fees
                     result["realized_pnl"] = realized_pnl
+                    result["pnl_source"] = pnl_source
+                    result["fee_data_complete"] = (
+                        fill_totals is not None
+                        and entry_fees_complete
+                    )
 
                     peak_pnl = float(
-                        (state.get("peak_pnl", {}) or {}).get(coin, 0.0) or 0.0
+                        (state.get("peak_pnl", {}) or {}).get(
+                            coin,
+                            0.0,
+                        ) or 0.0
                     )
                     peak_return_pct = float(
-                        (state.get("peak_return_pct", {}) or {}).get(coin, 0.0) or 0.0
+                        (state.get("peak_return_pct", {}) or {}).get(
+                            coin,
+                            0.0,
+                        ) or 0.0
                     )
                     entry_notional = entry_px * fill_size
                     realized_return_pct = (
@@ -560,11 +686,25 @@ def main():
                     )
 
                     print(
-                        f"    Realized P&L: ${realized_pnl:.4f} "
+                        f"    Hyperliquid gross P&L: "
+                        f"${gross_closed_pnl:.4f} "
+                        f"| trading fees: ${trading_fees:.4f} "
+                        f"(entries/pyramids ${entry_fees:.4f} + "
+                        f"close ${closing_fee:.4f})"
+                    )
+                    print(
+                        f"    Net realized P&L: ${realized_pnl:.4f} "
                         f"| peak: ${peak_pnl:.4f} "
                         f"| giveback: ${result['profit_giveback']:.4f} "
-                        f"| bot total: ${state['realized_pnl_total']:.4f}"
+                        f"| bot total: "
+                        f"${state['realized_pnl_total']:.4f}"
                     )
+
+                    if not result["fee_data_complete"]:
+                        print(
+                            "    Note: fee history was incomplete; "
+                            "net P&L may omit an older entry/pyramid fee"
+                        )
 
                 owned_coins.discard(coin)
                 pyramid_state.pop(coin, None)
