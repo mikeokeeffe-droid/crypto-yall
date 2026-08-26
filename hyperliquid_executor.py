@@ -21,6 +21,7 @@ Required environment variables:
 import json
 import os
 import sys
+import time
 import datetime as dt
 from decimal import Decimal, ROUND_DOWN
 
@@ -480,6 +481,92 @@ def _parse_response(trade: dict, resp: dict, info, coin: str) -> dict:
     return result
 
 
+def get_order_fill_totals(
+    info,
+    address: str,
+    oid,
+    coin: str,
+    attempts: int = 3,
+) -> dict | None:
+    """
+    Return Hyperliquid's exact fill accounting for one order.
+
+    Partial fills sharing the same order ID are summed.  closedPnl is the
+    exchange-reported gross closed P&L; fee is kept separate so the bot can
+    calculate net realized P&L after trading fees.
+    """
+    if oid is None:
+        return None
+
+    oid_text = str(oid)
+
+    for attempt in range(attempts):
+        try:
+            fills = info.user_fills(address)
+        except Exception as e:
+            print(
+                f"Warning: could not read Hyperliquid fills for "
+                f"{coin} order {oid}: {e}"
+            )
+            fills = []
+
+        matching = [
+            fill
+            for fill in fills
+            if str(fill.get("oid")) == oid_text
+            and fill.get("coin") == coin
+        ]
+
+        if matching:
+            fee_tokens = sorted({
+                str(fill.get("feeToken", ""))
+                for fill in matching
+                if fill.get("feeToken")
+            })
+
+            return {
+                "closed_pnl": sum(
+                    float(fill.get("closedPnl", 0.0) or 0.0)
+                    for fill in matching
+                ),
+                "fee": sum(
+                    float(fill.get("fee", 0.0) or 0.0)
+                    for fill in matching
+                ),
+                "fee_tokens": fee_tokens,
+                "fill_count": len(matching),
+            }
+
+        if attempt < attempts - 1:
+            time.sleep(0.5)
+
+    print(
+        f"Warning: Hyperliquid fill details not found for "
+        f"{coin} order {oid}; using fallback accounting"
+    )
+    return None
+
+
+def find_latest_open_history_record(history: list[dict], coin: str) -> dict | None:
+    """Find the most recent filled opening trade for a currently open coin."""
+    for item in reversed(history):
+        if item.get("hl_coin") != coin:
+            continue
+        if item.get("status") != "filled":
+            continue
+
+        action = item.get("action")
+        if action in ("open_long", "open_short"):
+            return item
+
+        # If we encounter a completed close first, there should not be an
+        # earlier opening record belonging to the current position.
+        if action == "close":
+            break
+
+    return None
+
+
 # ── Guardrails ──────────────────────────────────────────────────────────────
 
 def check_kill_switch() -> bool:
@@ -894,6 +981,22 @@ def main():
         if result.get("status") == "filled":
             coin = result["hl_coin"]
 
+            # Attach the exchange's exact fee / closedPnl for this order.
+            # This also records opening fees in history so the eventual close
+            # can calculate full round-trip trading costs.
+            fill_totals = get_order_fill_totals(
+                info,
+                address,
+                result.get("oid"),
+                coin,
+            )
+
+            if fill_totals is not None:
+                result["exchange_fee"] = fill_totals["fee"]
+                result["exchange_closed_pnl"] = fill_totals["closed_pnl"]
+                result["exchange_fill_count"] = fill_totals["fill_count"]
+                result["fee_tokens"] = fill_totals["fee_tokens"]
+
             if result["action"] == "close":
                 previous = managed_positions.get(coin)
 
@@ -904,18 +1007,80 @@ def main():
                         result.get("fill_size", previous["size"])
                     ))
 
+                    # Price-based gross P&L remains as a safe fallback if
+                    # Hyperliquid's fill-history lookup is temporarily missing.
                     if float(previous["size"]) > 0:
-                        realized_pnl = (fill_px - entry_px) * fill_size
+                        fallback_gross_pnl = (
+                            fill_px - entry_px
+                        ) * fill_size
                     else:
-                        realized_pnl = (entry_px - fill_px) * fill_size
+                        fallback_gross_pnl = (
+                            entry_px - fill_px
+                        ) * fill_size
 
+                    if fill_totals is not None:
+                        gross_closed_pnl = fill_totals["closed_pnl"]
+                        closing_fee = fill_totals["fee"]
+                        pnl_source = "hyperliquid_closedPnl"
+                    else:
+                        gross_closed_pnl = fallback_gross_pnl
+                        closing_fee = 0.0
+                        pnl_source = "price_fallback"
+
+                    # Find the opening order for this exact Daily position.
+                    # Newer history entries already contain exchange_fee.
+                    # For older positions, retrieve the opening fee from
+                    # Hyperliquid by the saved opening order ID.
+                    history_so_far = state.get("history", []) or []
+                    opening_record = find_latest_open_history_record(
+                        history_so_far,
+                        coin,
+                    )
+
+                    opening_fee = 0.0
+                    opening_fee_found = False
+
+                    if opening_record is not None:
+                        if "exchange_fee" in opening_record:
+                            opening_fee = float(
+                                opening_record.get("exchange_fee", 0.0) or 0.0
+                            )
+                            opening_fee_found = True
+                        elif opening_record.get("oid") is not None:
+                            opening_totals = get_order_fill_totals(
+                                info,
+                                address,
+                                opening_record.get("oid"),
+                                coin,
+                            )
+                            if opening_totals is not None:
+                                opening_fee = opening_totals["fee"]
+                                opening_fee_found = True
+
+                    trading_fees = opening_fee + closing_fee
+                    realized_pnl = gross_closed_pnl - trading_fees
+
+                    result["gross_closed_pnl"] = gross_closed_pnl
+                    result["opening_fee"] = opening_fee
+                    result["closing_fee"] = closing_fee
+                    result["trading_fees"] = trading_fees
                     result["realized_pnl"] = realized_pnl
+                    result["pnl_source"] = pnl_source
+                    result["fee_data_complete"] = (
+                        fill_totals is not None and opening_fee_found
+                    )
 
                     peak_pnl = float(
-                        (state.get("peak_pnl", {}) or {}).get(coin, 0.0) or 0.0
+                        (state.get("peak_pnl", {}) or {}).get(
+                            coin,
+                            0.0,
+                        ) or 0.0
                     )
                     peak_return_pct = float(
-                        (state.get("peak_return_pct", {}) or {}).get(coin, 0.0) or 0.0
+                        (state.get("peak_return_pct", {}) or {}).get(
+                            coin,
+                            0.0,
+                        ) or 0.0
                     )
                     entry_notional = entry_px * fill_size
                     realized_return_pct = (
@@ -930,16 +1095,36 @@ def main():
                     result["profit_giveback"] = peak_pnl - realized_pnl
 
                     state["realized_pnl_total"] = (
-                        float(state.get("realized_pnl_total", 0.0) or 0.0)
+                        float(
+                            state.get(
+                                "realized_pnl_total",
+                                0.0,
+                            ) or 0.0
+                        )
                         + realized_pnl
                     )
 
                     print(
-                        f"    Realized P&L: ${realized_pnl:.4f} "
-                        f"| peak: ${peak_pnl:.4f} "
-                        f"| giveback: ${result['profit_giveback']:.4f} "
-                        f"| bot total: ${state['realized_pnl_total']:.4f}"
+                        f"    Hyperliquid gross P&L: "
+                        f"${gross_closed_pnl:.4f} "
+                        f"| trading fees: ${trading_fees:.4f} "
+                        f"(open ${opening_fee:.4f} + "
+                        f"close ${closing_fee:.4f})"
                     )
+                    print(
+                        f"    Net realized P&L: ${realized_pnl:.4f} "
+                        f"| peak: ${peak_pnl:.4f} "
+                        f"| giveback: "
+                        f"${result['profit_giveback']:.4f} "
+                        f"| bot total: "
+                        f"${state['realized_pnl_total']:.4f}"
+                    )
+
+                    if not result["fee_data_complete"]:
+                        print(
+                            "    Note: fee history was incomplete; "
+                            "net P&L may omit an older opening fee"
+                        )
 
                 owned_coins.discard(coin)
                 state.setdefault("peak_pnl", {}).pop(coin, None)
