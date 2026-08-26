@@ -347,7 +347,7 @@ def decide_trades(
         if c not in closes
     }
 
-    slots = max_positions - len(remaining)
+    slots = max(0, max_positions - len(remaining))
 
     # Open new positions, prioritized by oscillator magnitude
     candidates = []
