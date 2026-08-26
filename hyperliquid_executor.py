@@ -120,7 +120,6 @@ def load_trading_state() -> dict:
     print("Daily state loaded successfully")
     return state
 
-
 def save_trading_state(state: dict):
     gist_token = os.environ.get("GIST_TOKEN")
     gist_id = os.environ.get("GIST_ID")
@@ -391,21 +390,38 @@ def execute_trade(info, exchange, trade: dict, capital: float, leverage: float) 
         return _parse_response(trade, resp, info, coin)
 
     mid = get_mid_price(info, coin)
-    calculated_notional = capital * POSITION_SIZE_PCT * leverage
-    notional = max(calculated_notional, MIN_ORDER_NOTIONAL)
+    requested_notional = capital * POSITION_SIZE_PCT * leverage
+    is_testnet = os.environ.get("HL_TESTNET", "true").lower() == "true"
 
-    # Never let the minimum-order adjustment exceed the bot's available
-    # leveraged allocation for this trade.
-    max_notional = capital * max(leverage, 1.0)
-    if notional > max_notional:
+    # Testnet may raise a tiny simulated order above the exchange minimum.
+    # Mainnet must never silently increase real-money risk: if the strategy's
+    # requested order is below Hyperliquid's $10 minimum, skip it.
+    if is_testnet and requested_notional < MIN_ORDER_NOTIONAL:
+        notional = MIN_ORDER_NOTIONAL
+
+        # Keep the existing safety guard: even on testnet, do not let the
+        # minimum-order adjustment exceed this bot's leveraged allocation.
+        max_notional = capital * max(leverage, 1.0)
+        if notional > max_notional:
+            return {
+                **trade,
+                "status": "skipped",
+                "reason": (
+                    f"Allocated capital too small for "
+                    f"${MIN_ORDER_NOTIONAL:.2f} minimum order"
+                ),
+            }
+    elif (not is_testnet) and requested_notional < 10.0:
         return {
             **trade,
             "status": "skipped",
             "reason": (
-                f"Allocated capital too small for ${MIN_ORDER_NOTIONAL:.2f} "
-                "minimum order"
+                f"Calculated order ${requested_notional:.2f} is below "
+                "Hyperliquid's $10 minimum"
             ),
         }
+    else:
+        notional = requested_notional
 
     raw_size = notional / mid
     sz_decimals = get_size_decimals(info, coin)
