@@ -97,7 +97,6 @@ def load_state() -> dict:
     print("Aggressive state loaded successfully")
     return state
 
-
 def save_state(state: dict):
     gist_token = os.environ.get("GIST_TOKEN")
     gist_id = os.environ.get("AGGRESSIVE_GIST_ID")
@@ -246,6 +245,21 @@ def decide_trades(signals: dict, open_positions: dict, max_positions: int,
             continue
         if not info.get("pyramid_added"):
             continue
+
+        # Pyramid only into a position that is currently profitable.
+        # This prevents averaging up into a trade that has already turned
+        # into a loser.
+        current_unrealized = float(
+            remaining[hl_coin].get("unrealized_pnl", 0.0) or 0.0
+        )
+        if current_unrealized <= 0:
+            print(
+                f"Skipping pyramid for {hl_coin}: "
+                f"position is not profitable "
+                f"(uPnL ${current_unrealized:.4f})"
+            )
+            continue
+
         # Limit pyramid count
         current_pyramid = pyramid_state.get(hl_coin, 0)
         if current_pyramid >= 2:
