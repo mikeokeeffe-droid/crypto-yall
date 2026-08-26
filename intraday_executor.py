@@ -53,26 +53,49 @@ def load_state() -> dict:
     gist_id = os.environ.get("INTRADAY_GIST_ID")
 
     if not gist_token or not gist_id:
-        return {}
-
-    resp = requests.get(
-        f"https://api.github.com/gists/{gist_id}",
-        headers={"Authorization": f"token {gist_token}"},
-        timeout=15,
-    )
-
-    if resp.status_code != 200:
-        return {}
-
-    files = resp.json().get("files", {})
-
-    if STATE_FILENAME not in files:
-        return {}
+        raise RuntimeError(
+            "Cannot load intraday state: GIST_TOKEN or INTRADAY_GIST_ID is missing"
+        )
 
     try:
-        return json.loads(files[STATE_FILENAME]["content"])
-    except Exception:
-        return {}
+        resp = requests.get(
+            f"https://api.github.com/gists/{gist_id}",
+            headers={"Authorization": f"token {gist_token}"},
+            timeout=15,
+        )
+    except requests.RequestException as e:
+        raise RuntimeError(
+            f"Failed to load intraday state from Gist: {e}"
+        ) from e
+
+    if not resp.ok:
+        raise RuntimeError(
+            f"Failed to load intraday state from Gist: "
+            f"HTTP {resp.status_code} {resp.text}"
+        )
+
+    try:
+        files = resp.json().get("files", {})
+
+        if STATE_FILENAME not in files:
+            raise KeyError(
+                f"{STATE_FILENAME} not found in Intraday Gist"
+            )
+
+        state = json.loads(
+            files[STATE_FILENAME]["content"]
+        )
+
+        if not isinstance(state, dict):
+            raise TypeError("Intraday state is not a JSON object")
+
+    except (ValueError, KeyError, TypeError, AttributeError) as e:
+        raise RuntimeError(
+            f"Intraday Gist state is invalid: {e}"
+        ) from e
+
+    print("Intraday state loaded successfully")
+    return state
 
 
 def save_state(state: dict):
