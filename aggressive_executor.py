@@ -258,7 +258,7 @@ def decide_trades(signals: dict, open_positions: dict, max_positions: int,
             "reason": f"pyramid add #{current_pyramid + 1} (osc re-entry)",
         })
 
-    slots = max_positions - len(remaining)
+    slots = max(0, max_positions - len(remaining))
 
     # Open new positions, prioritized by oscillator magnitude
     candidates = []
