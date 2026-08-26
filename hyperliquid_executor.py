@@ -320,7 +320,7 @@ def decide_trades(signals: dict, open_positions: dict, max_positions: int) -> li
     remaining_positions = {
         c: p for c, p in open_positions.items() if c not in closes_by_coin
     }
-    slots_available = max_positions - len(remaining_positions)
+    slots_available = max(0, max_positions - len(remaining_positions))
 
     open_candidates = []
 
