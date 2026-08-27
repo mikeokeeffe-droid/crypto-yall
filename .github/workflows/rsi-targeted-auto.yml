@@ -1,0 +1,53 @@
+name: RSI Targeted Research (Auto)
+
+on:
+  push:
+    branches:
+      - rsi-exit-test
+    paths:
+      - rsi_targeted_backtest.py
+      - .github/workflows/rsi-targeted-auto.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rsi-targeted-research
+  cancel-in-progress: true
+
+jobs:
+  backtest:
+    name: SOL and BTC rolling RSI research
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout research branch
+        uses: actions/checkout@v7
+        with:
+          ref: rsi-exit-test
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run targeted rolling RSI research
+        env:
+          BACKTEST_FEE_RATE: "0.00045"
+        run: |
+          python rsi_targeted_backtest.py | tee rsi_targeted_results.txt
+
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rsi-targeted-results
+          path: rsi_targeted_results.txt
+          if-no-files-found: warn
