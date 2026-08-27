@@ -175,6 +175,39 @@ def update_peak_tracking(state: dict, positions: dict, owned_coins: set[str]) ->
     state["peak_return_pct"] = peak_return_pct
 
 
+def calculate_rsi(closes, period: int = 14) -> float:
+    """
+    Calculate Wilder RSI for observation only.
+
+    This value is never used by trade decisions. It is recorded alongside
+    hourly flat observations so we can test whether RSI helps explain
+    stay-flat vs subsequent exits.
+    """
+    values = [float(v) for v in closes if v is not None]
+    if len(values) < period + 1:
+        return 50.0
+
+    gains = []
+    losses = []
+    for prev, curr in zip(values[:-1], values[1:]):
+        change = curr - prev
+        gains.append(max(change, 0.0))
+        losses.append(max(-change, 0.0))
+
+    avg_gain = sum(gains[:period]) / period
+    avg_loss = sum(losses[:period]) / period
+
+    for gain, loss in zip(gains[period:], losses[period:]):
+        avg_gain = ((avg_gain * (period - 1)) + gain) / period
+        avg_loss = ((avg_loss * (period - 1)) + loss) / period
+
+    if avg_loss == 0:
+        return 100.0 if avg_gain > 0 else 50.0
+
+    rs = avg_gain / avg_loss
+    return 100.0 - (100.0 / (1.0 + rs))
+
+
 def update_flat_tracking(state: dict, signals: dict, owned_coins: set[str]) -> None:
     """
     Passively track how long an owned Intraday position remains on a flat signal.
@@ -197,8 +230,13 @@ def update_flat_tracking(state: dict, signals: dict, owned_coins: set[str]) -> N
         str(k): str(v)
         for k, v in (state.get("flat_last_counted_hour", {}) or {}).items()
     }
+    flat_rsi_history = {
+        str(k): list(v)
+        for k, v in (state.get("flat_rsi_history", {}) or {}).items()
+        if isinstance(v, list)
+    }
 
-    for store in (flat_count, flat_since, flat_last_counted_hour):
+    for store in (flat_count, flat_since, flat_last_counted_hour, flat_rsi_history):
         for coin in list(store):
             if coin not in owned_coins:
                 store.pop(coin, None)
@@ -228,6 +266,21 @@ def update_flat_tracking(state: dict, signals: dict, owned_coins: set[str]) -> N
                 flat_count[coin] = int(flat_count.get(coin, 0) or 0) + 1
                 flat_last_counted_hour[coin] = hour_key
 
+                rsi_value = float(info.get("rsi", 50.0) or 50.0)
+                flat_rsi_history.setdefault(coin, []).append({
+                    "timestamp": now_iso,
+                    "hour": hour_key,
+                    "rsi": round(rsi_value, 4),
+                    "price": float(info.get("price", 0.0) or 0.0),
+                    "flat_count": int(flat_count.get(coin, 0) or 0),
+                })
+                flat_rsi_history[coin] = flat_rsi_history[coin][-500:]
+                print(
+                    f"Flat RSI observation: {coin} "
+                    f"rsi={rsi_value:.2f} "
+                    f"count={flat_count.get(coin, 0)}"
+                )
+
             print(
                 f"Flat tracking: {coin} "
                 f"count={flat_count.get(coin, 0)} "
@@ -243,10 +296,12 @@ def update_flat_tracking(state: dict, signals: dict, owned_coins: set[str]) -> N
             flat_count.pop(coin, None)
             flat_since.pop(coin, None)
             flat_last_counted_hour.pop(coin, None)
+            flat_rsi_history.pop(coin, None)
 
     state["flat_count"] = flat_count
     state["flat_since"] = flat_since
     state["flat_last_counted_hour"] = flat_last_counted_hour
+    state["flat_rsi_history"] = flat_rsi_history
 
 
 # ── Signal computation ─────────────────────────────────────────────────────
@@ -282,12 +337,15 @@ def compute_intraday_signals() -> dict:
                 if "TwoPole_Osc" in sig.columns
                 else 0.0
             )
+            rsi = calculate_rsi(df["Close"].tolist(), period=14)
 
             current[ticker] = {
                 "signal": last,
                 "action": action,
                 "price": price,
                 "osc": osc,
+                # Observation-only: never read by decide_trades().
+                "rsi": rsi,
             }
 
         except Exception as e:
