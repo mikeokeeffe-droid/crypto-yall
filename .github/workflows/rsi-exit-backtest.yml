@@ -1,0 +1,48 @@
+name: RSI Exit Backtest (Research Only)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rsi-exit-backtest-research
+  cancel-in-progress: false
+
+jobs:
+  backtest:
+    name: Test RSI flat-exit confirmation
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout RSI research branch
+        uses: actions/checkout@v7
+        with:
+          ref: rsi-exit-test
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run RSI exit comparison
+        env:
+          BACKTEST_FEE_RATE: "0.00045"
+          RSI_LOOKBACK_HOURS: "2000"
+        run: |
+          python rsi_exit_backtest.py | tee rsi_exit_results.txt
+
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rsi-exit-backtest-results
+          path: rsi_exit_results.txt
+          if-no-files-found: warn
