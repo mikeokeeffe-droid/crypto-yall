@@ -2,24 +2,8 @@
 rsi_targeted_backtest.py — Targeted rolling RSI robustness research.
 
 Research only. No live executor imports and no trading actions.
-
-Focus:
-  - SOL-USD
-  - BTC-USD
-
-Compare:
-  - BASELINE
-  - RSI 50/50
-  - RSI 45/55
-
-Method:
-  - 12 months of 1-hour Yahoo data
-  - 60-day rolling windows
-  - 30-day step between windows
-  - fees included
-  - ATR stops remain immediate
-
-The goal is to test consistency, not just one headline return.
+Tests SOL and BTC across several rolling-window lengths. Fees are supplied by
+BACKTEST_FEE_RATE from the research workflow matrix.
 """
 
 from __future__ import annotations
@@ -36,10 +20,8 @@ from rsi_exit_12m_backtest import (
     simulate,
 )
 
-
 ASSETS = ["SOL-USD", "BTC-USD"]
-WINDOW_DAYS = 60
-STEP_DAYS = 30
+WINDOW_CONFIGS = [(30, 15), (60, 30), (90, 30), (120, 30)]
 VARIANTS = [
     ("BASELINE", None, None),
     ("RSI 50/50", 50.0, 50.0),
@@ -47,12 +29,11 @@ VARIANTS = [
 ]
 
 
-def rolling_windows(index: pd.DatetimeIndex):
+def rolling_windows(index: pd.DatetimeIndex, window_days: int, step_days: int):
     start = index.min()
     final = index.max() + pd.Timedelta(hours=1)
-    window = pd.Timedelta(days=WINDOW_DAYS)
-    step = pd.Timedelta(days=STEP_DAYS)
-
+    window = pd.Timedelta(days=window_days)
+    step = pd.Timedelta(days=step_days)
     cursor = start
     number = 1
     while cursor + window <= final:
@@ -62,14 +43,15 @@ def rolling_windows(index: pd.DatetimeIndex):
 
 
 def main() -> None:
-    print("=" * 92)
-    print("TARGETED RSI ROBUSTNESS TEST — SOL + BTC")
+    print("=" * 96)
+    print("TARGETED RSI MULTI-WINDOW ROBUSTNESS TEST — SOL + BTC")
     print("Research only | Live bot unchanged | No orders")
-    print(f"History: {TEST_DAYS} days | Window: {WINDOW_DAYS}d | Step: {STEP_DAYS}d")
-    print(f"Fee assumption: {FEE_RATE * 100:.4f}% per side")
-    print("=" * 92)
+    print(f"History: {TEST_DAYS} days | Fee: {FEE_RATE * 100:.4f}% per side")
+    print(f"Windows: {WINDOW_CONFIGS}")
+    print("=" * 96)
 
     rows = []
+    full_rows = []
 
     for ticker in ASSETS:
         raw = fetch_yahoo_1h(ticker)
@@ -77,107 +59,82 @@ def main() -> None:
         test_end = prepared.index.max() + pd.Timedelta(hours=1)
         test_start = test_end - pd.Timedelta(days=TEST_DAYS)
         df = prepared[prepared.index >= test_start].copy()
+        allow_short = bool(get_asset_profile(ticker)["allow_short"])
 
-        profile = get_asset_profile(ticker)
-        allow_short = bool(profile["allow_short"])
+        print(f"\n{ticker}: {len(df)} closed 1h bars [{df.index.min()} -> {df.index.max()}]")
 
-        print(
-            f"\n{ticker}: {len(df)} closed 1h bars "
-            f"[{df.index.min()} -> {df.index.max()}]"
-        )
-
+        simulations = {}
         for variant, long_exit, short_exit in VARIANTS:
-            full_returns, full_trades = simulate(
+            returns, trades = simulate(
                 df,
                 allow_short=allow_short,
                 long_rsi_exit=long_exit,
                 short_rsi_exit=short_exit,
             )
-            full_metrics = metrics(full_returns, full_trades)
+            simulations[variant] = (returns, trades)
+            fm = metrics(returns, trades)
+            full_rows.append({"asset": ticker, "variant": variant, **fm})
             print(
-                f"  FULL {variant:<10} "
-                f"return={full_metrics.get('return_pct', 0):+8.3f}% "
-                f"DD={full_metrics.get('max_dd_pct', 0):+8.3f}% "
-                f"trades={full_metrics.get('trades', 0):4d} "
-                f"giveback={full_metrics.get('avg_giveback_pct', 0):6.3f}%"
+                f"  FULL {variant:<10} return={fm.get('return_pct', 0):+8.3f}% "
+                f"DD={fm.get('max_dd_pct', 0):+8.3f}% trades={fm.get('trades', 0):4d} "
+                f"giveback={fm.get('avg_giveback_pct', 0):6.3f}%"
             )
 
-            for window_name, start, end in rolling_windows(df.index):
-                wret = full_returns[
-                    (full_returns.index >= start)
-                    & (full_returns.index < end)
-                ]
-                wtrades = [
-                    t for t in full_trades
-                    if start <= t.exit_time < end
-                ]
-                wm = metrics(wret, wtrades)
-                rows.append({
-                    "asset": ticker,
-                    "window": window_name,
-                    "start": start,
-                    "end": end,
-                    "variant": variant,
-                    **wm,
-                })
+        for window_days, step_days in WINDOW_CONFIGS:
+            for window_name, start, end in rolling_windows(df.index, window_days, step_days):
+                for variant, _, _ in VARIANTS:
+                    returns, trades = simulations[variant]
+                    wret = returns[(returns.index >= start) & (returns.index < end)]
+                    wtrades = [t for t in trades if start <= t.exit_time < end]
+                    wm = metrics(wret, wtrades)
+                    rows.append({
+                        "asset": ticker,
+                        "window_days": window_days,
+                        "step_days": step_days,
+                        "window": window_name,
+                        "variant": variant,
+                        **wm,
+                    })
 
     result = pd.DataFrame(rows)
     if result.empty:
         raise RuntimeError("No targeted rolling results were produced")
 
-    pivot = result.pivot_table(
-        index=["asset", "window"],
-        columns="variant",
-        values="return_pct",
-        aggfunc="first",
-    ).reset_index()
-
-    print("\nROLLING 60-DAY RETURNS")
-    print(
-        pivot.to_string(
-            index=False,
-            float_format=lambda x: f"{x:,.3f}",
-        )
-    )
-
-    print("\nROBUSTNESS SUMMARY")
+    print("\nROBUSTNESS SUMMARY BY WINDOW LENGTH")
     for asset in ASSETS:
-        a = pivot[pivot["asset"] == asset].dropna().copy()
-        total = len(a)
-        if not total:
-            continue
-
-        wins_5050 = int((a["RSI 50/50"] > a["BASELINE"]).sum())
-        wins_4555 = int((a["RSI 45/55"] > a["BASELINE"]).sum())
-        best_5050 = int(
-            (
-                (a["RSI 50/50"] > a["BASELINE"])
-                & (a["RSI 50/50"] > a["RSI 45/55"])
-            ).sum()
-        )
-        best_4555 = int(
-            (
-                (a["RSI 45/55"] > a["BASELINE"])
-                & (a["RSI 45/55"] > a["RSI 50/50"])
-            ).sum()
-        )
-
         print(f"\n{asset}")
-        print(f"  RSI 50/50 beat baseline: {wins_5050}/{total} windows")
-        print(f"  RSI 45/55 beat baseline: {wins_4555}/{total} windows")
-        print(f"  RSI 50/50 was outright best: {best_5050}/{total} windows")
-        print(f"  RSI 45/55 was outright best: {best_4555}/{total} windows")
+        for window_days, _ in WINDOW_CONFIGS:
+            subset = result[(result.asset == asset) & (result.window_days == window_days)]
+            pivot = subset.pivot_table(
+                index="window",
+                columns="variant",
+                values="return_pct",
+                aggfunc="first",
+            ).dropna()
+            total = len(pivot)
+            if not total:
+                continue
 
-        # Average return delta gives size of the improvement, not just count.
-        delta_5050 = float((a["RSI 50/50"] - a["BASELINE"]).mean())
-        delta_4555 = float((a["RSI 45/55"] - a["BASELINE"]).mean())
-        print(f"  Avg 50/50 return delta: {delta_5050:+.3f} percentage points")
-        print(f"  Avg 45/55 return delta: {delta_4555:+.3f} percentage points")
+            for variant in ["RSI 50/50", "RSI 45/55"]:
+                delta = pivot[variant] - pivot["BASELINE"]
+                wins = int((delta > 0).sum())
+                best = int(
+                    (
+                        (pivot[variant] > pivot["BASELINE"])
+                        & (pivot[variant] > pivot[[v for v in ["RSI 50/50", "RSI 45/55"] if v != variant][0]])
+                    ).sum()
+                )
+                print(
+                    f"  {window_days:3d}d {variant:<9}: wins {wins:2d}/{total:<2d} "
+                    f"({wins / total * 100:5.1f}%) | outright best {best:2d}/{total:<2d} | "
+                    f"avg delta {delta.mean():+6.3f}pp | median {delta.median():+6.3f}pp | "
+                    f"worst {delta.min():+6.3f}pp"
+                )
 
     print("\nDECISION RULE")
-    print("Do not promote RSI live unless it wins across a clear majority of rolling")
-    print("windows and the improvement is large enough to justify added giveback/risk.")
-    print("Live bot remains unchanged by this research run.")
+    print("Do not change live logic unless an RSI rule remains better across multiple")
+    print("window lengths and fee assumptions without an unacceptable risk trade-off.")
+    print("Live bot remains unchanged.")
 
 
 if __name__ == "__main__":
