@@ -18,9 +18,19 @@ concurrency:
 
 jobs:
   backtest:
-    name: SOL and BTC rolling RSI research
+    name: Rolling RSI research (${{ matrix.fee.label }})
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        fee:
+          - label: fee035
+            rate: "0.00035"
+          - label: fee045
+            rate: "0.00045"
+          - label: fee060
+            rate: "0.00060"
 
     steps:
       - name: Checkout research branch
@@ -40,7 +50,7 @@ jobs:
 
       - name: Run targeted rolling RSI research
         env:
-          BACKTEST_FEE_RATE: "0.00045"
+          BACKTEST_FEE_RATE: ${{ matrix.fee.rate }}
         run: |
           python rsi_targeted_backtest.py | tee rsi_targeted_results.txt
 
@@ -48,6 +58,6 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: rsi-targeted-results
+          name: rsi-targeted-${{ matrix.fee.label }}
           path: rsi_targeted_results.txt
           if-no-files-found: warn
