@@ -293,10 +293,12 @@ def update_flat_tracking(state: dict, signals: dict, owned_coins: set[str]) -> N
                     f"action={action}"
                 )
 
+            # Reset the current flat streak, but KEEP flat_rsi_history so the
+            # observations survive long enough to compare against what happened
+            # after the flat period ended.
             flat_count.pop(coin, None)
             flat_since.pop(coin, None)
             flat_last_counted_hour.pop(coin, None)
-            flat_rsi_history.pop(coin, None)
 
     state["flat_count"] = flat_count
     state["flat_since"] = flat_since
