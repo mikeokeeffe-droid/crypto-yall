@@ -6,6 +6,7 @@ on:
       - rsi-exit-test
     paths:
       - rsi_targeted_backtest.py
+      - btc_rsi_asymmetric_backtest.py
       - .github/workflows/rsi-targeted-auto.yml
   workflow_dispatch:
 
@@ -42,10 +43,16 @@ jobs:
         run: |
           python rsi_targeted_backtest.py | tee rsi_targeted_results.txt
 
+      - name: Run BTC asymmetric RSI research
+        run: |
+          python btc_rsi_asymmetric_backtest.py | tee btc_rsi_asymmetric_results.txt
+
       - name: Upload results
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: rsi-targeted-fixed-data
-          path: rsi_targeted_results.txt
+          path: |
+            rsi_targeted_results.txt
+            btc_rsi_asymmetric_results.txt
           if-no-files-found: warn
