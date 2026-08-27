@@ -18,19 +18,9 @@ concurrency:
 
 jobs:
   backtest:
-    name: Rolling RSI research (${{ matrix.fee.label }})
+    name: Rolling RSI research — fixed dataset
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    strategy:
-      fail-fast: false
-      matrix:
-        fee:
-          - label: fee035
-            rate: "0.00035"
-          - label: fee045
-            rate: "0.00045"
-          - label: fee060
-            rate: "0.00060"
 
     steps:
       - name: Checkout research branch
@@ -49,8 +39,6 @@ jobs:
           pip install -r requirements.txt
 
       - name: Run targeted rolling RSI research
-        env:
-          BACKTEST_FEE_RATE: ${{ matrix.fee.rate }}
         run: |
           python rsi_targeted_backtest.py | tee rsi_targeted_results.txt
 
@@ -58,6 +46,6 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: rsi-targeted-${{ matrix.fee.label }}
+          name: rsi-targeted-fixed-data
           path: rsi_targeted_results.txt
           if-no-files-found: warn
