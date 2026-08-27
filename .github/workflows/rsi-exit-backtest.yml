@@ -35,7 +35,7 @@ jobs:
       - name: Run RSI exit comparison
         env:
           BACKTEST_FEE_RATE: "0.00045"
-          RSI_LOOKBACK_HOURS: "2000"
+          RSI_LOOKBACK_HOURS: "4320"
         run: |
           python rsi_exit_backtest.py | tee rsi_exit_results.txt
 
