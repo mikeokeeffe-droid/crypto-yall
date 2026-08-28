@@ -230,7 +230,9 @@ def atr_shadow(
 
     closes = df["Close"].astype(float).to_numpy()
     partial_history = False
-    start_idx = 0
+    # Safe fallback: if no completed candle exists at/after the recorded open,
+    # use only the latest completed candle instead of the full lookback history.
+    start_idx = len(closes) - 1
 
     if opened_ms is not None:
         times_ms = candle_times_ms(df.index)
