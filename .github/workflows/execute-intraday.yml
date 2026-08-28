@@ -25,6 +25,17 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
+      - name: Run read-only Intraday exit shadow monitor
+        continue-on-error: true
+        run: python intraday_shadow_report.py
+        env:
+          HL_ACCOUNT_ADDRESS: ${{ secrets.HL_ACCOUNT_ADDRESS }}
+          HL_TESTNET: ${{ vars.HL_TESTNET }}
+          GIST_TOKEN: ${{ secrets.GIST_TOKEN }}
+          INTRADAY_GIST_ID: ${{ secrets.INTRADAY_GIST_ID }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+
       - name: Execute intraday trades on Hyperliquid
         run: python intraday_executor.py
         env:
