@@ -7,6 +7,7 @@ on:
     paths:
       - rsi_targeted_backtest.py
       - btc_rsi_asymmetric_backtest.py
+      - adx_rsi_flat_exit_backtest.py
       - .github/workflows/rsi-targeted-auto.yml
   workflow_dispatch:
 
@@ -19,7 +20,7 @@ concurrency:
 
 jobs:
   backtest:
-    name: Rolling RSI research — fixed dataset
+    name: Rolling RSI and ADX research
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
@@ -47,12 +48,17 @@ jobs:
         run: |
           python btc_rsi_asymmetric_backtest.py | tee btc_rsi_asymmetric_results.txt
 
+      - name: Run ADX vs RSI FLAT-exit research
+        run: |
+          python adx_rsi_flat_exit_backtest.py | tee adx_rsi_flat_exit_results.txt
+
       - name: Upload results
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: rsi-targeted-fixed-data
+          name: rsi-adx-research-results
           path: |
             rsi_targeted_results.txt
             btc_rsi_asymmetric_results.txt
+            adx_rsi_flat_exit_results.txt
           if-no-files-found: warn
