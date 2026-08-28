@@ -9,6 +9,7 @@ on:
       - btc_rsi_asymmetric_backtest.py
       - adx_rsi_flat_exit_backtest.py
       - dmi_adx_flat_exit_backtest.py
+      - exit_signal_family_backtest.py
       - .github/workflows/rsi-targeted-auto.yml
   workflow_dispatch:
 
@@ -21,9 +22,9 @@ concurrency:
 
 jobs:
   backtest:
-    name: Rolling RSI, ADX and DMI research
+    name: Exit signal research
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 12
 
     steps:
       - name: Checkout research branch
@@ -57,14 +58,19 @@ jobs:
         run: |
           python dmi_adx_flat_exit_backtest.py | tee dmi_adx_flat_exit_results.txt
 
+      - name: Run ATR EMA MACD VWAP family research
+        run: |
+          python exit_signal_family_backtest.py | tee exit_signal_family_results.txt
+
       - name: Upload results
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: rsi-adx-dmi-research-results
+          name: exit-signal-research-results
           path: |
             rsi_targeted_results.txt
             btc_rsi_asymmetric_results.txt
             adx_rsi_flat_exit_results.txt
             dmi_adx_flat_exit_results.txt
+            exit_signal_family_results.txt
           if-no-files-found: warn
