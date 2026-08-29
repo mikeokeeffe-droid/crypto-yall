@@ -26,7 +26,31 @@ jobs:
         run: pip install -r requirements.txt
 
       - name: Execute trades on Hyperliquid
-        run: python hyperliquid_executor.py
+        shell: bash
+        run: |
+          set +e
+          for attempt in 1 2 3; do
+            echo "Daily executor attempt ${attempt}/3"
+            log_file="daily_attempt_${attempt}.log"
+
+            python hyperliquid_executor.py 2>&1 | tee "$log_file"
+            status=${PIPESTATUS[0]}
+
+            if [ "$status" -eq 0 ]; then
+              exit 0
+            fi
+
+            if grep -q "Failed to init Hyperliquid client" "$log_file" && [ "$attempt" -lt 3 ]; then
+              echo "Hyperliquid client init failed; retrying in 10 seconds..."
+              sleep 10
+              continue
+            fi
+
+            echo "Daily executor failed; not retrying this error."
+            exit "$status"
+          done
+
+          exit 1
         env:
           HL_PRIVATE_KEY: ${{ secrets.HL_PRIVATE_KEY }}
           HL_ACCOUNT_ADDRESS: ${{ secrets.HL_ACCOUNT_ADDRESS }}
