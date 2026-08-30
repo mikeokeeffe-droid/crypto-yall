@@ -9,6 +9,11 @@ It compares currently owned Intraday positions against three research ideas:
   2) 1.5 x ATR trailing-stop trigger
   3) Donchian-20 trigger for LINK only
 
+It also builds a passive FLAT-signal research dataset. For each owned position
+that reaches signal=0 it records the first FLAT price/P&L, hourly FLAT checks,
+ADX/DMI/ATR context, duration, and the eventual live outcome. This is research
+only and never changes the live strategy.
+
 The existing live Intraday strategy remains the source of truth for trading.
 Shadow snapshots are stored in the Intraday Gist for later review. Telegram is
 sent only when a position's shadow decision signature changes.
@@ -275,6 +280,251 @@ def donchian_shadow(df: pd.DataFrame, side: str) -> tuple[str, float | None]:
     return ("EXIT" if current_price > level else "HOLD"), level
 
 
+def parse_iso(value: str | None) -> dt.datetime | None:
+    if not value:
+        return None
+    try:
+        parsed = dt.datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=dt.UTC)
+        return parsed.astimezone(dt.UTC)
+    except (TypeError, ValueError):
+        return None
+
+
+def latest_filled_close(state: dict, coin: str, started_at: str | None) -> dict | None:
+    """Return the latest filled close for coin at/after a FLAT episode start."""
+    started = parse_iso(started_at)
+    for item in reversed(state.get("history", []) or []):
+        if item.get("hl_coin") != coin:
+            continue
+        if item.get("action") != "close" or item.get("status") != "filled":
+            continue
+
+        item_time = parse_iso(item.get("timestamp"))
+        if started is not None and item_time is not None and item_time < started:
+            continue
+        return item
+    return None
+
+
+def update_flat_research(
+    state: dict,
+    snapshots: list[dict],
+    managed_coins: set[str],
+    now: dt.datetime,
+) -> None:
+    """
+    Build an observation-only dataset around signal=0 while positions are held.
+
+    A FLAT episode starts the first time an owned position is observed with
+    live_signal == 0. We save one sample per UTC hour so manual reruns do not
+    inflate the dataset. The episode is finalized when the signal recovers or
+    when the position is no longer owned/open. The comparison to first-FLAT P&L
+    is intentionally labelled approximate because a hypothetical first-FLAT
+    close would have its own closing fee/funding/slippage.
+    """
+    active = {
+        str(k): dict(v)
+        for k, v in (state.get("shadow_flat_active", {}) or {}).items()
+        if isinstance(v, dict)
+    }
+    flat_history = list(state.get("shadow_flat_history", []) or [])
+    completed = list(state.get("shadow_flat_completed", []) or [])
+    hour_key = now.strftime("%Y-%m-%dT%H:00Z")
+
+    for snapshot in snapshots:
+        coin = str(snapshot["coin"])
+        side = str(snapshot["side"])
+        entry_px = float(snapshot["entry_px"])
+        current_pnl = float(snapshot["unrealized_pnl"])
+        is_flat_signal = int(snapshot.get("live_signal", 0)) == 0
+        episode = active.get(coin)
+
+        # Do not let a stale episode bleed into a newly opened/reversed trade.
+        if episode is not None and (
+            episode.get("side") != side
+            or abs(float(episode.get("entry_px", entry_px)) - entry_px) > 1e-12
+        ):
+            completed.append({
+                **episode,
+                "ended_at": now.isoformat(),
+                "end_reason": "position_changed",
+            })
+            active.pop(coin, None)
+            episode = None
+
+        if is_flat_signal:
+            if episode is None:
+                episode = {
+                    "ticker": snapshot["ticker"],
+                    "coin": coin,
+                    "side": side,
+                    "entry_px": entry_px,
+                    "started_at": now.isoformat(),
+                    "first_flat_price": float(snapshot["price"]),
+                    "first_flat_unrealized_pnl": current_pnl,
+                    "flat_checks": 0,
+                    "last_counted_hour": None,
+                }
+                active[coin] = episode
+
+            if episode.get("last_counted_hour") != hour_key:
+                episode["flat_checks"] = int(episode.get("flat_checks", 0) or 0) + 1
+                episode["last_counted_hour"] = hour_key
+                new_hour = True
+            else:
+                new_hour = False
+
+            started = parse_iso(episode.get("started_at"))
+            flat_hours = (
+                max(0.0, (now - started).total_seconds() / 3600.0)
+                if started is not None
+                else 0.0
+            )
+            first_pnl = float(episode.get("first_flat_unrealized_pnl", 0.0) or 0.0)
+            pnl_change = current_pnl - first_pnl
+
+            snapshot.update({
+                "flat_signal": True,
+                "flat_since": episode.get("started_at"),
+                "flat_checks": int(episode.get("flat_checks", 0) or 0),
+                "flat_hours": flat_hours,
+                "first_flat_price": float(episode["first_flat_price"]),
+                "first_flat_unrealized_pnl": first_pnl,
+                "hold_vs_first_flat_pnl": pnl_change,
+                "first_flat_exit_better_by": max(0.0, -pnl_change),
+                "holding_better_by": max(0.0, pnl_change),
+            })
+
+            episode.update({
+                "last_seen_at": now.isoformat(),
+                "last_price": float(snapshot["price"]),
+                "last_unrealized_pnl": current_pnl,
+                "last_live_action": snapshot.get("live_action"),
+                "last_adx": float(snapshot["adx"]),
+                "last_dmi_adx20": snapshot.get("dmi_adx20"),
+                "last_atr15": snapshot.get("atr15"),
+            })
+
+            if new_hour:
+                flat_history.append({
+                    "timestamp": now.isoformat(),
+                    "ticker": snapshot["ticker"],
+                    "coin": coin,
+                    "side": side,
+                    "entry_px": entry_px,
+                    "price": float(snapshot["price"]),
+                    "unrealized_pnl": current_pnl,
+                    "live_action": snapshot.get("live_action"),
+                    "flat_checks": int(episode["flat_checks"]),
+                    "flat_since": episode["started_at"],
+                    "flat_hours": flat_hours,
+                    "first_flat_price": float(episode["first_flat_price"]),
+                    "first_flat_unrealized_pnl": first_pnl,
+                    "hold_vs_first_flat_pnl": pnl_change,
+                    "first_flat_exit_better_by": max(0.0, -pnl_change),
+                    "holding_better_by": max(0.0, pnl_change),
+                    "adx": float(snapshot["adx"]),
+                    "plus_di": float(snapshot["plus_di"]),
+                    "minus_di": float(snapshot["minus_di"]),
+                    "dmi_adx20": snapshot.get("dmi_adx20"),
+                    "atr15": snapshot.get("atr15"),
+                    "atr_trail_level": snapshot.get("atr_trail_level"),
+                    "donchian20": snapshot.get("donchian20"),
+                    "comparison_note": (
+                        "First-FLAT comparison is approximate; hypothetical "
+                        "exit fees/funding/slippage are not applied."
+                    ),
+                })
+                print(
+                    f"FLAT research: {coin} {side.upper()} "
+                    f"check={episode['flat_checks']} "
+                    f"hours={flat_hours:.1f} "
+                    f"hold-vs-first-flat=${pnl_change:+.4f}"
+                )
+
+        else:
+            snapshot["flat_signal"] = False
+            if episode is not None:
+                first_pnl = float(
+                    episode.get("first_flat_unrealized_pnl", 0.0) or 0.0
+                )
+                pnl_change = current_pnl - first_pnl
+                completed.append({
+                    **episode,
+                    "ended_at": now.isoformat(),
+                    "end_reason": f"signal_{snapshot.get('live_action')}",
+                    "end_price": float(snapshot["price"]),
+                    "end_unrealized_pnl": current_pnl,
+                    "hold_vs_first_flat_pnl": pnl_change,
+                    "first_flat_exit_better_by": max(0.0, -pnl_change),
+                    "holding_better_by": max(0.0, pnl_change),
+                    "comparison_note": (
+                        "Comparison uses unrealized P&L at observation points."
+                    ),
+                })
+                active.pop(coin, None)
+                snapshot["flat_episode_ended"] = True
+                print(
+                    f"FLAT research ended: {coin} "
+                    f"reason={snapshot.get('live_action')} "
+                    f"hold-vs-first-flat=${pnl_change:+.4f}"
+                )
+
+    # A position that disappeared since the previous shadow run was normally
+    # closed by the real executor after the prior shadow observation. Pull the
+    # live close result from normal Intraday history when available.
+    for coin in list(active):
+        if coin in managed_coins:
+            continue
+
+        episode = active.pop(coin)
+        close = latest_filled_close(state, coin, episode.get("started_at"))
+        outcome = {
+            **episode,
+            "ended_at": now.isoformat(),
+            "end_reason": "position_no_longer_owned",
+        }
+
+        if close is not None:
+            realized = close.get("realized_pnl")
+            first_pnl = float(
+                episode.get("first_flat_unrealized_pnl", 0.0) or 0.0
+            )
+            outcome.update({
+                "end_reason": str(close.get("reason") or "live_close"),
+                "live_close_timestamp": close.get("timestamp"),
+                "live_close_price": close.get("fill_price"),
+                "live_realized_pnl": realized,
+                "live_gross_pnl": close.get("gross_closed_pnl"),
+                "live_trading_fees": close.get("trading_fees"),
+                "live_funding_pnl": close.get("funding_pnl"),
+            })
+            if realized is not None:
+                approx_delta = float(realized) - first_pnl
+                outcome.update({
+                    "approx_live_vs_first_flat_pnl": approx_delta,
+                    "approx_first_flat_exit_better_by": max(0.0, -approx_delta),
+                    "approx_live_hold_better_by": max(0.0, approx_delta),
+                    "comparison_note": (
+                        "Approximate: live realized P&L includes actual fees/funding; "
+                        "first-FLAT value is unrealized and does not include a "
+                        "hypothetical closing fee/slippage."
+                    ),
+                })
+
+        completed.append(outcome)
+        print(
+            f"FLAT research finalized: {coin} "
+            f"reason={outcome.get('end_reason')}"
+        )
+
+    state["shadow_flat_active"] = active
+    state["shadow_flat_history"] = flat_history[-1000:]
+    state["shadow_flat_completed"] = completed[-250:]
+
+
 def send_telegram(lines: list[str]) -> None:
     token = os.environ.get("TELEGRAM_BOT_TOKEN")
     raw_ids = os.environ.get("TELEGRAM_CHAT_ID")
@@ -311,6 +561,7 @@ def main() -> None:
     }
 
     if not managed:
+        update_flat_research(state, [], set(), now)
         state["last_shadow_snapshot"] = {
             "timestamp": now.isoformat(),
             "positions": [],
@@ -447,6 +698,8 @@ def main() -> None:
                     don_text += f" | level ${don_level:,.4f}"
                 changed_lines.append(don_text)
             changed_lines.append("")
+
+    update_flat_research(state, snapshots, set(managed), now)
 
     # Remove alert signatures for positions no longer owned.
     for coin in list(new_signatures):
