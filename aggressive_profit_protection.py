@@ -17,6 +17,7 @@ ENABLED = os.environ.get("AGGRESSIVE_PROFIT_PROTECTION", "ON").upper() == "ON"
 _peak_returns = {}
 _original_update_peak_tracking = aggressive.update_peak_tracking
 _original_decide_trades = aggressive.decide_trades
+_original_send_telegram = aggressive._send_telegram
 
 
 def update_peak_tracking(state, positions, owned_coins):
@@ -47,7 +48,6 @@ def decide_trades(signals, open_positions, max_positions, pyramid_state):
     already_closing = {
         t["hl_coin"] for t in trades if t.get("action") == "close"
     }
-
     ticker_by_coin = {coin: ticker for ticker, coin in HL_SYMBOL_MAP.items()}
 
     for coin, position in open_positions.items():
@@ -70,13 +70,17 @@ def decide_trades(signals, open_positions, max_positions, pyramid_state):
         if ticker is None:
             continue
 
-        # A protection close must replace any pyramid action for this coin.
         trades = [t for t in trades if t.get("hl_coin") != coin]
         trades.append({
             "ticker": ticker,
             "hl_coin": coin,
             "action": "close",
             "side": "long" if float(position.get("size", 0.0)) > 0 else "short",
+            "exit_type": "PROFIT PROTECTION",
+            "protection_arm_pct": ARM_PCT,
+            "protection_peak_pct": peak_pct,
+            "protection_trigger_return_pct": current_pct,
+            "protection_giveback_pct": giveback,
             "reason": (
                 f"profit protection: peak {peak_pct:.2f}% -> "
                 f"current {current_pct:.2f}% "
@@ -88,8 +92,50 @@ def decide_trades(signals, open_positions, max_positions, pyramid_state):
     return trades
 
 
+def send_telegram(results, status_summary):
+    """Add Aggressive exit diagnostics without changing execution behaviour."""
+    enriched = []
+    for result in results:
+        item = dict(result)
+        if item.get("action") == "close":
+            item.setdefault(
+                "exit_type",
+                "PROFIT PROTECTION"
+                if str(item.get("reason", "")).startswith("profit protection:")
+                else "SIGNAL EXIT",
+            )
+
+            diagnostics = []
+            diagnostics.append(f"Exit type: {item['exit_type']}")
+
+            if "peak_return_pct" in item:
+                diagnostics.append(
+                    f"Peak return: {float(item.get('peak_return_pct', 0.0) or 0.0):+.2f}%"
+                )
+            if "realized_return_pct" in item:
+                diagnostics.append(
+                    f"Net return: {float(item.get('realized_return_pct', 0.0) or 0.0):+.2f}%"
+                )
+            if "protection_giveback_pct" in item:
+                diagnostics.append(
+                    f"Protection giveback: {float(item.get('protection_giveback_pct', 0.0) or 0.0):.2f}pp"
+                )
+                diagnostics.append(
+                    f"Protection rule: arm +{float(item.get('protection_arm_pct', ARM_PCT)):.2f}% / max {GIVEBACK_PCT:.2f}pp giveback"
+                )
+
+            original_reason = item.get("reason", "")
+            if diagnostics:
+                item["reason"] = original_reason + " | " + " | ".join(diagnostics)
+
+        enriched.append(item)
+
+    _original_send_telegram(enriched, status_summary)
+
+
 aggressive.update_peak_tracking = update_peak_tracking
 aggressive.decide_trades = decide_trades
+aggressive._send_telegram = send_telegram
 
 
 if __name__ == "__main__":
