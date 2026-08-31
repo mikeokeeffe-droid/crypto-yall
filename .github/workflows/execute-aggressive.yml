@@ -33,7 +33,7 @@ jobs:
             echo "Aggressive executor attempt ${attempt}/3"
             log_file="aggressive_attempt_${attempt}.log"
 
-            python aggressive_executor.py 2>&1 | tee "$log_file"
+            python aggressive_profit_protection.py 2>&1 | tee "$log_file"
             status=${PIPESTATUS[0]}
 
             if [ "$status" -eq 0 ]; then
@@ -60,6 +60,9 @@ jobs:
           AGGRESSIVE_DD_PCT: ${{ vars.AGGRESSIVE_DD_PCT }}
           AGGRESSIVE_MAX_POSITIONS: ${{ vars.AGGRESSIVE_MAX_POSITIONS }}
           AGGRESSIVE_KILL_SWITCH: ${{ vars.AGGRESSIVE_KILL_SWITCH }}
+          AGGRESSIVE_PROFIT_PROTECTION: 'ON'
+          AGGRESSIVE_PROFIT_ARM_PCT: '1.0'
+          AGGRESSIVE_PROFIT_GIVEBACK_PCT: '2.0'
           GIST_TOKEN: ${{ secrets.GIST_TOKEN }}
           AGGRESSIVE_GIST_ID: ${{ secrets.AGGRESSIVE_GIST_ID }}
           GMAIL_USER: ${{ secrets.GMAIL_USER }}
