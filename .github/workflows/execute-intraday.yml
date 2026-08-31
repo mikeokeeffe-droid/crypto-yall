@@ -36,6 +36,15 @@ jobs:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
 
+      - name: Run read-only peak-profit shadow research
+        continue-on-error: true
+        run: python intraday_peak_profit_shadow.py
+        env:
+          HL_ACCOUNT_ADDRESS: ${{ secrets.HL_ACCOUNT_ADDRESS }}
+          HL_TESTNET: ${{ vars.HL_TESTNET }}
+          GIST_TOKEN: ${{ secrets.GIST_TOKEN }}
+          INTRADAY_GIST_ID: ${{ secrets.INTRADAY_GIST_ID }}
+
       - name: Execute intraday trades on Hyperliquid
         shell: bash
         run: |
