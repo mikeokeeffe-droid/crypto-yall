@@ -67,15 +67,15 @@ jobs:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
 
-      - name: Execute intraday trades on Hyperliquid
+      - name: Execute intraday trades with profit protection
         shell: bash
         run: |
           set +e
           for attempt in 1 2 3; do
-            echo "Intraday executor attempt ${attempt}/3"
+            echo "Intraday protected executor attempt ${attempt}/3"
             log_file="intraday_attempt_${attempt}.log"
 
-            python intraday_executor.py 2>&1 | tee "$log_file"
+            python intraday_profit_protection.py 2>&1 | tee "$log_file"
             status=${PIPESTATUS[0]}
 
             if [ "$status" -eq 0 ]; then
@@ -88,7 +88,7 @@ jobs:
               continue
             fi
 
-            echo "Intraday executor failed; not retrying this error."
+            echo "Intraday protected executor failed; not retrying this error."
             exit "$status"
           done
 
@@ -102,6 +102,9 @@ jobs:
           INTRADAY_MAX_POSITIONS: ${{ vars.INTRADAY_MAX_POSITIONS }}
           INTRADAY_KILL_SWITCH: ${{ vars.INTRADAY_KILL_SWITCH }}
           INTRADAY_TEST_NOTIONAL: ${{ vars.INTRADAY_TEST_NOTIONAL }}
+          INTRADAY_PROFIT_PROTECTION: ON
+          INTRADAY_PROFIT_ARM_PCT: '0.5'
+          INTRADAY_PROFIT_GIVEBACK_PCT: '2.0'
           GIST_TOKEN: ${{ secrets.GIST_TOKEN }}
           INTRADAY_GIST_ID: ${{ secrets.INTRADAY_GIST_ID }}
           GMAIL_USER: ${{ secrets.GMAIL_USER }}
