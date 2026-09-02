@@ -1,6 +1,6 @@
 """Live profit protection for the Aggressive bot only.
 
-Arms after peak return reaches +1.0% on entry notional. Once armed, closes
+Arms after peak return reaches +0.5% on entry notional. Once armed, closes
 when current return has fallen 2.0 percentage points from the tracked peak.
 The existing aggressive signal exits remain unchanged and take precedence.
 """
@@ -10,7 +10,7 @@ import os
 import aggressive_executor as aggressive
 from intraday_data_loader import HL_SYMBOL_MAP
 
-ARM_PCT = float(os.environ.get("AGGRESSIVE_PROFIT_ARM_PCT", "1.0"))
+ARM_PCT = float(os.environ.get("AGGRESSIVE_PROFIT_ARM_PCT", "0.5"))
 GIVEBACK_PCT = float(os.environ.get("AGGRESSIVE_PROFIT_GIVEBACK_PCT", "2.0"))
 ENABLED = os.environ.get("AGGRESSIVE_PROFIT_PROTECTION", "ON").upper() == "ON"
 
