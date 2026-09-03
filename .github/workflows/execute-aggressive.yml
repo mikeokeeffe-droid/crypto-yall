@@ -25,6 +25,14 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
+      - name: Run read-only Aggressive exit shadow suite
+        run: python aggressive_exit_shadow_suite.py
+        env:
+          HL_ACCOUNT_ADDRESS: ${{ secrets.HL_ACCOUNT_ADDRESS }}
+          HL_TESTNET: ${{ vars.HL_TESTNET }}
+          GIST_TOKEN: ${{ secrets.GIST_TOKEN }}
+          AGGRESSIVE_GIST_ID: ${{ secrets.AGGRESSIVE_GIST_ID }}
+
       - name: Execute aggressive trades on Hyperliquid
         shell: bash
         run: |
@@ -61,7 +69,7 @@ jobs:
           AGGRESSIVE_MAX_POSITIONS: ${{ vars.AGGRESSIVE_MAX_POSITIONS }}
           AGGRESSIVE_KILL_SWITCH: ${{ vars.AGGRESSIVE_KILL_SWITCH }}
           AGGRESSIVE_PROFIT_PROTECTION: 'ON'
-          AGGRESSIVE_PROFIT_ARM_PCT: '1.0'
+          AGGRESSIVE_PROFIT_ARM_PCT: '0.5'
           AGGRESSIVE_PROFIT_GIVEBACK_PCT: '2.0'
           GIST_TOKEN: ${{ secrets.GIST_TOKEN }}
           AGGRESSIVE_GIST_ID: ${{ secrets.AGGRESSIVE_GIST_ID }}
