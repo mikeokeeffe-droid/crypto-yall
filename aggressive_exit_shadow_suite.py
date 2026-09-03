@@ -102,6 +102,8 @@ def latest_open_time(state: dict, coin: str) -> pd.Timestamp | None:
     for rec in reversed(state.get("history", []) or []):
         if str(rec.get("hl_coin", "")) != coin:
             continue
+        if str(rec.get("action", "")) == "close" and str(rec.get("status", "")).lower() == "filled":
+            break
         action = str(rec.get("action", ""))
         if action in {"open_long", "open_short"} and str(rec.get("status", "")).lower() == "filled":
             try:
@@ -114,6 +116,19 @@ def latest_open_time(state: dict, coin: str) -> pd.Timestamp | None:
     return None
 
 
+def same_trade(previous: dict, side: str, entry_px: float) -> bool:
+    if not previous:
+        return False
+    if str(previous.get("side", "")).lower() != side:
+        return False
+    try:
+        old_entry = float(previous.get("entry_px", 0.0) or 0.0)
+    except (TypeError, ValueError):
+        return False
+    tolerance = max(1e-12, abs(entry_px) * 1e-8)
+    return abs(old_entry - entry_px) <= tolerance
+
+
 def main() -> None:
     print("Aggressive exit shadow suite started")
     print("READ ONLY: no private key, no Exchange client, no order methods")
@@ -122,14 +137,27 @@ def main() -> None:
     positions = get_positions(info, address)
     owned = set(state.get("owned_coins", []) or [])
     managed = {c: p for c, p in positions.items() if c in owned}
+    shadow = state.setdefault("aggressive_exit_shadow", {})
+    rsi_armed = state.setdefault("aggressive_rsi_armed", {})
+
+    # Remove state for positions that are no longer owned/open so a future
+    # trade in the same coin always starts with a clean shadow trail.
+    for coin in list(shadow):
+        if coin not in managed:
+            shadow.pop(coin, None)
+    for coin in list(rsi_armed):
+        if coin not in managed:
+            rsi_armed.pop(coin, None)
+
     if not managed:
+        state["aggressive_exit_shadow"] = shadow
+        state["aggressive_rsi_armed"] = rsi_armed
+        save_state(state)
         print("No Aggressive-owned open positions")
         return
 
     data = fetch_all_intraday(TICKERS, interval="30m", lookback_hours=LOOKBACK_HOURS)
     ticker_by_coin = {coin: ticker for ticker, coin in HL_SYMBOL_MAP.items()}
-    shadow = state.setdefault("aggressive_exit_shadow", {})
-    rsi_armed = state.setdefault("aggressive_rsi_armed", {})
 
     for coin, pos in managed.items():
         ticker = ticker_by_coin.get(coin)
@@ -139,6 +167,7 @@ def main() -> None:
             continue
 
         side = "long" if float(pos["size"]) > 0 else "short"
+        entry = float(pos.get("entry_px", 0.0) or 0.0)
         current = float(df["Close"].iloc[-1])
         atr = atr_wilder(df)
         atr_now = float(atr.iloc[-1]) if np.isfinite(atr.iloc[-1]) else None
@@ -146,27 +175,41 @@ def main() -> None:
             print(f"{coin}: ATR unavailable")
             continue
 
-        # ATR1.5: one-sided volatility trail from the best close in the observed
-        # since-entry window. This is research-only and ratchets through state.
+        previous = shadow.get(coin, {}) if isinstance(shadow.get(coin), dict) else {}
+        continuing = same_trade(previous, side, entry)
+        if not continuing:
+            # New position, side flip, or materially different entry: never
+            # inherit ATR/Chandelier ratchets or RSI armed state from old trade.
+            previous = {}
+            rsi_armed[coin] = False
+            print(f"{coin}: starting fresh shadow state for new {side} trade")
+
         open_time = latest_open_time(state, coin)
-        since = df[df.index >= open_time] if open_time is not None else df.tail(48)
-        partial = open_time is None or len(since) == 0
+        if open_time is not None:
+            since = df[df.index >= open_time]
+            partial = len(since) == 0
+        else:
+            since = df.iloc[-1:]
+            partial = True
         if len(since) == 0:
-            since = df.tail(48)
+            since = df.iloc[-1:]
+            partial = True
+
+        # Match Intraday's reference rules: the entry itself is always a valid
+        # favorable extreme, then completed since-entry candles can improve it.
         if side == "long":
-            best_close = float(since["Close"].max())
+            best_close = max(entry, float(since["Close"].max()))
+            best_high = max(entry, float(since["High"].max()))
             atr_candidate = best_close - ATR_MULT * atr_now
-            best_high = float(since["High"].max())
             chand_candidate = best_high - CHAND_MULT * atr_now
         else:
-            best_close = float(since["Close"].min())
+            best_close = min(entry, float(since["Close"].min()))
+            best_low = min(entry, float(since["Low"].min()))
             atr_candidate = best_close + ATR_MULT * atr_now
-            best_low = float(since["Low"].min())
             chand_candidate = best_low + CHAND_MULT * atr_now
 
-        prev = shadow.get(coin, {}) if isinstance(shadow.get(coin), dict) else {}
-        prev_atr = prev.get("atr_level")
-        prev_chand = prev.get("chandelier_level")
+        prev_atr = previous.get("atr_level")
+        prev_chand = previous.get("chandelier_level")
         if side == "long":
             atr_level = max(float(prev_atr), atr_candidate) if prev_atr is not None else atr_candidate
             chand_level = max(float(prev_chand), chand_candidate) if prev_chand is not None else chand_candidate
@@ -185,13 +228,13 @@ def main() -> None:
         )
         rsi_armed[coin] = bool(armed)
 
-        entry = float(pos.get("entry_px", 0.0) or 0.0)
         size = abs(float(pos.get("size", 0.0) or 0.0))
         upnl = float(pos.get("unrealized_pnl", 0.0) or 0.0)
         ret = upnl / (entry * size) * 100.0 if entry > 0 and size > 0 else 0.0
 
         shadow[coin] = {
             "side": side,
+            "entry_px": entry,
             "price": current,
             "return_pct": ret,
             "atr": atr_now,
