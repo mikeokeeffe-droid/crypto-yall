@@ -1,9 +1,15 @@
 """Live profit protection for the Aggressive bot only.
 
-Arms after peak return reaches +0.5% on entry notional. Once armed, closes
-when current return has fallen 2.0 percentage points from the tracked peak.
-The existing aggressive signal exits remain unchanged and take precedence.
-After a protection exit, same-setup re-entry is blocked until the signal resets.
+Keeps the existing signal exits unchanged and gives them precedence.
+
+Two live protection layers are applied on entry-notional return:
+1) Small-profit floor: once peak return reaches +1.00%, close if the current
+   return falls to +0.25% or lower.
+2) Existing trailing protection: once peak reaches +0.50%, close after a
+   2.00 percentage-point giveback from the tracked peak.
+
+After any protection exit, same-setup re-entry is blocked until the signal
+resets or flips.
 """
 
 import os
@@ -14,6 +20,8 @@ from reentry_lock import block_locked_entries, mark_pending_lock, refresh_locks
 
 ARM_PCT = float(os.environ.get("AGGRESSIVE_PROFIT_ARM_PCT", "0.5"))
 GIVEBACK_PCT = float(os.environ.get("AGGRESSIVE_PROFIT_GIVEBACK_PCT", "2.0"))
+SMALL_PROFIT_PEAK_PCT = float(os.environ.get("AGGRESSIVE_SMALL_PROFIT_PEAK_PCT", "1.0"))
+SMALL_PROFIT_FLOOR_PCT = float(os.environ.get("AGGRESSIVE_SMALL_PROFIT_FLOOR_PCT", "0.25"))
 ENABLED = os.environ.get("AGGRESSIVE_PROFIT_PROTECTION", "ON").upper() == "ON"
 
 _peak_returns = {}
@@ -52,26 +60,55 @@ def decide_trades(signals, open_positions, max_positions, pyramid_state):
     for coin, position in open_positions.items():
         if coin in already_closing:
             continue
+
         peak_pct = float(_peak_returns.get(coin, 0.0) or 0.0)
-        if peak_pct < ARM_PCT:
-            continue
         current_pct = _current_return_pct(position)
         if current_pct is None:
             continue
+
         giveback = peak_pct - current_pct
-        if giveback < GIVEBACK_PCT:
+        small_profit_trigger = (
+            peak_pct >= SMALL_PROFIT_PEAK_PCT
+            and current_pct <= SMALL_PROFIT_FLOOR_PCT
+        )
+        trailing_trigger = (
+            peak_pct >= ARM_PCT
+            and giveback >= GIVEBACK_PCT
+        )
+
+        if not small_profit_trigger and not trailing_trigger:
             continue
+
         ticker = ticker_by_coin.get(coin)
         if ticker is None:
             continue
         side = "long" if float(position.get("size", 0.0)) > 0 else "short"
+
+        if small_profit_trigger:
+            protection_mode = "SMALL PROFIT FLOOR"
+            reason = (
+                f"small-profit protection: peak {peak_pct:.2f}% -> current {current_pct:.2f}% "
+                f"(floor +{SMALL_PROFIT_FLOOR_PCT:.2f}% after peak +{SMALL_PROFIT_PEAK_PCT:.2f}%)"
+            )
+        else:
+            protection_mode = "TRAILING PROFIT PROTECTION"
+            reason = (
+                f"profit protection: peak {peak_pct:.2f}% -> current {current_pct:.2f}% "
+                f"({giveback:.2f}pp giveback; armed at {ARM_PCT:.2f}%)"
+            )
+
         trades = [t for t in trades if t.get("hl_coin") != coin]
         trades.append({
             "ticker": ticker, "hl_coin": coin, "action": "close", "side": side,
-            "exit_type": "PROFIT PROTECTION", "protection_arm_pct": ARM_PCT,
-            "protection_peak_pct": peak_pct, "protection_trigger_return_pct": current_pct,
+            "exit_type": "PROFIT PROTECTION",
+            "protection_mode": protection_mode,
+            "protection_arm_pct": ARM_PCT,
+            "protection_peak_pct": peak_pct,
+            "protection_trigger_return_pct": current_pct,
             "protection_giveback_pct": giveback,
-            "reason": f"profit protection: peak {peak_pct:.2f}% -> current {current_pct:.2f}% ({giveback:.2f}pp giveback; armed at {ARM_PCT:.2f}%)",
+            "small_profit_peak_pct": SMALL_PROFIT_PEAK_PCT,
+            "small_profit_floor_pct": SMALL_PROFIT_FLOOR_PCT,
+            "reason": reason,
         })
         mark_pending_lock(_state, coin, side)
         already_closing.add(coin)
@@ -83,17 +120,25 @@ def send_telegram(results, status_summary):
     for result in results:
         item = dict(result)
         if item.get("action") == "close":
-            item.setdefault("exit_type", "PROFIT PROTECTION" if str(item.get("reason", "")).startswith("profit protection:") else "SIGNAL EXIT")
+            reason = str(item.get("reason", ""))
+            is_protection = reason.startswith("profit protection:") or reason.startswith("small-profit protection:")
+            item.setdefault("exit_type", "PROFIT PROTECTION" if is_protection else "SIGNAL EXIT")
             diagnostics = [f"Exit type: {item['exit_type']}"]
             if "peak_return_pct" in item:
                 diagnostics.append(f"Peak return: {float(item.get('peak_return_pct', 0.0) or 0.0):+.2f}%")
             if "realized_return_pct" in item:
                 diagnostics.append(f"Net return: {float(item.get('realized_return_pct', 0.0) or 0.0):+.2f}%")
-            if "protection_giveback_pct" in item:
-                diagnostics.append(f"Protection giveback: {float(item.get('protection_giveback_pct', 0.0) or 0.0):.2f}pp")
-                diagnostics.append(f"Protection rule: arm +{float(item.get('protection_arm_pct', ARM_PCT)):.2f}% / max {GIVEBACK_PCT:.2f}pp giveback")
+            if is_protection:
+                if item.get("protection_mode"):
+                    diagnostics.append(f"Protection mode: {item['protection_mode']}")
+                diagnostics.append(
+                    f"Small-profit floor: peak +{SMALL_PROFIT_PEAK_PCT:.2f}% / floor +{SMALL_PROFIT_FLOOR_PCT:.2f}%"
+                )
+                diagnostics.append(
+                    f"Trailing rule: arm +{ARM_PCT:.2f}% / max {GIVEBACK_PCT:.2f}pp giveback"
+                )
                 diagnostics.append("Re-entry: locked until signal reset")
-            item["reason"] = item.get("reason", "") + " | " + " | ".join(diagnostics)
+            item["reason"] = reason + " | " + " | ".join(diagnostics)
         enriched.append(item)
     _original_send_telegram(enriched, status_summary)
 
@@ -103,5 +148,9 @@ aggressive.decide_trades = decide_trades
 aggressive._send_telegram = send_telegram
 
 if __name__ == "__main__":
-    print(f"Aggressive live profit protection: {'ON' if ENABLED else 'OFF'} | arm +{ARM_PCT:.2f}% | max giveback {GIVEBACK_PCT:.2f}pp | re-entry lock ON")
+    print(
+        f"Aggressive live profit protection: {'ON' if ENABLED else 'OFF'} | "
+        f"small-profit peak +{SMALL_PROFIT_PEAK_PCT:.2f}% -> floor +{SMALL_PROFIT_FLOOR_PCT:.2f}% | "
+        f"trail arm +{ARM_PCT:.2f}% / max giveback {GIVEBACK_PCT:.2f}pp | re-entry lock ON"
+    )
     aggressive.main()
