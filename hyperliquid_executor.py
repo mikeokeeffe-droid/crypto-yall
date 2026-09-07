@@ -1358,7 +1358,7 @@ def main():
                     result["peak_unrealized_pnl"] = peak_pnl
                     result["peak_return_pct"] = peak_return_pct
                     result["realized_return_pct"] = realized_return_pct
-                    result["profit_giveback"] = peak_pnl - realized_pnl
+                    result["profit_giveback"] = max(0.0, peak_pnl - max(realized_pnl, 0.0))
 
                     state["realized_pnl_total"] = (
                         float(
