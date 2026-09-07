@@ -12,6 +12,8 @@ Required environment variables:
     AGGRESSIVE_MAX_POSITIONS            (defaults to 4)
     AGGRESSIVE_DD_PCT                   (defaults to 3 — tighter than others)
     AGGRESSIVE_KILL_SWITCH              ("OFF" halts aggressive only)
+    AGGRESSIVE_LEVERAGE                 (normal aggressive leverage; defaults to 3x)
+    AGGRESSIVE_MAX_LEVERAGE             (large-cap aggressive leverage; defaults to 4x)
     GMAIL_USER / GMAIL_APP_PASSWORD / NOTIFY_EMAILS
     TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID
 """
@@ -48,6 +50,8 @@ STATE_FILENAME = "aggressive_state.json"
 POSITION_SIZE_PCT = 0.015  # 1.5% per trade — higher than standard intraday
 PYRAMID_SIZE_PCT = 0.005   # 0.5% extra per pyramid add (max 2 adds)
 TESTNET_MIN_ORDER_NOTIONAL = 12.0  # buffer above Hyperliquid $10 minimum
+AGGRESSIVE_LEVERAGE = float(os.getenv("AGGRESSIVE_LEVERAGE", "3"))
+AGGRESSIVE_MAX_LEVERAGE = float(os.getenv("AGGRESSIVE_MAX_LEVERAGE", "4"))
 
 
 # ── State persistence (separate Gist) ───────────────────────────────────────
@@ -583,9 +587,13 @@ def main():
 
     results = []
     for trade in trades:
-        # Aggressive leverage: 4x for large cap (capped at 3x by HL), 1.5x for mid cap
+        # Aggressive leverage is controlled by repository/environment variables.
+        # Mid-cap / volatile assets use the normal setting; large caps use the max setting.
+        # Hyperliquid may apply a lower market-specific cap where required.
         profile = get_asset_profile(trade["ticker"])
-        leverage = min(4.0, profile["max_bull_leverage"] * 1.33)  # bumped from standard
+        is_large_cap = float(profile.get("max_bull_leverage", 1.5)) >= 3.0
+        leverage = AGGRESSIVE_MAX_LEVERAGE if is_large_cap else AGGRESSIVE_LEVERAGE
+        leverage = max(1.0, min(leverage, AGGRESSIVE_MAX_LEVERAGE))
         result = execute_trade(info, exchange, trade, capital, leverage)
         results.append(result)
         print(f"  {result['ticker']} {result['action']}: {result.get('status')}")
