@@ -59,6 +59,8 @@ jobs:
           DAILY_DD_PCT: ${{ vars.DAILY_DD_PCT }}
           MAX_POSITIONS: ${{ vars.MAX_POSITIONS }}
           KILL_SWITCH: ${{ vars.KILL_SWITCH }}
+          DAILY_LEVERAGE: ${{ vars.DAILY_LEVERAGE }}
+          DAILY_MAX_LEVERAGE: ${{ vars.DAILY_MAX_LEVERAGE }}
           GIST_TOKEN: ${{ secrets.GIST_TOKEN }}
           GIST_ID: ${{ secrets.GIST_ID }}
           GMAIL_USER: ${{ secrets.GMAIL_USER }}
