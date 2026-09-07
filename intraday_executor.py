@@ -919,6 +919,27 @@ def main():
         })
 
     state["history"] = history[-500:]
+
+    # Closed-trade win/loss percentages from retained bot history.
+    closed = [
+        h for h in state["history"]
+        if h.get("action") == "close"
+        and h.get("status") == "filled"
+        and h.get("realized_pnl") is not None
+    ]
+    wins = sum(1 for h in closed if float(h.get("realized_pnl", 0.0) or 0.0) > 0)
+    losses = sum(1 for h in closed if float(h.get("realized_pnl", 0.0) or 0.0) < 0)
+    breakeven = max(0, len(closed) - wins - losses)
+    decided = wins + losses
+    win_pct = (wins / decided * 100.0) if decided else 0.0
+    loss_pct = (losses / decided * 100.0) if decided else 0.0
+    state["closed_trade_stats"] = {
+        "wins": wins,
+        "losses": losses,
+        "breakeven": breakeven,
+        "win_pct": win_pct,
+        "loss_pct": loss_pct,
+    }
     state["last_equity"] = equity
     state["last_run"] = dt.datetime.now(
         dt.UTC
@@ -965,6 +986,7 @@ def main():
         f" | {error_count} error(s)"
         f" | {skipped_count} skipped"
         f" | Equity: ${equity:,.2f}"
+        f" | W/L: {win_pct:.1f}%/{loss_pct:.1f}%"
     )
 
     if results:
