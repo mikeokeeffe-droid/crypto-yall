@@ -933,12 +933,27 @@ def main():
     decided = wins + losses
     win_pct = (wins / decided * 100.0) if decided else 0.0
     loss_pct = (losses / decided * 100.0) if decided else 0.0
+    gross_winning_dollars = sum(
+        float(h.get("realized_pnl", 0.0) or 0.0)
+        for h in closed
+        if float(h.get("realized_pnl", 0.0) or 0.0) > 0
+    )
+    gross_losing_dollars = sum(
+        float(h.get("realized_pnl", 0.0) or 0.0)
+        for h in closed
+        if float(h.get("realized_pnl", 0.0) or 0.0) < 0
+    )
+    net_closed_dollars = gross_winning_dollars + gross_losing_dollars
+
     state["closed_trade_stats"] = {
         "wins": wins,
         "losses": losses,
         "breakeven": breakeven,
         "win_pct": win_pct,
         "loss_pct": loss_pct,
+        "profit_dollars": gross_winning_dollars,
+        "loss_dollars": gross_losing_dollars,
+        "net_dollars": net_closed_dollars,
     }
     state["last_equity"] = equity
     state["last_run"] = dt.datetime.now(
@@ -987,6 +1002,8 @@ def main():
         f" | {skipped_count} skipped"
         f" | Equity: ${equity:,.2f}"
         f" | W/L: {win_pct:.1f}%/{loss_pct:.1f}%"
+        f" | P/L$: +${gross_winning_dollars:.2f}/${gross_losing_dollars:.2f}"
+        f" | Net: ${net_closed_dollars:+.2f}"
     )
 
     if results:
