@@ -12,6 +12,8 @@ Required environment variables (shared with daily bot):
     INTRADAY_MAX_POSITIONS            (defaults to 2)
     INTRADAY_DD_PCT                   (daily drawdown cutoff, e.g. 5)
     INTRADAY_KILL_SWITCH              ("OFF" halts intraday only)
+    INTRADAY_LEVERAGE                 (defaults to current 2x)
+    INTRADAY_MAX_LEVERAGE             (defaults to current 2x)
     GMAIL_USER / GMAIL_APP_PASSWORD / NOTIFY_EMAILS
     TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID
 """
@@ -49,6 +51,8 @@ STATE_FILENAME = "intraday_state.json"
 POSITION_SIZE_PCT = 0.01
 TESTNET_MIN_ORDER_NOTIONAL = 12.0
 MAINNET_MIN_ORDER_NOTIONAL = 10.0
+INTRADAY_LEVERAGE = float(os.getenv("INTRADAY_LEVERAGE", "2"))
+INTRADAY_MAX_LEVERAGE = float(os.getenv("INTRADAY_MAX_LEVERAGE", "2"))
 
 
 # ── State persistence (separate Gist from daily bot) ────────────────────────
@@ -694,7 +698,7 @@ def main():
     results = []
 
     for trade in trades:
-        leverage = 2.0
+        leverage = max(1.0, min(INTRADAY_LEVERAGE, INTRADAY_MAX_LEVERAGE))
 
         result = execute_trade(
             info,
