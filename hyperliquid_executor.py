@@ -12,6 +12,8 @@ Required environment variables:
     SEGREGATED_CAPITAL  – USDC allocated to bot (e.g. "10000")
     DAILY_DD_PCT        – Max daily drawdown % before auto-pause (e.g. "5")
     MAX_POSITIONS       – Max concurrent open positions
+    DAILY_LEVERAGE      – Base daily leverage multiplier (defaults to 1x)
+    DAILY_MAX_LEVERAGE  – Maximum daily leverage (defaults to current 3x cap)
     KILL_SWITCH         – "OFF" to halt all trading, else trades enabled
     GIST_TOKEN / GIST_ID – State persistence
     GMAIL_USER / GMAIL_APP_PASSWORD / NOTIFY_EMAILS – email alerts
@@ -41,6 +43,9 @@ from signal_utils import classify_signal
 
 
 # ── Config ───────────────────────────────────────────────────────────────────
+
+DAILY_LEVERAGE = float(os.getenv("DAILY_LEVERAGE", "1"))
+DAILY_MAX_LEVERAGE = float(os.getenv("DAILY_MAX_LEVERAGE", "3"))
 
 # Map yfinance tickers → Hyperliquid symbols
 HL_TICKER_MAP = {
@@ -1182,9 +1187,10 @@ def main():
 
     for trade in trades:
         sig_info = signals.get(trade["ticker"], {})
+        strategy_leverage = max(1.0, float(sig_info.get("leverage", 1.0)))
         leverage = max(
             1.0,
-            min(sig_info.get("leverage", 1.0), 3.0),
+            min(strategy_leverage * DAILY_LEVERAGE, DAILY_MAX_LEVERAGE),
         )
 
         result = execute_trade(
