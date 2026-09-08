@@ -91,9 +91,45 @@ def load_state() -> dict:
                 f"{STATE_FILENAME} not found in Intraday Gist"
             )
 
-        state = json.loads(
-            files[STATE_FILENAME]["content"]
-        )
+        state_file = files[STATE_FILENAME]
+
+        # GitHub's Gist API truncates large files in the inline "content"
+        # field.  Parsing that truncated text produces misleading JSON errors
+        # such as "Unterminated string".  When GitHub marks the file as
+        # truncated, fetch the complete file from its authenticated raw_url.
+        if state_file.get("truncated"):
+            raw_url = state_file.get("raw_url")
+            if not raw_url:
+                raise ValueError("Intraday Gist state is truncated but has no raw_url")
+
+            try:
+                raw_resp = requests.get(
+                    raw_url,
+                    headers={
+                        "Authorization": f"token {gist_token}",
+                        "Accept": "application/vnd.github.raw",
+                    },
+                    timeout=30,
+                )
+            except requests.RequestException as e:
+                raise RuntimeError(
+                    f"Failed to load full intraday state from Gist raw_url: {e}"
+                ) from e
+
+            if not raw_resp.ok:
+                raise RuntimeError(
+                    "Failed to load full intraday state from Gist raw_url: "
+                    f"HTTP {raw_resp.status_code} {raw_resp.text}"
+                )
+            state_text = raw_resp.text
+            print(
+                "Intraday Gist state exceeded the inline API limit; "
+                "loaded complete state from raw_url"
+            )
+        else:
+            state_text = state_file.get("content", "")
+
+        state = json.loads(state_text)
 
         if not isinstance(state, dict):
             raise TypeError("Intraday state is not a JSON object")
