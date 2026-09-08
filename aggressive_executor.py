@@ -245,6 +245,47 @@ def get_position_entry_fees(
     return total_fee, complete
 
 
+ENTRY_SHADOW_KEYS = (
+    "entry_quality",
+    "entry_quality_score",
+    "entry_type",
+    "entry_adx",
+    "entry_plus_di",
+    "entry_minus_di",
+    "entry_atr_pct",
+    "entry_vwap_dev_pct",
+    "entry_osc",
+    "entry_osc_delta",
+    "entry_directional_ok",
+    "entry_vwap_ok",
+    "entry_oscillator_ok",
+    "entry_shadow_only",
+    "entry_leverage",
+)
+
+
+def get_position_entry_shadow(state: dict, coin: str) -> dict:
+    """Return the original filled-entry shadow diagnostics for this position."""
+    history = state.get("history", []) or []
+
+    for item in reversed(history):
+        if item.get("hl_coin") != coin or item.get("status") != "filled":
+            continue
+
+        action = item.get("action")
+        if action == "close":
+            break
+
+        if action in ("open_long", "open_short"):
+            return {
+                key: item[key]
+                for key in ENTRY_SHADOW_KEYS
+                if key in item
+            }
+
+    return {}
+
+
 # ── Signal computation ─────────────────────────────────────────────────────
 
 def compute_aggressive_signals() -> dict:
@@ -755,6 +796,11 @@ def main():
                     result["peak_return_pct"] = peak_return_pct
                     result["realized_return_pct"] = realized_return_pct
                     result["profit_giveback"] = max(0.0, peak_pnl - max(realized_pnl, 0.0))
+
+                    # Carry the original entry-quality research fields onto the
+                    # close record so wins/losses can be analysed directly by
+                    # STRONG/MEDIUM/WEAK and fresh-vs-sync entry type.
+                    result.update(get_position_entry_shadow(state, coin))
 
                     state["realized_pnl_total"] = (
                         float(state.get("realized_pnl_total", 0.0) or 0.0)
