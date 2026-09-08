@@ -187,7 +187,7 @@ def get_account_equity(info, address: str) -> float:
 
 
 def get_open_positions(info, address: str) -> dict:
-    """Return {coin: {size, entry_px, unrealized_pnl}} for open positions."""
+    """Return open positions including the exchange-reported leverage."""
     state = info.user_state(address)
     positions = {}
 
@@ -197,10 +197,19 @@ def get_open_positions(info, address: str) -> dict:
         if size == 0:
             continue
 
+        raw_leverage = pos.get("leverage", 1.0)
+        if isinstance(raw_leverage, dict):
+            raw_leverage = raw_leverage.get("value", 1.0)
+        try:
+            leverage = float(raw_leverage or 1.0)
+        except (TypeError, ValueError):
+            leverage = 1.0
+
         positions[pos["coin"]] = {
             "size": size,  # signed: + long, - short
             "entry_px": float(pos["entryPx"]),
             "unrealized_pnl": float(pos["unrealizedPnl"]),
+            "leverage": leverage,
         }
 
     return positions
