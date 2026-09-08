@@ -18,8 +18,18 @@ import aggressive_executor as aggressive
 from intraday_data_loader import HL_SYMBOL_MAP
 from reentry_lock import block_locked_entries, mark_pending_lock, refresh_locks
 
-ARM_PCT = float(os.environ.get("AGGRESSIVE_PROFIT_ARM_PCT", "0.5"))
-GIVEBACK_PCT = float(os.environ.get("AGGRESSIVE_PROFIT_GIVEBACK_PCT", "2.0"))
+def _env_float(name: str, default: float) -> float:
+    raw = os.environ.get(name)
+    return float(raw) if raw not in (None, "") else float(default)
+
+
+ARM_PCT = _env_float("AGGRESSIVE_PROFIT_ARM_PCT", 0.5)
+GIVEBACK_PCT = _env_float("AGGRESSIVE_PROFIT_GIVEBACK_PCT", 2.0)
+LOW_LEV_ARM_PCT = _env_float("AGGRESSIVE_LOW_LEV_PROTECTION", 0.5)
+LOW_LEV_GIVEBACK_PCT = _env_float("AGGRESSIVE_LOW_LEV_GIVEBACK", 2.0)
+HIGH_LEV_ARM_PCT = _env_float("AGGRESSIVE_HIGH_LEV_PROTECTION", 0.4)
+HIGH_LEV_GIVEBACK_PCT = _env_float("AGGRESSIVE_HIGH_LEV_GIVEBACK", 1.0)
+HIGH_LEV_THRESHOLD = _env_float("AGGRESSIVE_HIGH_LEV_THRESHOLD", 3.0)
 SMALL_PROFIT_PEAK_PCT = float(os.environ.get("AGGRESSIVE_SMALL_PROFIT_PEAK_PCT", "1.0"))
 SMALL_PROFIT_FLOOR_PCT = float(os.environ.get("AGGRESSIVE_SMALL_PROFIT_FLOOR_PCT", "0.25"))
 ENABLED = os.environ.get("AGGRESSIVE_PROFIT_PROTECTION", "ON").upper() == "ON"
@@ -66,14 +76,22 @@ def decide_trades(signals, open_positions, max_positions, pyramid_state):
         if current_pct is None:
             continue
 
+        leverage = float(position.get("leverage", 1.0) or 1.0)
+        is_high_leverage = leverage >= HIGH_LEV_THRESHOLD
+        active_arm_pct = HIGH_LEV_ARM_PCT if is_high_leverage else LOW_LEV_ARM_PCT
+        active_giveback_pct = (
+            HIGH_LEV_GIVEBACK_PCT if is_high_leverage else LOW_LEV_GIVEBACK_PCT
+        )
+        protection_band = "HIGH LEVERAGE" if is_high_leverage else "LOW LEVERAGE"
+
         giveback = peak_pct - current_pct
         small_profit_trigger = (
             peak_pct >= SMALL_PROFIT_PEAK_PCT
             and current_pct <= SMALL_PROFIT_FLOOR_PCT
         )
         trailing_trigger = (
-            peak_pct >= ARM_PCT
-            and giveback >= GIVEBACK_PCT
+            peak_pct >= active_arm_pct
+            and giveback >= active_giveback_pct
         )
 
         if not small_profit_trigger and not trailing_trigger:
@@ -91,10 +109,12 @@ def decide_trades(signals, open_positions, max_positions, pyramid_state):
                 f"(floor +{SMALL_PROFIT_FLOOR_PCT:.2f}% after peak +{SMALL_PROFIT_PEAK_PCT:.2f}%)"
             )
         else:
-            protection_mode = "TRAILING PROFIT PROTECTION"
+            protection_mode = f"{protection_band} TRAILING PROFIT PROTECTION"
             reason = (
-                f"profit protection: peak {peak_pct:.2f}% -> current {current_pct:.2f}% "
-                f"({giveback:.2f}pp giveback; armed at {ARM_PCT:.2f}%)"
+                f"profit protection: {protection_band.lower()} {leverage:.0f}x | "
+                f"peak {peak_pct:.2f}% -> current {current_pct:.2f}% "
+                f"({giveback:.2f}pp giveback; armed at {active_arm_pct:.2f}%, "
+                f"max {active_giveback_pct:.2f}pp)"
             )
 
         trades = [t for t in trades if t.get("hl_coin") != coin]
@@ -102,7 +122,10 @@ def decide_trades(signals, open_positions, max_positions, pyramid_state):
             "ticker": ticker, "hl_coin": coin, "action": "close", "side": side,
             "exit_type": "PROFIT PROTECTION",
             "protection_mode": protection_mode,
-            "protection_arm_pct": ARM_PCT,
+            "protection_arm_pct": active_arm_pct,
+            "protection_max_giveback_pct": active_giveback_pct,
+            "position_leverage": leverage,
+            "protection_band": protection_band,
             "protection_peak_pct": peak_pct,
             "protection_trigger_return_pct": current_pct,
             "protection_giveback_pct": giveback,
@@ -134,8 +157,14 @@ def send_telegram(results, status_summary):
                 diagnostics.append(
                     f"Small-profit floor: peak +{SMALL_PROFIT_PEAK_PCT:.2f}% / floor +{SMALL_PROFIT_FLOOR_PCT:.2f}%"
                 )
+                if item.get("position_leverage") is not None:
+                    diagnostics.append(
+                        f"Leverage band: {item.get('protection_band', 'UNKNOWN')} "
+                        f"({float(item['position_leverage']):.0f}x)"
+                    )
                 diagnostics.append(
-                    f"Trailing rule: arm +{ARM_PCT:.2f}% / max {GIVEBACK_PCT:.2f}pp giveback"
+                    f"Trailing rule used: arm +{float(item.get('protection_arm_pct', ARM_PCT)):.2f}% "
+                    f"/ max {float(item.get('protection_max_giveback_pct', GIVEBACK_PCT)):.2f}pp giveback"
                 )
                 diagnostics.append("Re-entry: locked until signal reset")
             item["reason"] = reason + " | " + " | ".join(diagnostics)
@@ -151,6 +180,8 @@ if __name__ == "__main__":
     print(
         f"Aggressive live profit protection: {'ON' if ENABLED else 'OFF'} | "
         f"small-profit peak +{SMALL_PROFIT_PEAK_PCT:.2f}% -> floor +{SMALL_PROFIT_FLOOR_PCT:.2f}% | "
-        f"trail arm +{ARM_PCT:.2f}% / max giveback {GIVEBACK_PCT:.2f}pp | re-entry lock ON"
+        f"low-lev arm +{LOW_LEV_ARM_PCT:.2f}% / {LOW_LEV_GIVEBACK_PCT:.2f}pp | "
+        f"high-lev ({HIGH_LEV_THRESHOLD:.0f}x+) arm +{HIGH_LEV_ARM_PCT:.2f}% / "
+        f"{HIGH_LEV_GIVEBACK_PCT:.2f}pp | re-entry lock ON"
     )
     aggressive.main()
