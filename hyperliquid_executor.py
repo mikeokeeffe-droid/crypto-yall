@@ -955,6 +955,19 @@ def _send_telegram(results: list[dict], status_summary: str):
                 f"${r.get('fill_price', 0):,.2f}"
             )
 
+            if r.get("entry_quality") is not None:
+                quality = str(r.get("entry_quality", "UNKNOWN"))
+                score = float(r.get("entry_quality_score", 0.0) or 0.0)
+                entry_type = str(r.get("entry_type", "unknown"))
+                entry_leverage = r.get("entry_leverage")
+                quality_line = (
+                    f"  Entry quality: {quality} {score:.0f}/100"
+                    f" | {entry_type}"
+                )
+                if entry_leverage is not None:
+                    quality_line += f" | {float(entry_leverage):.0f}x"
+                lines.append(quality_line)
+
             # On a completed close, show the trade's realized result.
             # Intraday and Aggressive use this same Telegram function, so
             # this automatically applies to all three live bots.
