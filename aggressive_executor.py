@@ -27,6 +27,7 @@ import requests
 
 from intraday_data_loader import fetch_all_intraday, HL_SYMBOL_MAP
 from aggressive_strategy import generate_aggressive_signals, classify_aggressive_signal
+from aggressive_entry_shadow import score_entry_quality
 from hyperliquid_executor import (
     ASSETS,
     get_client,
@@ -275,6 +276,8 @@ def compute_aggressive_signals() -> dict:
                 "osc": osc,
                 "pyramid": pyramid,
                 "pyramid_added": pyramid > prev_pyramid,  # fresh pyramid this bar
+                "_entry_df": df,
+                "_entry_signal_df": sig,
             }
         except Exception as e:
             print(f"Error on {ticker}: {e}")
@@ -595,6 +598,32 @@ def main():
         leverage = AGGRESSIVE_MAX_LEVERAGE if is_large_cap else AGGRESSIVE_LEVERAGE
         leverage = max(1.0, min(leverage, AGGRESSIVE_MAX_LEVERAGE))
         result = execute_trade(info, exchange, trade, capital, leverage)
+
+        # Observation only: score newly filled Aggressive entries.
+        if (
+            result.get("status") == "filled"
+            and result.get("action") in ("open_long", "open_short")
+        ):
+            signal_info = signals.get(trade["ticker"], {})
+            entry_type = (
+                "sync_hold"
+                if str(trade.get("reason", "")).startswith("sync to ")
+                else "fresh_signal"
+            )
+            shadow = score_entry_quality(
+                signal_info.get("_entry_df"),
+                signal_info.get("_entry_signal_df"),
+                trade["side"],
+                entry_type,
+            )
+            result.update(shadow)
+            result["entry_leverage"] = leverage
+            print(
+                f"    Entry Quality Shadow: {shadow.get('entry_quality')} "
+                f"{shadow.get('entry_quality_score', 0):.0f}/100 | "
+                f"{entry_type} | {leverage:.0f}x | observation only"
+            )
+
         results.append(result)
         print(f"  {result['ticker']} {result['action']}: {result.get('status')}")
 
@@ -829,7 +858,13 @@ def main():
     # Refresh peaks after any fills so newly opened positions get tracked too.
     update_peak_tracking(state, state["open_positions"], owned_coins)
 
-    state["last_signals"] = signals
+    state["last_signals"] = {
+        ticker: {
+            k: v for k, v in signal_info.items()
+            if not k.startswith("_entry_")
+        }
+        for ticker, signal_info in signals.items()
+    }
     save_state(state)
 
     filled_count = sum(1 for r in results if r.get("status") == "filled")
