@@ -1,7 +1,7 @@
 {
   "bots": {
     "aggressive": {
-      "bot_state_drawdown_pct": -0.4719990740740739,
+      "bot_state_drawdown_pct": -0.2151620370370364,
       "by_asset": {
         "AVAX": {
           "average_loss": -0.238954,
@@ -138,7 +138,7 @@
       "funding": -0.000356,
       "gross_closed_pnl": -0.28468,
       "incomplete_accounting": [],
-      "last_run": "2026-09-10T11:03:09.118617+00:00",
+      "last_run": "2026-09-10T11:33:16.122317+00:00",
       "leverage_results": {
         "3x": {
           "average_loss": -0.238954,
@@ -239,7 +239,7 @@
     }
   },
   "date_utc": "2026-09-10",
-  "generated_at": "2026-09-10T11:08:18.322589+00:00",
+  "generated_at": "2026-09-10T11:33:17.757694+00:00",
   "report_errors": [],
   "reporting_only": true,
   "schema_version": 1
