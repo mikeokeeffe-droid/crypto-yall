@@ -22,6 +22,196 @@ BOTS = {
 }
 
 
+MIDCAP_SHORT_SHADOW_TICKERS = [
+    "SOL-USD",
+    "AVAX-USD",
+    "LINK-USD",
+    "SUI20947-USD",
+    "XRP-USD",
+    "ONDO-USD",
+]
+
+
+def _load_previous_short_shadow() -> dict[str, Any]:
+    path = Path("reports/latest.json")
+    if not path.exists():
+        return {}
+    try:
+        previous = json.loads(path.read_text(encoding="utf-8"))
+        value = previous.get("short_opportunity_check", {})
+        return value if isinstance(value, dict) else {}
+    except Exception:
+        return {}
+
+
+def _shadow_return_pct(entry_price: float, current_price: float) -> float:
+    if entry_price <= 0:
+        return 0.0
+    return (entry_price - current_price) / entry_price * 100.0
+
+
+def _shadow_stats(rows: list[dict[str, Any]]) -> dict[str, Any]:
+    values = [float(r.get("gross_return_pct", 0.0) or 0.0) for r in rows]
+    wins = [v for v in values if v > 0]
+    losses = [v for v in values if v < 0]
+    decided = len(wins) + len(losses)
+    return {
+        "closed_trades": len(rows),
+        "wins": len(wins),
+        "losses": len(losses),
+        "win_rate_pct": round(len(wins) / decided * 100.0, 2) if decided else None,
+        "average_win_pct": round(sum(wins) / len(wins), 4) if wins else None,
+        "average_loss_pct": round(sum(losses) / len(losses), 4) if losses else None,
+        "cumulative_gross_return_pct": round(sum(values), 4),
+    }
+
+
+def _update_short_opportunity_check(previous: dict[str, Any], now: dt.datetime) -> dict[str, Any]:
+    """
+    Observation-only shadow for mid-cap shorts that live trading currently blocks.
+
+    Tracks only fresh short signals seen after this feature starts. It never
+    sends orders, imports executor modules, or changes live bot state.
+    Shadow returns are price-only gross percentages: fees and funding excluded.
+    """
+    from intraday_data_loader import fetch_all_intraday, HL_SYMBOL_MAP
+    from aggressive_strategy import (
+        generate_aggressive_signals,
+        classify_aggressive_signal,
+    )
+    from intraday_strategy import (
+        generate_intraday_signals,
+        classify_intraday_signal,
+    )
+
+    result = previous if isinstance(previous, dict) else {}
+    result.setdefault("tracking_started_at", now.isoformat())
+    result["updated_at"] = now.isoformat()
+    result["scope"] = (
+        "Shadow-only fresh short signals for SOL/AVAX/LINK/SUI/XRP/ONDO "
+        "that live trading blocks because mid-cap allow_short=False."
+    )
+    result["accounting_note"] = (
+        "Paper results are price-only gross return percentages; trading fees "
+        "and funding are not included."
+    )
+    result.setdefault("bots", {})
+    result["errors"] = []
+
+    configs = {
+        "aggressive": {
+            "interval": "30m",
+            "lookback_hours": 1000,
+            "generate": generate_aggressive_signals,
+            "classify": classify_aggressive_signal,
+        },
+        "intraday": {
+            "interval": "1h",
+            "lookback_hours": 1000,
+            "generate": generate_intraday_signals,
+            "classify": classify_intraday_signal,
+        },
+    }
+
+    for bot_name, cfg in configs.items():
+        bot_state = result["bots"].setdefault(
+            bot_name,
+            {"open_positions": {}, "closed_trades": []},
+        )
+        bot_state.setdefault("open_positions", {})
+        bot_state.setdefault("closed_trades", [])
+
+        try:
+            all_data = fetch_all_intraday(
+                MIDCAP_SHORT_SHADOW_TICKERS,
+                interval=cfg["interval"],
+                lookback_hours=cfg["lookback_hours"],
+            )
+        except Exception as exc:
+            result["errors"].append(
+                f"{bot_name}: data fetch failed: {type(exc).__name__}: {exc}"
+            )
+            continue
+
+        for ticker in MIDCAP_SHORT_SHADOW_TICKERS:
+            asset = HL_SYMBOL_MAP.get(ticker, ticker)
+            try:
+                df = all_data.get(ticker)
+                if df is None or df.empty or len(df) < 50:
+                    continue
+
+                signal_df = cfg["generate"](df, allow_short=True)
+                last_signal = int(signal_df["Signal"].iloc[-1])
+                prev_signal = int(signal_df["Signal"].iloc[-2])
+                action = cfg["classify"](last_signal, prev_signal)
+                price = float(df["Close"].iloc[-1])
+                candle_time = df.index[-1]
+                if hasattr(candle_time, "isoformat"):
+                    candle_time = candle_time.isoformat()
+                else:
+                    candle_time = str(candle_time)
+
+                open_pos = bot_state["open_positions"].get(asset)
+
+                if open_pos is None and action == "enter_short":
+                    bot_state["open_positions"][asset] = {
+                        "asset": asset,
+                        "ticker": ticker,
+                        "entry_time": candle_time,
+                        "entry_price": price,
+                        "blocked_live_reason": "mid-cap allow_short=False",
+                        "current_price": price,
+                        "unrealized_gross_return_pct": 0.0,
+                    }
+                    continue
+
+                if open_pos is None:
+                    continue
+
+                entry_price = float(open_pos.get("entry_price", 0.0) or 0.0)
+                open_pos["current_price"] = price
+                open_pos["unrealized_gross_return_pct"] = round(
+                    _shadow_return_pct(entry_price, price),
+                    4,
+                )
+
+                if last_signal != -1:
+                    gross_return_pct = _shadow_return_pct(entry_price, price)
+                    closed = {
+                        "asset": asset,
+                        "ticker": ticker,
+                        "entry_time": open_pos.get("entry_time"),
+                        "exit_time": candle_time,
+                        "entry_price": entry_price,
+                        "exit_price": price,
+                        "gross_return_pct": round(gross_return_pct, 4),
+                        "outcome": (
+                            "win" if gross_return_pct > 0
+                            else "loss" if gross_return_pct < 0
+                            else "breakeven"
+                        ),
+                        "exit_action": action,
+                        "blocked_live_reason": "mid-cap allow_short=False",
+                    }
+                    bot_state["closed_trades"].append(closed)
+                    bot_state["open_positions"].pop(asset, None)
+
+            except Exception as exc:
+                result["errors"].append(
+                    f"{bot_name}/{asset}: {type(exc).__name__}: {exc}"
+                )
+
+        bot_state["closed_trades"] = bot_state["closed_trades"][-200:]
+        today_rows = [
+            r for r in bot_state["closed_trades"]
+            if str(r.get("exit_time", "")).startswith(now.date().isoformat())
+        ]
+        bot_state["today"] = _shadow_stats(today_rows)
+        bot_state["all_time"] = _shadow_stats(bot_state["closed_trades"])
+
+    return result
+
+
 def _fetch_gist_file(gist_id: str, filename: str, token: str) -> dict[str, Any]:
     resp = requests.get(
         f"https://api.github.com/gists/{gist_id}",
@@ -235,8 +425,10 @@ def main() -> None:
 
     now = dt.datetime.now(dt.UTC)
     day = now.date()
+    previous_short_shadow = _load_previous_short_shadow()
+
     report: dict[str, Any] = {
-        "schema_version": 1,
+        "schema_version": 2,
         "date_utc": day.isoformat(),
         "generated_at": now.isoformat(),
         "reporting_only": True,
@@ -254,6 +446,17 @@ def main() -> None:
             report["bots"][name] = _summarize(name, state, day)
         except Exception as exc:
             report["report_errors"].append(f"{name}: {type(exc).__name__}: {exc}")
+
+    try:
+        report["short_opportunity_check"] = _update_short_opportunity_check(
+            previous_short_shadow,
+            now,
+        )
+    except Exception as exc:
+        report["short_opportunity_check"] = previous_short_shadow
+        report["report_errors"].append(
+            f"short opportunity tracking: {type(exc).__name__}: {exc}"
+        )
 
     out = Path("reports")
     out.mkdir(exist_ok=True)
