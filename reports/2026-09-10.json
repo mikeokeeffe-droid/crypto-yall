@@ -1,7 +1,7 @@
 {
   "bots": {
     "aggressive": {
-      "bot_state_drawdown_pct": -0.4635805555555551,
+      "bot_state_drawdown_pct": -0.6876962962962959,
       "by_asset": {
         "AVAX": {
           "average_loss": -0.238954,
@@ -46,9 +46,31 @@
           "trades": 1,
           "win_rate_pct": 0.0,
           "wins": 0
+        },
+        "SUI": {
+          "average_loss": -0.195015,
+          "average_win": null,
+          "breakeven": 0,
+          "losses": 1,
+          "net_pnl": -0.195015,
+          "profit_giveback": 0.032536,
+          "trades": 1,
+          "win_rate_pct": 0.0,
+          "wins": 0
+        },
+        "XRP": {
+          "average_loss": -0.124213,
+          "average_win": null,
+          "breakeven": 0,
+          "losses": 1,
+          "net_pnl": -0.124213,
+          "profit_giveback": 0.05232,
+          "trades": 1,
+          "win_rate_pct": 0.0,
+          "wins": 0
         }
       },
-      "closed_trade_max_drawdown": 0.428743,
+      "closed_trade_max_drawdown": 0.747971,
       "closed_trades": [
         {
           "asset": "BTC",
@@ -125,17 +147,55 @@
           "side": "long",
           "time": "2026-09-10T12:33:21.847857+00:00",
           "trading_fees": 0.012715
+        },
+        {
+          "asset": "SUI",
+          "entry_quality": "MEDIUM",
+          "entry_type": "sync_hold",
+          "exit_type": null,
+          "fee_data_complete": true,
+          "funding": -0.001114,
+          "funding_data_complete": true,
+          "gross_pnl": -0.180516,
+          "leverage": 3.0,
+          "peak_unrealized_pnl": 0.032536,
+          "pnl_source": "hyperliquid_closedPnl+userFunding",
+          "profit_giveback": 0.032536,
+          "protection_mode": null,
+          "realized_net_pnl": -0.195015,
+          "side": "long",
+          "time": "2026-09-10T13:03:34.100495+00:00",
+          "trading_fees": 0.013385
+        },
+        {
+          "asset": "XRP",
+          "entry_quality": "WEAK",
+          "entry_type": "sync_hold",
+          "exit_type": null,
+          "fee_data_complete": true,
+          "funding": 0.000102,
+          "funding_data_complete": true,
+          "gross_pnl": -0.112,
+          "leverage": 3.0,
+          "peak_unrealized_pnl": 0.05232,
+          "pnl_source": "hyperliquid_closedPnl+userFunding",
+          "profit_giveback": 0.05232,
+          "protection_mode": null,
+          "realized_net_pnl": -0.124213,
+          "side": "long",
+          "time": "2026-09-10T13:03:34.100531+00:00",
+          "trading_fees": 0.012315
         }
       ],
       "entry_quality_results": {
         "MEDIUM": {
-          "average_loss": -0.083729,
+          "average_loss": -0.139372,
           "average_win": null,
           "breakeven": 0,
-          "losses": 1,
-          "net_pnl": -0.083729,
-          "profit_giveback": 0.0768,
-          "trades": 1,
+          "losses": 2,
+          "net_pnl": -0.278744,
+          "profit_giveback": 0.109336,
+          "trades": 2,
           "win_rate_pct": 0.0,
           "wins": 0
         },
@@ -149,6 +209,17 @@
           "trades": 3,
           "win_rate_pct": 33.33,
           "wins": 1
+        },
+        "WEAK": {
+          "average_loss": -0.124213,
+          "average_win": null,
+          "breakeven": 0,
+          "losses": 1,
+          "net_pnl": -0.124213,
+          "profit_giveback": 0.05232,
+          "trades": 1,
+          "win_rate_pct": 0.0,
+          "wins": 0
         }
       },
       "entry_type_results": {
@@ -164,31 +235,31 @@
           "wins": 0
         },
         "sync": {
-          "average_loss": null,
+          "average_loss": -0.159614,
           "average_win": 0.019907,
           "breakeven": 0,
-          "losses": 0,
-          "net_pnl": 0.019907,
-          "profit_giveback": 0.089533,
-          "trades": 1,
-          "win_rate_pct": 100.0,
+          "losses": 2,
+          "net_pnl": -0.299321,
+          "profit_giveback": 0.174389,
+          "trades": 3,
+          "win_rate_pct": 33.33,
           "wins": 1
         }
       },
       "errors": [],
-      "funding": -0.00177,
-      "gross_closed_pnl": -0.35428,
+      "funding": -0.002782,
+      "gross_closed_pnl": -0.646796,
       "incomplete_accounting": [],
-      "last_run": "2026-09-10T12:33:21.847984+00:00",
+      "last_run": "2026-09-10T13:03:34.100661+00:00",
       "leverage_results": {
         "3x": {
-          "average_loss": -0.161342,
+          "average_loss": -0.160478,
           "average_win": null,
           "breakeven": 0,
-          "losses": 2,
-          "net_pnl": -0.322683,
-          "profit_giveback": 0.0768,
-          "trades": 2,
+          "losses": 4,
+          "net_pnl": -0.641911,
+          "profit_giveback": 0.161656,
+          "trades": 4,
           "win_rate_pct": 0.0,
           "wins": 0
         },
@@ -204,7 +275,7 @@
           "wins": 1
         }
       },
-      "profit_giveback": 0.189133,
+      "profit_giveback": 0.273989,
       "profit_protection_exits": [
         {
           "asset": "LINK",
@@ -226,21 +297,21 @@
           "trading_fees": 0.012715
         }
       ],
-      "realized_net_pnl": -0.408836,
+      "realized_net_pnl": -0.728064,
       "safety_events": [],
       "skipped_orders": [],
       "stats": {
-        "average_loss": -0.142914,
+        "average_loss": -0.149594,
         "average_win": 0.019907,
         "breakeven": 0,
-        "losses": 3,
-        "net_pnl": -0.408836,
-        "profit_giveback": 0.189133,
-        "trades": 4,
-        "win_rate_pct": 25.0,
+        "losses": 5,
+        "net_pnl": -0.728064,
+        "profit_giveback": 0.273989,
+        "trades": 6,
+        "win_rate_pct": 16.67,
         "wins": 1
       },
-      "trading_fees": 0.052786
+      "trading_fees": 0.078486
     },
     "daily": {
       "bot_state_drawdown_pct": 0.0,
@@ -300,7 +371,7 @@
     }
   },
   "date_utc": "2026-09-10",
-  "generated_at": "2026-09-10T12:33:24.342219+00:00",
+  "generated_at": "2026-09-10T13:03:37.177223+00:00",
   "report_errors": [],
   "reporting_only": true,
   "schema_version": 1
