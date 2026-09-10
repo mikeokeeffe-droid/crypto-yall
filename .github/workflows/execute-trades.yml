@@ -4,7 +4,7 @@ on:
   workflow_dispatch: {}       # Manual/API trigger
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: execute-trades-live
@@ -68,3 +68,26 @@ jobs:
           NOTIFY_EMAILS: ${{ secrets.NOTIFY_EMAILS }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+
+      - name: Publish daily bot report
+        if: always()
+        continue-on-error: true
+        run: |
+          python daily_bot_report.py
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add reports/latest.json reports/$(date -u +%F).json
+
+          if git diff --cached --quiet; then
+            echo "No report changes to commit"
+          else
+            git commit -m "Update bot report $(date -u +%F)"
+            git push
+          fi
+        env:
+          GIST_TOKEN: ${{ secrets.GIST_TOKEN }}
+          GIST_ID: ${{ secrets.GIST_ID }}
+          INTRADAY_GIST_ID: ${{ secrets.INTRADAY_GIST_ID }}
+          AGGRESSIVE_GIST_ID: ${{ secrets.AGGRESSIVE_GIST_ID }}
