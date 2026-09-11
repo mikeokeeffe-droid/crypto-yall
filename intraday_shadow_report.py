@@ -74,7 +74,26 @@ def load_state() -> dict:
     if STATE_FILENAME not in files:
         raise RuntimeError(f"{STATE_FILENAME} missing from Intraday Gist")
 
-    state = json.loads(files[STATE_FILENAME]["content"])
+    state_file = files[STATE_FILENAME]
+    content = state_file.get("content", "")
+    if state_file.get("truncated"):
+        raw_url = state_file.get("raw_url")
+        if not raw_url:
+            raise RuntimeError(
+                f"{STATE_FILENAME} is truncated and has no raw_url"
+            )
+        raw = requests.get(
+            raw_url,
+            headers={
+                "Authorization": f"token {token}",
+                "Accept": "application/vnd.github.raw",
+            },
+            timeout=30,
+        )
+        raw.raise_for_status()
+        content = raw.text
+
+    state = json.loads(content)
     if not isinstance(state, dict):
         raise RuntimeError("Intraday state is not a JSON object")
     return state
