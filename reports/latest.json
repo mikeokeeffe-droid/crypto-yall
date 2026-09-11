@@ -336,7 +336,7 @@
       "trading_fees": 0
     },
     "intraday": {
-      "bot_state_drawdown_pct": 1.313915740740741,
+      "bot_state_drawdown_pct": 1.0789879629629628,
       "by_asset": {
         "ETH": {
           "average_loss": null,
@@ -345,6 +345,17 @@
           "losses": 0,
           "net_pnl": 0.752248,
           "profit_giveback": 0.325622,
+          "trades": 1,
+          "win_rate_pct": 100.0,
+          "wins": 1
+        },
+        "ONDO": {
+          "average_loss": null,
+          "average_win": 0.077101,
+          "breakeven": 0,
+          "losses": 0,
+          "net_pnl": 0.077101,
+          "profit_giveback": 0.432359,
           "trades": 1,
           "win_rate_pct": 100.0,
           "wins": 1
@@ -400,14 +411,33 @@
           "side": "long",
           "time": "2026-09-11T16:08:34.054656+00:00",
           "trading_fees": 0.013623
+        },
+        {
+          "asset": "ONDO",
+          "entry_quality": null,
+          "entry_type": null,
+          "exit_type": "PROFIT PROTECTION",
+          "fee_data_complete": true,
+          "funding": -0.002409,
+          "funding_data_complete": true,
+          "gross_pnl": 0.09282,
+          "leverage": null,
+          "peak_unrealized_pnl": 0.50946,
+          "pnl_source": "hyperliquid_closedPnl+userFunding",
+          "profit_giveback": 0.43235900000000005,
+          "protection_mode": "TRAILING PROFIT PROTECTION",
+          "realized_net_pnl": 0.077101,
+          "side": "long",
+          "time": "2026-09-11T18:08:25.847220+00:00",
+          "trading_fees": 0.01331
         }
       ],
       "errors": [],
-      "funding": -0.00368,
-      "gross_closed_pnl": 1.09531,
+      "funding": -0.006089,
+      "gross_closed_pnl": 1.18813,
       "incomplete_accounting": [],
-      "last_run": "2026-09-11T17:08:34.516851+00:00",
-      "profit_giveback": 0.660713,
+      "last_run": "2026-09-11T18:08:25.847304+00:00",
+      "profit_giveback": 1.093072,
       "profit_protection_exits": [
         {
           "asset": "ETH",
@@ -446,27 +476,46 @@
           "side": "long",
           "time": "2026-09-11T16:08:34.054656+00:00",
           "trading_fees": 0.013623
+        },
+        {
+          "asset": "ONDO",
+          "entry_quality": null,
+          "entry_type": null,
+          "exit_type": "PROFIT PROTECTION",
+          "fee_data_complete": true,
+          "funding": -0.002409,
+          "funding_data_complete": true,
+          "gross_pnl": 0.09282,
+          "leverage": null,
+          "peak_unrealized_pnl": 0.50946,
+          "pnl_source": "hyperliquid_closedPnl+userFunding",
+          "profit_giveback": 0.43235900000000005,
+          "protection_mode": "TRAILING PROFIT PROTECTION",
+          "realized_net_pnl": 0.077101,
+          "side": "long",
+          "time": "2026-09-11T18:08:25.847220+00:00",
+          "trading_fees": 0.01331
         }
       ],
-      "realized_net_pnl": 1.064257,
+      "realized_net_pnl": 1.141358,
       "safety_events": [],
       "skipped_orders": [],
       "stats": {
         "average_loss": null,
-        "average_win": 0.532129,
+        "average_win": 0.380453,
         "breakeven": 0,
         "losses": 0,
-        "net_pnl": 1.064257,
-        "profit_giveback": 0.660713,
-        "trades": 2,
+        "net_pnl": 1.141358,
+        "profit_giveback": 1.093072,
+        "trades": 3,
         "win_rate_pct": 100.0,
-        "wins": 2
+        "wins": 3
       },
-      "trading_fees": 0.027373
+      "trading_fees": 0.040683
     }
   },
   "date_utc": "2026-09-11",
-  "generated_at": "2026-09-11T18:03:15.659398+00:00",
+  "generated_at": "2026-09-11T18:08:29.142290+00:00",
   "report_errors": [],
   "reporting_only": true,
   "schema_version": 2,
@@ -606,6 +655,6 @@
     "errors": [],
     "scope": "Shadow-only fresh short signals for SOL/AVAX/LINK/SUI/XRP/ONDO that live trading blocks because mid-cap allow_short=False.",
     "tracking_started_at": "2026-09-10T22:03:23.796957+00:00",
-    "updated_at": "2026-09-11T18:03:15.659398+00:00"
+    "updated_at": "2026-09-11T18:08:29.142290+00:00"
   }
 }
