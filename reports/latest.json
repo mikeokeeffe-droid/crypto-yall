@@ -90,12 +90,30 @@
           "status": "error",
           "ticker": "XRP-USD",
           "timestamp": "2026-09-11T04:33:06.630321+00:00"
+        },
+        {
+          "action": "open_long",
+          "error": "User or API Wallet 0xf26f22ed5aeb74cd177371d018b194c2ac7632ae does not exist.",
+          "hl_coin": "XRP",
+          "reason": "sync to hold_long",
+          "status": "error",
+          "ticker": "XRP-USD",
+          "timestamp": "2026-09-11T05:03:05.838801+00:00"
+        },
+        {
+          "action": "open_long",
+          "error": "User or API Wallet 0xf26f22ed5aeb74cd177371d018b194c2ac7632ae does not exist.",
+          "hl_coin": "BTC",
+          "reason": "sync to hold_long",
+          "status": "error",
+          "ticker": "BTC-USD",
+          "timestamp": "2026-09-11T05:03:05.838820+00:00"
         }
       ],
       "funding": -0.000186,
       "gross_closed_pnl": -0.002255,
       "incomplete_accounting": [],
-      "last_run": "2026-09-11T04:33:06.630440+00:00",
+      "last_run": "2026-09-11T05:03:05.838927+00:00",
       "leverage_results": {
         "3x": {
           "average_loss": -0.015906,
@@ -185,7 +203,7 @@
     }
   },
   "date_utc": "2026-09-11",
-  "generated_at": "2026-09-11T04:33:09.208704+00:00",
+  "generated_at": "2026-09-11T05:03:07.910415+00:00",
   "report_errors": [],
   "reporting_only": true,
   "schema_version": 2,
@@ -289,6 +307,6 @@
     "errors": [],
     "scope": "Shadow-only fresh short signals for SOL/AVAX/LINK/SUI/XRP/ONDO that live trading blocks because mid-cap allow_short=False.",
     "tracking_started_at": "2026-09-10T22:03:23.796957+00:00",
-    "updated_at": "2026-09-11T04:33:09.208704+00:00"
+    "updated_at": "2026-09-11T05:03:07.910415+00:00"
   }
 }
