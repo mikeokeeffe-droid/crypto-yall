@@ -336,36 +336,137 @@
       "trading_fees": 0
     },
     "intraday": {
-      "bot_state_drawdown_pct": 1.7396666666666665,
-      "by_asset": {},
+      "bot_state_drawdown_pct": 1.2606944444444443,
+      "by_asset": {
+        "ETH": {
+          "average_loss": null,
+          "average_win": 0.752248,
+          "breakeven": 0,
+          "losses": 0,
+          "net_pnl": 0.752248,
+          "profit_giveback": 0.325622,
+          "trades": 1,
+          "win_rate_pct": 100.0,
+          "wins": 1
+        },
+        "SOL": {
+          "average_loss": null,
+          "average_win": 0.312009,
+          "breakeven": 0,
+          "losses": 0,
+          "net_pnl": 0.312009,
+          "profit_giveback": 0.335091,
+          "trades": 1,
+          "win_rate_pct": 100.0,
+          "wins": 1
+        }
+      },
       "closed_trade_max_drawdown": 0.0,
-      "closed_trades": [],
+      "closed_trades": [
+        {
+          "asset": "ETH",
+          "entry_quality": null,
+          "entry_type": null,
+          "exit_type": "PROFIT PROTECTION",
+          "fee_data_complete": true,
+          "funding": -0.003212,
+          "funding_data_complete": true,
+          "gross_pnl": 0.76921,
+          "leverage": null,
+          "peak_unrealized_pnl": 1.07787,
+          "pnl_source": "hyperliquid_closedPnl+userFunding",
+          "profit_giveback": 0.3256220000000002,
+          "protection_mode": "TRAILING PROFIT PROTECTION",
+          "realized_net_pnl": 0.752248,
+          "side": "long",
+          "time": "2026-09-11T16:08:34.054626+00:00",
+          "trading_fees": 0.01375
+        },
+        {
+          "asset": "SOL",
+          "entry_quality": null,
+          "entry_type": null,
+          "exit_type": "PROFIT PROTECTION",
+          "fee_data_complete": true,
+          "funding": -0.000468,
+          "funding_data_complete": true,
+          "gross_pnl": 0.3261,
+          "leverage": null,
+          "peak_unrealized_pnl": 0.6471,
+          "pnl_source": "hyperliquid_closedPnl+userFunding",
+          "profit_giveback": 0.335091,
+          "protection_mode": "TRAILING PROFIT PROTECTION",
+          "realized_net_pnl": 0.312009,
+          "side": "long",
+          "time": "2026-09-11T16:08:34.054656+00:00",
+          "trading_fees": 0.013623
+        }
+      ],
       "errors": [],
-      "funding": 0,
-      "gross_closed_pnl": 0,
+      "funding": -0.00368,
+      "gross_closed_pnl": 1.09531,
       "incomplete_accounting": [],
-      "last_run": "2026-09-11T15:08:30.832603+00:00",
-      "profit_giveback": 0,
-      "profit_protection_exits": [],
-      "realized_net_pnl": 0,
+      "last_run": "2026-09-11T16:08:34.054711+00:00",
+      "profit_giveback": 0.660713,
+      "profit_protection_exits": [
+        {
+          "asset": "ETH",
+          "entry_quality": null,
+          "entry_type": null,
+          "exit_type": "PROFIT PROTECTION",
+          "fee_data_complete": true,
+          "funding": -0.003212,
+          "funding_data_complete": true,
+          "gross_pnl": 0.76921,
+          "leverage": null,
+          "peak_unrealized_pnl": 1.07787,
+          "pnl_source": "hyperliquid_closedPnl+userFunding",
+          "profit_giveback": 0.3256220000000002,
+          "protection_mode": "TRAILING PROFIT PROTECTION",
+          "realized_net_pnl": 0.752248,
+          "side": "long",
+          "time": "2026-09-11T16:08:34.054626+00:00",
+          "trading_fees": 0.01375
+        },
+        {
+          "asset": "SOL",
+          "entry_quality": null,
+          "entry_type": null,
+          "exit_type": "PROFIT PROTECTION",
+          "fee_data_complete": true,
+          "funding": -0.000468,
+          "funding_data_complete": true,
+          "gross_pnl": 0.3261,
+          "leverage": null,
+          "peak_unrealized_pnl": 0.6471,
+          "pnl_source": "hyperliquid_closedPnl+userFunding",
+          "profit_giveback": 0.335091,
+          "protection_mode": "TRAILING PROFIT PROTECTION",
+          "realized_net_pnl": 0.312009,
+          "side": "long",
+          "time": "2026-09-11T16:08:34.054656+00:00",
+          "trading_fees": 0.013623
+        }
+      ],
+      "realized_net_pnl": 1.064257,
       "safety_events": [],
       "skipped_orders": [],
       "stats": {
         "average_loss": null,
-        "average_win": null,
+        "average_win": 0.532129,
         "breakeven": 0,
         "losses": 0,
-        "net_pnl": 0,
-        "profit_giveback": 0,
-        "trades": 0,
-        "win_rate_pct": null,
-        "wins": 0
+        "net_pnl": 1.064257,
+        "profit_giveback": 0.660713,
+        "trades": 2,
+        "win_rate_pct": 100.0,
+        "wins": 2
       },
-      "trading_fees": 0
+      "trading_fees": 0.027373
     }
   },
   "date_utc": "2026-09-11",
-  "generated_at": "2026-09-11T16:03:23.986596+00:00",
+  "generated_at": "2026-09-11T16:08:36.972676+00:00",
   "report_errors": [],
   "reporting_only": true,
   "schema_version": 2,
@@ -505,6 +606,6 @@
     "errors": [],
     "scope": "Shadow-only fresh short signals for SOL/AVAX/LINK/SUI/XRP/ONDO that live trading blocks because mid-cap allow_short=False.",
     "tracking_started_at": "2026-09-10T22:03:23.796957+00:00",
-    "updated_at": "2026-09-11T16:03:23.986596+00:00"
+    "updated_at": "2026-09-11T16:08:36.972676+00:00"
   }
 }
