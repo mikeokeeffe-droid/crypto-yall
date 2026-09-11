@@ -16,7 +16,15 @@ def load_state():
     token, gist = os.environ.get("GIST_TOKEN"), os.environ.get("INTRADAY_GIST_ID")
     if not token or not gist: raise RuntimeError("Gist credentials missing")
     r=requests.get(f"https://api.github.com/gists/{gist}",headers={"Authorization":f"token {token}"},timeout=15); r.raise_for_status()
-    return json.loads(r.json()["files"][STATE_FILENAME]["content"])
+    files=r.json().get("files",{})
+    if STATE_FILENAME not in files: raise RuntimeError(f"{STATE_FILENAME} missing from Intraday Gist")
+    state_file=files[STATE_FILENAME]; content=state_file.get("content","")
+    if state_file.get("truncated"):
+        raw_url=state_file.get("raw_url")
+        if not raw_url: raise RuntimeError(f"{STATE_FILENAME} is truncated and has no raw_url")
+        raw=requests.get(raw_url,headers={"Authorization":f"token {token}","Accept":"application/vnd.github.raw"},timeout=30); raw.raise_for_status()
+        content=raw.text
+    return json.loads(content)
 
 
 def save_state(state):
