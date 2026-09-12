@@ -1,7 +1,7 @@
 {
   "bots": {
     "aggressive": {
-      "bot_state_drawdown_pct": -0.41393425925925914,
+      "bot_state_drawdown_pct": -0.4352638888888888,
       "by_asset": {
         "AVAX": {
           "average_loss": -0.102557,
@@ -21,6 +21,17 @@
           "losses": 1,
           "net_pnl": -0.165869,
           "profit_giveback": 0.00354,
+          "trades": 1,
+          "win_rate_pct": 0.0,
+          "wins": 0
+        },
+        "LINK": {
+          "average_loss": -0.065926,
+          "average_win": null,
+          "breakeven": 0,
+          "losses": 1,
+          "net_pnl": -0.065926,
+          "profit_giveback": 0.0,
           "trades": 1,
           "win_rate_pct": 0.0,
           "wins": 0
@@ -48,7 +59,7 @@
           "wins": 0
         }
       },
-      "closed_trade_max_drawdown": 0.450575,
+      "closed_trade_max_drawdown": 0.516501,
       "closed_trades": [
         {
           "asset": "ETH",
@@ -125,6 +136,25 @@
           "side": "long",
           "time": "2026-09-12T19:03:17.455697+00:00",
           "trading_fees": 0.012266
+        },
+        {
+          "asset": "LINK",
+          "entry_quality": "WEAK",
+          "entry_type": "sync_hold",
+          "exit_type": null,
+          "fee_data_complete": true,
+          "funding": -0.000466,
+          "funding_data_complete": true,
+          "gross_pnl": -0.052,
+          "leverage": 3.0,
+          "peak_unrealized_pnl": 0.0,
+          "pnl_source": "hyperliquid_closedPnl+userFunding",
+          "profit_giveback": 0.0,
+          "protection_mode": null,
+          "realized_net_pnl": -0.065926,
+          "side": "long",
+          "time": "2026-09-12T20:03:16.338122+00:00",
+          "trading_fees": 0.01346
         }
       ],
       "entry_quality_results": {
@@ -151,13 +181,13 @@
           "wins": 0
         },
         "WEAK": {
-          "average_loss": -0.102557,
+          "average_loss": -0.084241,
           "average_win": null,
           "breakeven": 0,
-          "losses": 1,
-          "net_pnl": -0.102557,
+          "losses": 2,
+          "net_pnl": -0.168483,
           "profit_giveback": 0.035979,
-          "trades": 1,
+          "trades": 2,
           "win_rate_pct": 0.0,
           "wins": 0
         }
@@ -175,31 +205,31 @@
           "wins": 0
         },
         "sync": {
-          "average_loss": -0.064799,
+          "average_loss": -0.065175,
           "average_win": null,
           "breakeven": 0,
-          "losses": 2,
-          "net_pnl": -0.129599,
+          "losses": 3,
+          "net_pnl": -0.195525,
           "profit_giveback": 0.120979,
-          "trades": 2,
+          "trades": 3,
           "win_rate_pct": 0.0,
           "wins": 0
         }
       },
       "errors": [],
-      "funding": -0.002905,
-      "gross_closed_pnl": -0.395237,
+      "funding": -0.003371,
+      "gross_closed_pnl": -0.447237,
       "incomplete_accounting": [],
-      "last_run": "2026-09-12T19:33:18.285746+00:00",
+      "last_run": "2026-09-12T20:03:16.338246+00:00",
       "leverage_results": {
         "3x": {
-          "average_loss": -0.094902,
+          "average_loss": -0.087658,
           "average_win": null,
           "breakeven": 0,
-          "losses": 3,
-          "net_pnl": -0.284706,
+          "losses": 4,
+          "net_pnl": -0.350632,
           "profit_giveback": 0.151524,
-          "trades": 3,
+          "trades": 4,
           "win_rate_pct": 0.0,
           "wins": 0
         },
@@ -217,21 +247,21 @@
       },
       "profit_giveback": 0.155064,
       "profit_protection_exits": [],
-      "realized_net_pnl": -0.450575,
+      "realized_net_pnl": -0.516501,
       "safety_events": [],
       "skipped_orders": [],
       "stats": {
-        "average_loss": -0.112644,
+        "average_loss": -0.1033,
         "average_win": null,
         "breakeven": 0,
-        "losses": 4,
-        "net_pnl": -0.450575,
+        "losses": 5,
+        "net_pnl": -0.516501,
         "profit_giveback": 0.155064,
-        "trades": 4,
+        "trades": 5,
         "win_rate_pct": 0.0,
         "wins": 0
       },
-      "trading_fees": 0.052433
+      "trading_fees": 0.065893
     },
     "daily": {
       "bot_state_drawdown_pct": 0.0,
@@ -323,7 +353,7 @@
     }
   },
   "date_utc": "2026-09-12",
-  "generated_at": "2026-09-12T19:33:20.534647+00:00",
+  "generated_at": "2026-09-12T20:03:18.959833+00:00",
   "report_errors": [],
   "reporting_only": true,
   "schema_version": 2,
@@ -502,47 +532,56 @@
           "AVAX": {
             "asset": "AVAX",
             "blocked_live_reason": "mid-cap allow_short=False",
-            "current_price": 7.3839,
+            "current_price": 7.3615,
             "entry_price": 7.3973,
             "entry_time": "2026-09-12T17:30:00",
             "ticker": "AVAX-USD",
-            "unrealized_gross_return_pct": 0.1811
+            "unrealized_gross_return_pct": 0.484
           },
           "LINK": {
             "asset": "LINK",
             "blocked_live_reason": "mid-cap allow_short=False",
-            "current_price": 11.498,
+            "current_price": 11.473,
             "entry_price": 11.51,
             "entry_time": "2026-09-12T18:30:00",
             "ticker": "LINK-USD",
-            "unrealized_gross_return_pct": 0.1043
+            "unrealized_gross_return_pct": 0.3215
           },
           "ONDO": {
             "asset": "ONDO",
             "blocked_live_reason": "mid-cap allow_short=False",
-            "current_price": 0.3481,
+            "current_price": 0.34761,
             "entry_price": 0.35109,
             "entry_time": "2026-09-12T15:00:00",
             "ticker": "ONDO-USD",
-            "unrealized_gross_return_pct": 0.8516
+            "unrealized_gross_return_pct": 0.9912
           },
           "SOL": {
             "asset": "SOL",
             "blocked_live_reason": "mid-cap allow_short=False",
-            "current_price": 101.58,
+            "current_price": 101.27,
             "entry_price": 101.99,
             "entry_time": "2026-09-12T15:00:00",
             "ticker": "SOL-USD",
-            "unrealized_gross_return_pct": 0.402
+            "unrealized_gross_return_pct": 0.706
+          },
+          "SUI": {
+            "asset": "SUI",
+            "blocked_live_reason": "mid-cap allow_short=False",
+            "current_price": 0.72105,
+            "entry_price": 0.72105,
+            "entry_time": "2026-09-12T19:30:00",
+            "ticker": "SUI20947-USD",
+            "unrealized_gross_return_pct": 0.0
           },
           "XRP": {
             "asset": "XRP",
             "blocked_live_reason": "mid-cap allow_short=False",
-            "current_price": 1.3637,
+            "current_price": 1.3621,
             "entry_price": 1.367,
             "entry_time": "2026-09-12T17:00:00",
             "ticker": "XRP-USD",
-            "unrealized_gross_return_pct": 0.2414
+            "unrealized_gross_return_pct": 0.3584
           }
         },
         "today": {
@@ -595,20 +634,20 @@
           "LINK": {
             "asset": "LINK",
             "blocked_live_reason": "mid-cap allow_short=False",
-            "current_price": 11.51,
+            "current_price": 11.473,
             "entry_price": 11.511,
             "entry_time": "2026-09-12T05:00:00",
             "ticker": "LINK-USD",
-            "unrealized_gross_return_pct": 0.0087
+            "unrealized_gross_return_pct": 0.3301
           },
           "XRP": {
             "asset": "XRP",
             "blocked_live_reason": "mid-cap allow_short=False",
-            "current_price": 1.3626,
+            "current_price": 1.3621,
             "entry_price": 1.3603,
             "entry_time": "2026-09-12T01:00:00",
             "ticker": "XRP-USD",
-            "unrealized_gross_return_pct": -0.1691
+            "unrealized_gross_return_pct": -0.1323
           }
         },
         "today": {
@@ -625,6 +664,6 @@
     "errors": [],
     "scope": "Shadow-only fresh short signals for SOL/AVAX/LINK/SUI/XRP/ONDO that live trading blocks because mid-cap allow_short=False.",
     "tracking_started_at": "2026-09-10T22:03:23.796957+00:00",
-    "updated_at": "2026-09-12T19:33:20.534647+00:00"
+    "updated_at": "2026-09-12T20:03:18.959833+00:00"
   }
 }
