@@ -262,7 +262,7 @@
       "trading_fees": 0
     },
     "intraday": {
-      "bot_state_drawdown_pct": -0.1016314814814814,
+      "bot_state_drawdown_pct": -0.1215018518518518,
       "by_asset": {
         "BTC": {
           "average_loss": null,
@@ -302,7 +302,7 @@
       "funding": -0.000447,
       "gross_closed_pnl": 0.01634,
       "incomplete_accounting": [],
-      "last_run": "2026-09-12T18:08:21.119226+00:00",
+      "last_run": "2026-09-12T19:08:27.015039+00:00",
       "profit_giveback": 0.037972,
       "profit_protection_exits": [],
       "realized_net_pnl": 0.002688,
@@ -323,7 +323,7 @@
     }
   },
   "date_utc": "2026-09-12",
-  "generated_at": "2026-09-12T19:03:19.873340+00:00",
+  "generated_at": "2026-09-12T19:08:29.204689+00:00",
   "report_errors": [],
   "reporting_only": true,
   "schema_version": 2,
@@ -625,6 +625,6 @@
     "errors": [],
     "scope": "Shadow-only fresh short signals for SOL/AVAX/LINK/SUI/XRP/ONDO that live trading blocks because mid-cap allow_short=False.",
     "tracking_started_at": "2026-09-10T22:03:23.796957+00:00",
-    "updated_at": "2026-09-12T19:03:19.873340+00:00"
+    "updated_at": "2026-09-12T19:08:29.204689+00:00"
   }
 }
