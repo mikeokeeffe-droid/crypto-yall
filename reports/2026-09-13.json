@@ -1,7 +1,7 @@
 {
   "bots": {
     "aggressive": {
-      "bot_state_drawdown_pct": 0.1853685185185184,
+      "bot_state_drawdown_pct": 0.2618314814814812,
       "by_asset": {
         "AVAX": {
           "average_loss": -0.048226,
@@ -350,7 +350,7 @@
       "funding": 0.004049,
       "gross_closed_pnl": -0.109584,
       "incomplete_accounting": [],
-      "last_run": "2026-09-13T20:03:20.930268+00:00",
+      "last_run": "2026-09-13T20:33:06.959594+00:00",
       "leverage_results": {
         "3x": {
           "average_loss": -0.073989,
@@ -534,7 +534,7 @@
     }
   },
   "date_utc": "2026-09-13",
-  "generated_at": "2026-09-13T20:08:38.357974+00:00",
+  "generated_at": "2026-09-13T20:33:08.909929+00:00",
   "report_errors": [],
   "reporting_only": true,
   "schema_version": 2,
@@ -907,6 +907,6 @@
     "errors": [],
     "scope": "Shadow-only fresh short signals for SOL/AVAX/LINK/SUI/XRP/ONDO that live trading blocks because mid-cap allow_short=False.",
     "tracking_started_at": "2026-09-10T22:03:23.796957+00:00",
-    "updated_at": "2026-09-13T20:08:38.357974+00:00"
+    "updated_at": "2026-09-13T20:33:08.909929+00:00"
   }
 }
