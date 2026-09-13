@@ -259,6 +259,11 @@ ENTRY_SHADOW_KEYS = (
     "entry_directional_ok",
     "entry_vwap_ok",
     "entry_oscillator_ok",
+    "shadow_fresh_only_would_block",
+    "shadow_bearish_regime_evaluable",
+    "shadow_bearish_regime_would_block",
+    "shadow_bearish_regime_rule",
+    "shadow_combined_would_block",
     "entry_shadow_only",
     "entry_leverage",
 )
@@ -663,6 +668,13 @@ def main():
                 f"    Entry Quality Shadow: {shadow.get('entry_quality')} "
                 f"{shadow.get('entry_quality_score', 0):.0f}/100 | "
                 f"{entry_type} | {leverage:.0f}x | observation only"
+            )
+            print(
+                "    Entry Filter Shadow: "
+                f"fresh-only={'BLOCK' if shadow.get('shadow_fresh_only_would_block') else 'ALLOW'} | "
+                f"bearish-long={'BLOCK' if shadow.get('shadow_bearish_regime_would_block') else 'ALLOW'} | "
+                f"combined={'BLOCK' if shadow.get('shadow_combined_would_block') else 'ALLOW'} | "
+                "observation only"
             )
 
         results.append(result)
