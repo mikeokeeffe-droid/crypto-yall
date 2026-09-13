@@ -337,6 +337,10 @@ def _summarize(name: str, state: dict[str, Any], day: dt.date) -> dict[str, Any]
             "leverage": r.get("entry_leverage") or r.get("leverage"),
             "entry_quality": r.get("entry_quality"),
             "entry_type": r.get("entry_type"),
+            "shadow_fresh_only_would_block": r.get("shadow_fresh_only_would_block"),
+            "shadow_bearish_regime_evaluable": r.get("shadow_bearish_regime_evaluable"),
+            "shadow_bearish_regime_would_block": r.get("shadow_bearish_regime_would_block"),
+            "shadow_combined_would_block": r.get("shadow_combined_would_block"),
             "exit_type": r.get("exit_type"),
             "protection_mode": r.get("protection_mode"),
             "peak_unrealized_pnl": r.get("peak_unrealized_pnl"),
@@ -414,6 +418,41 @@ def _summarize(name: str, state: dict[str, Any], day: dt.date) -> dict[str, Any]
                 else "fresh" if r.get("entry_type") else None
             ),
         )
+        result["entry_filter_shadow_results"] = {
+            "fresh_only": {
+                "would_allow": _trade_stats([
+                    r for r in closes
+                    if r.get("shadow_fresh_only_would_block") is False
+                ]),
+                "would_block": _trade_stats([
+                    r for r in closes
+                    if r.get("shadow_fresh_only_would_block") is True
+                ]),
+            },
+            "bearish_regime_long_filter": {
+                "rule": "block long when ADX>=15, -DI>+DI, and price is below 20-bar rolling VWAP",
+                "would_allow": _trade_stats([
+                    r for r in closes
+                    if r.get("shadow_bearish_regime_evaluable") is True
+                    and r.get("shadow_bearish_regime_would_block") is False
+                ]),
+                "would_block": _trade_stats([
+                    r for r in closes
+                    if r.get("shadow_bearish_regime_would_block") is True
+                ]),
+            },
+            "combined": {
+                "would_allow": _trade_stats([
+                    r for r in closes
+                    if r.get("shadow_combined_would_block") is False
+                ]),
+                "would_block": _trade_stats([
+                    r for r in closes
+                    if r.get("shadow_combined_would_block") is True
+                ]),
+            },
+            "observation_only": True,
+        }
 
     return result
 
