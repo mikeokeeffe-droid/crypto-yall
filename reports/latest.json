@@ -572,7 +572,7 @@
       "trading_fees": 0
     },
     "intraday": {
-      "bot_state_drawdown_pct": -0.265225,
+      "bot_state_drawdown_pct": -0.47179907407407407,
       "by_asset": {
         "BTC": {
           "average_loss": -0.025643,
@@ -584,9 +584,31 @@
           "trades": 1,
           "win_rate_pct": 0.0,
           "wins": 0
+        },
+        "ETH": {
+          "average_loss": -0.096389,
+          "average_win": null,
+          "breakeven": 0,
+          "losses": 1,
+          "net_pnl": -0.096389,
+          "profit_giveback": 0.0024,
+          "trades": 1,
+          "win_rate_pct": 0.0,
+          "wins": 0
+        },
+        "XRP": {
+          "average_loss": -0.209083,
+          "average_win": null,
+          "breakeven": 0,
+          "losses": 1,
+          "net_pnl": -0.209083,
+          "profit_giveback": 0.0363,
+          "trades": 1,
+          "win_rate_pct": 0.0,
+          "wins": 0
         }
       },
-      "closed_trade_max_drawdown": 0.025643,
+      "closed_trade_max_drawdown": 0.331115,
       "closed_trades": [
         {
           "asset": "BTC",
@@ -610,34 +632,80 @@
           "side": "short",
           "time": "2026-09-13T19:09:07.612840+00:00",
           "trading_fees": 0.013213
+        },
+        {
+          "asset": "ETH",
+          "entry_quality": null,
+          "entry_type": null,
+          "exit_type": null,
+          "fee_data_complete": true,
+          "funding": -0.000185,
+          "funding_data_complete": true,
+          "gross_pnl": -0.0828,
+          "leverage": null,
+          "peak_unrealized_pnl": 0.0024,
+          "pnl_source": "hyperliquid_closedPnl+userFunding",
+          "profit_giveback": 0.0024,
+          "protection_mode": null,
+          "realized_net_pnl": -0.096389,
+          "shadow_bearish_regime_evaluable": null,
+          "shadow_bearish_regime_would_block": null,
+          "shadow_combined_would_block": null,
+          "shadow_fresh_only_would_block": null,
+          "side": "long",
+          "time": "2026-09-13T23:08:29.735944+00:00",
+          "trading_fees": 0.013404
+        },
+        {
+          "asset": "XRP",
+          "entry_quality": null,
+          "entry_type": null,
+          "exit_type": null,
+          "fee_data_complete": true,
+          "funding": 6.3e-05,
+          "funding_data_complete": true,
+          "gross_pnl": -0.1958,
+          "leverage": null,
+          "peak_unrealized_pnl": 0.0363,
+          "pnl_source": "hyperliquid_closedPnl+userFunding",
+          "profit_giveback": 0.0363,
+          "protection_mode": null,
+          "realized_net_pnl": -0.209083,
+          "shadow_bearish_regime_evaluable": null,
+          "shadow_bearish_regime_would_block": null,
+          "shadow_combined_would_block": null,
+          "shadow_fresh_only_would_block": null,
+          "side": "long",
+          "time": "2026-09-13T23:08:29.735975+00:00",
+          "trading_fees": 0.013346
         }
       ],
       "errors": [],
-      "funding": 0.0003,
-      "gross_closed_pnl": -0.01273,
+      "funding": 0.000178,
+      "gross_closed_pnl": -0.29133,
       "incomplete_accounting": [],
-      "last_run": "2026-09-13T22:08:28.593063+00:00",
-      "profit_giveback": 0.12863,
+      "last_run": "2026-09-13T23:08:29.736049+00:00",
+      "profit_giveback": 0.16733,
       "profit_protection_exits": [],
-      "realized_net_pnl": -0.025643,
+      "realized_net_pnl": -0.331115,
       "safety_events": [],
       "skipped_orders": [],
       "stats": {
-        "average_loss": -0.025643,
+        "average_loss": -0.110372,
         "average_win": null,
         "breakeven": 0,
-        "losses": 1,
-        "net_pnl": -0.025643,
-        "profit_giveback": 0.12863,
-        "trades": 1,
+        "losses": 3,
+        "net_pnl": -0.331115,
+        "profit_giveback": 0.16733,
+        "trades": 3,
         "win_rate_pct": 0.0,
         "wins": 0
       },
-      "trading_fees": 0.013213
+      "trading_fees": 0.039963
     }
   },
   "date_utc": "2026-09-13",
-  "generated_at": "2026-09-13T23:03:10.704884+00:00",
+  "generated_at": "2026-09-13T23:08:32.449803+00:00",
   "report_errors": [],
   "reporting_only": true,
   "schema_version": 2,
@@ -1016,6 +1084,6 @@
     "errors": [],
     "scope": "Shadow-only fresh short signals for SOL/AVAX/LINK/SUI/XRP/ONDO that live trading blocks because mid-cap allow_short=False.",
     "tracking_started_at": "2026-09-10T22:03:23.796957+00:00",
-    "updated_at": "2026-09-13T23:03:10.704884+00:00"
+    "updated_at": "2026-09-13T23:08:32.449803+00:00"
   }
 }
