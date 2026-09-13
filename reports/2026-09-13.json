@@ -1,7 +1,7 @@
 {
   "bots": {
     "aggressive": {
-      "bot_state_drawdown_pct": 0.11357222222222216,
+      "bot_state_drawdown_pct": 0.15935740740740728,
       "by_asset": {
         "AVAX": {
           "average_loss": -0.048226,
@@ -350,7 +350,7 @@
       "funding": 0.004049,
       "gross_closed_pnl": -0.109584,
       "incomplete_accounting": [],
-      "last_run": "2026-09-13T18:03:08.030234+00:00",
+      "last_run": "2026-09-13T18:33:08.022092+00:00",
       "leverage_results": {
         "3x": {
           "average_loss": -0.073989,
@@ -498,7 +498,7 @@
     }
   },
   "date_utc": "2026-09-13",
-  "generated_at": "2026-09-13T18:08:22.921644+00:00",
+  "generated_at": "2026-09-13T18:33:10.239743+00:00",
   "report_errors": [],
   "reporting_only": true,
   "schema_version": 2,
@@ -508,12 +508,12 @@
       "aggressive": {
         "all_time": {
           "average_loss_pct": -1.2858,
-          "average_win_pct": 0.6998,
-          "closed_trades": 20,
-          "cumulative_gross_return_pct": -11.8167,
+          "average_win_pct": 0.7129,
+          "closed_trades": 21,
+          "cumulative_gross_return_pct": -11.012,
           "losses": 13,
-          "win_rate_pct": 35.0,
-          "wins": 7
+          "win_rate_pct": 38.1,
+          "wins": 8
         },
         "closed_trades": [
           {
@@ -755,27 +755,29 @@
             "gross_return_pct": 1.0001,
             "outcome": "win",
             "ticker": "SOL-USD"
-          }
-        ],
-        "open_positions": {
-          "XRP": {
+          },
+          {
             "asset": "XRP",
             "blocked_live_reason": "mid-cap allow_short=False",
-            "current_price": 1.3547,
             "entry_price": 1.367,
             "entry_time": "2026-09-12T17:00:00",
-            "ticker": "XRP-USD",
-            "unrealized_gross_return_pct": 0.8998
+            "exit_action": "cover_short",
+            "exit_price": 1.356,
+            "exit_time": "2026-09-13T18:00:00",
+            "gross_return_pct": 0.8047,
+            "outcome": "win",
+            "ticker": "XRP-USD"
           }
-        },
+        ],
+        "open_positions": {},
         "today": {
           "average_loss_pct": -0.6351,
-          "average_win_pct": 0.9936,
-          "closed_trades": 7,
-          "cumulative_gross_return_pct": 0.4403,
+          "average_win_pct": 0.9464,
+          "closed_trades": 8,
+          "cumulative_gross_return_pct": 1.245,
           "losses": 4,
-          "win_rate_pct": 42.86,
-          "wins": 3
+          "win_rate_pct": 50.0,
+          "wins": 4
         }
       },
       "intraday": {
@@ -869,6 +871,6 @@
     "errors": [],
     "scope": "Shadow-only fresh short signals for SOL/AVAX/LINK/SUI/XRP/ONDO that live trading blocks because mid-cap allow_short=False.",
     "tracking_started_at": "2026-09-10T22:03:23.796957+00:00",
-    "updated_at": "2026-09-13T18:08:22.921644+00:00"
+    "updated_at": "2026-09-13T18:33:10.239743+00:00"
   }
 }
