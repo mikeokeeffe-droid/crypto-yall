@@ -76,6 +76,10 @@
           "profit_giveback": 0.0076,
           "protection_mode": null,
           "realized_net_pnl": -0.044232,
+          "shadow_bearish_regime_evaluable": null,
+          "shadow_bearish_regime_would_block": null,
+          "shadow_combined_would_block": null,
+          "shadow_fresh_only_would_block": null,
           "side": "short",
           "time": "2026-09-13T02:03:11.469169+00:00",
           "trading_fees": 0.013198
@@ -95,6 +99,10 @@
           "profit_giveback": 0.0,
           "protection_mode": null,
           "realized_net_pnl": -0.141758,
+          "shadow_bearish_regime_evaluable": null,
+          "shadow_bearish_regime_would_block": null,
+          "shadow_combined_would_block": null,
+          "shadow_fresh_only_would_block": null,
           "side": "long",
           "time": "2026-09-13T03:33:11.184197+00:00",
           "trading_fees": 0.013439
@@ -114,6 +122,10 @@
           "profit_giveback": 0.013258,
           "protection_mode": null,
           "realized_net_pnl": -0.090036,
+          "shadow_bearish_regime_evaluable": null,
+          "shadow_bearish_regime_would_block": null,
+          "shadow_combined_would_block": null,
+          "shadow_fresh_only_would_block": null,
           "side": "long",
           "time": "2026-09-13T07:03:14.789724+00:00",
           "trading_fees": 0.012785
@@ -133,6 +145,10 @@
           "profit_giveback": 0.0026,
           "protection_mode": null,
           "realized_net_pnl": -0.015938,
+          "shadow_bearish_regime_evaluable": null,
+          "shadow_bearish_regime_would_block": null,
+          "shadow_combined_would_block": null,
+          "shadow_fresh_only_would_block": null,
           "side": "long",
           "time": "2026-09-13T08:03:55.909389+00:00",
           "trading_fees": 0.013383
@@ -152,11 +168,91 @@
           "profit_giveback": 0.116116,
           "protection_mode": "HIGH LEVERAGE TRAILING PROFIT PROTECTION",
           "realized_net_pnl": -0.048226,
+          "shadow_bearish_regime_evaluable": null,
+          "shadow_bearish_regime_would_block": null,
+          "shadow_combined_would_block": null,
+          "shadow_fresh_only_would_block": null,
           "side": "long",
           "time": "2026-09-13T08:03:55.909416+00:00",
           "trading_fees": 0.01348
         }
       ],
+      "entry_filter_shadow_results": {
+        "bearish_regime_long_filter": {
+          "rule": "block long when ADX>=15, -DI>+DI, and price is below 20-bar rolling VWAP",
+          "would_allow": {
+            "average_loss": null,
+            "average_win": null,
+            "breakeven": 0,
+            "losses": 0,
+            "net_pnl": 0,
+            "profit_giveback": 0,
+            "trades": 0,
+            "win_rate_pct": null,
+            "wins": 0
+          },
+          "would_block": {
+            "average_loss": null,
+            "average_win": null,
+            "breakeven": 0,
+            "losses": 0,
+            "net_pnl": 0,
+            "profit_giveback": 0,
+            "trades": 0,
+            "win_rate_pct": null,
+            "wins": 0
+          }
+        },
+        "combined": {
+          "would_allow": {
+            "average_loss": null,
+            "average_win": null,
+            "breakeven": 0,
+            "losses": 0,
+            "net_pnl": 0,
+            "profit_giveback": 0,
+            "trades": 0,
+            "win_rate_pct": null,
+            "wins": 0
+          },
+          "would_block": {
+            "average_loss": null,
+            "average_win": null,
+            "breakeven": 0,
+            "losses": 0,
+            "net_pnl": 0,
+            "profit_giveback": 0,
+            "trades": 0,
+            "win_rate_pct": null,
+            "wins": 0
+          }
+        },
+        "fresh_only": {
+          "would_allow": {
+            "average_loss": null,
+            "average_win": null,
+            "breakeven": 0,
+            "losses": 0,
+            "net_pnl": 0,
+            "profit_giveback": 0,
+            "trades": 0,
+            "win_rate_pct": null,
+            "wins": 0
+          },
+          "would_block": {
+            "average_loss": null,
+            "average_win": null,
+            "breakeven": 0,
+            "losses": 0,
+            "net_pnl": 0,
+            "profit_giveback": 0,
+            "trades": 0,
+            "win_rate_pct": null,
+            "wins": 0
+          }
+        },
+        "observation_only": true
+      },
       "entry_quality_results": {
         "MEDIUM": {
           "average_loss": -0.046229,
@@ -262,6 +358,10 @@
           "profit_giveback": 0.116116,
           "protection_mode": "HIGH LEVERAGE TRAILING PROFIT PROTECTION",
           "realized_net_pnl": -0.048226,
+          "shadow_bearish_regime_evaluable": null,
+          "shadow_bearish_regime_would_block": null,
+          "shadow_combined_would_block": null,
+          "shadow_fresh_only_would_block": null,
           "side": "long",
           "time": "2026-09-13T08:03:55.909416+00:00",
           "trading_fees": 0.01348
@@ -312,7 +412,7 @@
       "trading_fees": 0
     },
     "intraday": {
-      "bot_state_drawdown_pct": 0.0870833333333333,
+      "bot_state_drawdown_pct": 0.11910185185185188,
       "by_asset": {},
       "closed_trade_max_drawdown": 0.0,
       "closed_trades": [],
@@ -320,7 +420,7 @@
       "funding": 0,
       "gross_closed_pnl": 0,
       "incomplete_accounting": [],
-      "last_run": "2026-09-13T10:08:56.526204+00:00",
+      "last_run": "2026-09-13T11:08:26.233145+00:00",
       "profit_giveback": 0,
       "profit_protection_exits": [],
       "realized_net_pnl": 0,
@@ -341,7 +441,7 @@
     }
   },
   "date_utc": "2026-09-13",
-  "generated_at": "2026-09-13T11:03:14.890489+00:00",
+  "generated_at": "2026-09-13T11:08:28.631837+00:00",
   "report_errors": [],
   "reporting_only": true,
   "schema_version": 2,
@@ -697,6 +797,6 @@
     "errors": [],
     "scope": "Shadow-only fresh short signals for SOL/AVAX/LINK/SUI/XRP/ONDO that live trading blocks because mid-cap allow_short=False.",
     "tracking_started_at": "2026-09-10T22:03:23.796957+00:00",
-    "updated_at": "2026-09-13T11:03:14.890489+00:00"
+    "updated_at": "2026-09-13T11:08:28.631837+00:00"
   }
 }
