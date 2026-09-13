@@ -130,6 +130,26 @@ def score_entry_quality(
 
     quality = "STRONG" if score >= 70 else "MEDIUM" if score >= 50 else "WEAK"
 
+    # Observation-only filter experiments. These flags are diagnostics only:
+    # they are never consumed by the live trade decision path.
+    shadow_fresh_only_would_block = entry_type.startswith("sync_")
+    shadow_bearish_regime_evaluable = bool(
+        is_long
+        and math.isfinite(adx)
+        and math.isfinite(plus_di)
+        and math.isfinite(minus_di)
+        and math.isfinite(vwap_dev)
+    )
+    shadow_bearish_regime_would_block = bool(
+        shadow_bearish_regime_evaluable
+        and adx >= 15.0
+        and minus_di > plus_di
+        and vwap_dev < 0.0
+    )
+    shadow_combined_would_block = bool(
+        shadow_fresh_only_would_block or shadow_bearish_regime_would_block
+    )
+
     return {
         "entry_quality": quality,
         "entry_quality_score": round(score, 1),
@@ -144,5 +164,12 @@ def score_entry_quality(
         "entry_directional_ok": bool(directional_ok),
         "entry_vwap_ok": bool(vwap_ok),
         "entry_oscillator_ok": bool(oscillator_ok),
+        "shadow_fresh_only_would_block": shadow_fresh_only_would_block,
+        "shadow_bearish_regime_evaluable": shadow_bearish_regime_evaluable,
+        "shadow_bearish_regime_would_block": shadow_bearish_regime_would_block,
+        "shadow_bearish_regime_rule": (
+            "block long when ADX>=15, -DI>+DI, and price is below 20-bar rolling VWAP"
+        ),
+        "shadow_combined_would_block": shadow_combined_would_block,
         "entry_shadow_only": True,
     }
