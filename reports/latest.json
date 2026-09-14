@@ -651,7 +651,7 @@
       "funding": 0.001025,
       "gross_closed_pnl": -0.34014,
       "incomplete_accounting": [],
-      "last_run": "2026-09-14T20:08:30.154173+00:00",
+      "last_run": "2026-09-14T21:08:30.394349+00:00",
       "profit_giveback": 0.060552,
       "profit_protection_exits": [],
       "realized_net_pnl": -0.365152,
@@ -672,7 +672,7 @@
     }
   },
   "date_utc": "2026-09-14",
-  "generated_at": "2026-09-14T21:03:27.896348+00:00",
+  "generated_at": "2026-09-14T21:08:32.656498+00:00",
   "report_errors": [],
   "reporting_only": true,
   "schema_version": 2,
@@ -1137,6 +1137,6 @@
     "errors": [],
     "scope": "Shadow-only fresh short signals for SOL/AVAX/LINK/SUI/XRP/ONDO that live trading blocks because mid-cap allow_short=False.",
     "tracking_started_at": "2026-09-10T22:03:23.796957+00:00",
-    "updated_at": "2026-09-14T21:03:27.896348+00:00"
+    "updated_at": "2026-09-14T21:08:32.656498+00:00"
   }
 }
