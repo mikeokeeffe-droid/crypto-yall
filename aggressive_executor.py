@@ -264,6 +264,9 @@ ENTRY_SHADOW_KEYS = (
     "shadow_bearish_regime_would_block",
     "shadow_bearish_regime_rule",
     "shadow_combined_would_block",
+    "shadow_market_regime",
+    "shadow_dynamic_leverage",
+    "shadow_dynamic_leverage_rule",
     "entry_shadow_only",
     "entry_leverage",
 )
@@ -675,6 +678,12 @@ def main():
                 f"bearish-long={'BLOCK' if shadow.get('shadow_bearish_regime_would_block') else 'ALLOW'} | "
                 f"combined={'BLOCK' if shadow.get('shadow_combined_would_block') else 'ALLOW'} | "
                 "observation only"
+            )
+            print(
+                "    Dynamic Leverage Shadow: "
+                f"{shadow.get('shadow_market_regime', 'UNKNOWN')} -> "
+                f"{float(shadow.get('shadow_dynamic_leverage', leverage)):.0f}x "
+                f"(live remains {leverage:.0f}x) | observation only"
             )
 
         results.append(result)
