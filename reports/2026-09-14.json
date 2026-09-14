@@ -1,7 +1,7 @@
 {
   "bots": {
     "aggressive": {
-      "bot_state_drawdown_pct": 0.03796203703703725,
+      "bot_state_drawdown_pct": 0.012432407407407685,
       "by_asset": {
         "BTC": {
           "average_loss": -0.018066,
@@ -192,7 +192,7 @@
       "funding": 0.000369,
       "gross_closed_pnl": -0.12093,
       "incomplete_accounting": [],
-      "last_run": "2026-09-14T08:03:09.462451+00:00",
+      "last_run": "2026-09-14T09:03:14.653970+00:00",
       "leverage_results": {
         "4x": {
           "average_loss": -0.073576,
@@ -320,7 +320,7 @@
     }
   },
   "date_utc": "2026-09-14",
-  "generated_at": "2026-09-14T08:33:14.398740+00:00",
+  "generated_at": "2026-09-14T09:03:16.488967+00:00",
   "report_errors": [],
   "reporting_only": true,
   "schema_version": 2,
@@ -750,20 +750,20 @@
           "AVAX": {
             "asset": "AVAX",
             "blocked_live_reason": "mid-cap allow_short=False",
-            "current_price": 7.4195,
+            "current_price": 7.3763,
             "entry_price": 7.3907,
             "entry_time": "2026-09-12T21:00:00",
             "ticker": "AVAX-USD",
-            "unrealized_gross_return_pct": -0.3897
+            "unrealized_gross_return_pct": 0.1948
           },
           "SUI": {
             "asset": "SUI",
             "blocked_live_reason": "mid-cap allow_short=False",
-            "current_price": 0.72441,
+            "current_price": 0.72419,
             "entry_price": 0.71609,
             "entry_time": "2026-09-14T03:00:00",
             "ticker": "SUI20947-USD",
-            "unrealized_gross_return_pct": -1.1619
+            "unrealized_gross_return_pct": -1.1311
           }
         },
         "today": {
@@ -780,6 +780,6 @@
     "errors": [],
     "scope": "Shadow-only fresh short signals for SOL/AVAX/LINK/SUI/XRP/ONDO that live trading blocks because mid-cap allow_short=False.",
     "tracking_started_at": "2026-09-10T22:03:23.796957+00:00",
-    "updated_at": "2026-09-14T08:33:14.398740+00:00"
+    "updated_at": "2026-09-14T09:03:16.488967+00:00"
   }
 }
