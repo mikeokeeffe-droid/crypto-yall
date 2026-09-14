@@ -341,6 +341,8 @@ def _summarize(name: str, state: dict[str, Any], day: dt.date) -> dict[str, Any]
             "shadow_bearish_regime_evaluable": r.get("shadow_bearish_regime_evaluable"),
             "shadow_bearish_regime_would_block": r.get("shadow_bearish_regime_would_block"),
             "shadow_combined_would_block": r.get("shadow_combined_would_block"),
+            "shadow_market_regime": r.get("shadow_market_regime"),
+            "shadow_dynamic_leverage": r.get("shadow_dynamic_leverage"),
             "exit_type": r.get("exit_type"),
             "protection_mode": r.get("protection_mode"),
             "peak_unrealized_pnl": r.get("peak_unrealized_pnl"),
@@ -418,6 +420,21 @@ def _summarize(name: str, state: dict[str, Any], day: dt.date) -> dict[str, Any]
                 else "fresh" if r.get("entry_type") else None
             ),
         )
+        result["dynamic_leverage_shadow_results"] = {
+            "rule": "1x strong bearish; 2x bearish; 3x mixed; 4x bullish; 5x strong bullish",
+            "by_regime": _group(closes, lambda r: r.get("shadow_market_regime")),
+            "by_shadow_leverage": _group(
+                closes,
+                lambda r: (
+                    f"{float(r.get('shadow_dynamic_leverage')):g}x"
+                    if r.get("shadow_dynamic_leverage") is not None else None
+                ),
+            ),
+            "tagged_trades": sum(
+                1 for r in closes if r.get("shadow_dynamic_leverage") is not None
+            ),
+            "observation_only": True,
+        }
         result["entry_filter_shadow_results"] = {
             "fresh_only": {
                 "would_allow": _trade_stats([
