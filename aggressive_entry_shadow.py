@@ -150,6 +150,25 @@ def score_entry_quality(
         shadow_fresh_only_would_block or shadow_bearish_regime_would_block
     )
 
+    # Observation-only dynamic-leverage experiment. This never changes the
+    # leverage passed to Hyperliquid; it only records what a regime-aware
+    # policy would have selected for later comparison.
+    if adx >= 25.0 and minus_di > plus_di and vwap_dev < 0.0:
+        shadow_market_regime = "STRONG_BEARISH"
+        shadow_dynamic_leverage = 1.0
+    elif minus_di > plus_di and vwap_dev < 0.0:
+        shadow_market_regime = "BEARISH"
+        shadow_dynamic_leverage = 2.0
+    elif adx >= 25.0 and plus_di > minus_di and vwap_dev >= 0.0:
+        shadow_market_regime = "STRONG_BULLISH"
+        shadow_dynamic_leverage = 5.0
+    elif plus_di > minus_di and vwap_dev >= 0.0:
+        shadow_market_regime = "BULLISH"
+        shadow_dynamic_leverage = 4.0
+    else:
+        shadow_market_regime = "MIXED"
+        shadow_dynamic_leverage = 3.0
+
     return {
         "entry_quality": quality,
         "entry_quality_score": round(score, 1),
@@ -171,5 +190,10 @@ def score_entry_quality(
             "block long when ADX>=15, -DI>+DI, and price is below 20-bar rolling VWAP"
         ),
         "shadow_combined_would_block": shadow_combined_would_block,
+        "shadow_market_regime": shadow_market_regime,
+        "shadow_dynamic_leverage": shadow_dynamic_leverage,
+        "shadow_dynamic_leverage_rule": (
+            "1x strong bearish; 2x bearish; 3x mixed; 4x bullish; 5x strong bullish"
+        ),
         "entry_shadow_only": True,
     }
