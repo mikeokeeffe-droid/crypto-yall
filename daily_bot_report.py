@@ -343,6 +343,9 @@ def _summarize(name: str, state: dict[str, Any], day: dt.date) -> dict[str, Any]
             "shadow_combined_would_block": r.get("shadow_combined_would_block"),
             "shadow_market_regime": r.get("shadow_market_regime"),
             "shadow_dynamic_leverage": r.get("shadow_dynamic_leverage"),
+            "shadow_dual_short_btc_short": r.get("shadow_dual_short_btc_short"),
+            "shadow_dual_short_eth_short": r.get("shadow_dual_short_eth_short"),
+            "shadow_dual_short_long_block_would_block": r.get("shadow_dual_short_long_block_would_block"),
             "exit_type": r.get("exit_type"),
             "protection_mode": r.get("protection_mode"),
             "peak_unrealized_pnl": r.get("peak_unrealized_pnl"),
@@ -432,6 +435,25 @@ def _summarize(name: str, state: dict[str, Any], day: dt.date) -> dict[str, Any]
             ),
             "tagged_trades": sum(
                 1 for r in closes if r.get("shadow_dynamic_leverage") is not None
+            ),
+            "observation_only": True,
+        }
+        result["dual_short_long_block_shadow_results"] = {
+            "rule": (
+                "shadow-only: block NEW SOL/AVAX/LINK/SUI/XRP/ONDO longs "
+                "when Aggressive owns both BTC and ETH shorts"
+            ),
+            "would_allow": _trade_stats([
+                r for r in closes
+                if r.get("shadow_dual_short_long_block_would_block") is False
+            ]),
+            "would_block": _trade_stats([
+                r for r in closes
+                if r.get("shadow_dual_short_long_block_would_block") is True
+            ]),
+            "tagged_trades": sum(
+                1 for r in closes
+                if r.get("shadow_dual_short_long_block_would_block") is not None
             ),
             "observation_only": True,
         }
