@@ -267,6 +267,10 @@ ENTRY_SHADOW_KEYS = (
     "shadow_market_regime",
     "shadow_dynamic_leverage",
     "shadow_dynamic_leverage_rule",
+    "shadow_dual_short_long_block_would_block",
+    "shadow_dual_short_btc_short",
+    "shadow_dual_short_eth_short",
+    "shadow_dual_short_rule",
     "entry_shadow_only",
     "entry_leverage",
 )
@@ -666,6 +670,29 @@ def main():
                 entry_type,
             )
             result.update(shadow)
+
+            # Observation-only BTC+ETH direction gate. For a NEW mid-cap long,
+            # record whether both BTC and ETH were already short in positions
+            # owned by Aggressive at decision time. This never blocks or sends
+            # an order and does not alter existing positions.
+            midcap_coins = {"SOL", "AVAX", "LINK", "SUI", "XRP", "ONDO"}
+            btc_pos = managed_positions.get("BTC")
+            eth_pos = managed_positions.get("ETH")
+            btc_short = bool(btc_pos and float(btc_pos.get("size", 0.0) or 0.0) < 0)
+            eth_short = bool(eth_pos and float(eth_pos.get("size", 0.0) or 0.0) < 0)
+            dual_short_block = bool(
+                trade["side"] == "long"
+                and trade["hl_coin"] in midcap_coins
+                and btc_short
+                and eth_short
+            )
+            result["shadow_dual_short_btc_short"] = btc_short
+            result["shadow_dual_short_eth_short"] = eth_short
+            result["shadow_dual_short_long_block_would_block"] = dual_short_block
+            result["shadow_dual_short_rule"] = (
+                "shadow-only: block NEW SOL/AVAX/LINK/SUI/XRP/ONDO longs "
+                "when Aggressive owns both BTC and ETH shorts"
+            )
             result["entry_leverage"] = leverage
             print(
                 f"    Entry Quality Shadow: {shadow.get('entry_quality')} "
@@ -684,6 +711,11 @@ def main():
                 f"{shadow.get('shadow_market_regime', 'UNKNOWN')} -> "
                 f"{float(shadow.get('shadow_dynamic_leverage', leverage)):.0f}x "
                 f"(live remains {leverage:.0f}x) | observation only"
+            )
+            print(
+                "    BTC+ETH Dual-Short Long-Block Shadow: "
+                f"BTC-short={btc_short} | ETH-short={eth_short} | "
+                f"{'BLOCK' if dual_short_block else 'ALLOW'} | observation only"
             )
 
         results.append(result)
