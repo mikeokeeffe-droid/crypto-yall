@@ -628,6 +628,40 @@ def main():
 
     trades = decide_trades(signals, managed_positions, max_positions, pyramid_state)
 
+    # LIVE BTC+ETH dual-short long gate:
+    # If Aggressive already owns BOTH BTC and ETH shorts, do not open or
+    # pyramid LONG positions in the mid-cap basket. Existing mid-cap longs
+    # are not force-closed; normal exit/profit-protection logic still manages
+    # them. This gate does not enable mid-cap shorting.
+    midcap_coins = {"SOL", "AVAX", "LINK", "SUI", "XRP", "ONDO"}
+    btc_pos = managed_positions.get("BTC")
+    eth_pos = managed_positions.get("ETH")
+    btc_short_live = bool(
+        btc_pos and float(btc_pos.get("size", 0.0) or 0.0) < 0
+    )
+    eth_short_live = bool(
+        eth_pos and float(eth_pos.get("size", 0.0) or 0.0) < 0
+    )
+    dual_short_gate_live = btc_short_live and eth_short_live
+    if dual_short_gate_live:
+        blocked = [
+            t for t in trades
+            if t.get("hl_coin") in midcap_coins
+            and t.get("action") in ("open_long", "pyramid_long")
+        ]
+        if blocked:
+            print(
+                "BTC+ETH DUAL-SHORT LIVE GATE: blocking mid-cap long(s): "
+                + ", ".join(t["hl_coin"] for t in blocked)
+            )
+        trades = [
+            t for t in trades
+            if not (
+                t.get("hl_coin") in midcap_coins
+                and t.get("action") in ("open_long", "pyramid_long")
+            )
+        ]
+
     # Cross-bot position lock:
     # Never open/pyramid a coin already present on the shared Hyperliquid
     # account unless this aggressive bot owns it.
@@ -671,10 +705,8 @@ def main():
             )
             result.update(shadow)
 
-            # Observation-only BTC+ETH direction gate. For a NEW mid-cap long,
-            # record whether both BTC and ETH were already short in positions
-            # owned by Aggressive at decision time. This never blocks or sends
-            # an order and does not alter existing positions.
+            # Record BTC+ETH direction-gate context on entries that remain
+            # eligible after the live gate.
             midcap_coins = {"SOL", "AVAX", "LINK", "SUI", "XRP", "ONDO"}
             btc_pos = managed_positions.get("BTC")
             eth_pos = managed_positions.get("ETH")
@@ -690,8 +722,8 @@ def main():
             result["shadow_dual_short_eth_short"] = eth_short
             result["shadow_dual_short_long_block_would_block"] = dual_short_block
             result["shadow_dual_short_rule"] = (
-                "shadow-only: block NEW SOL/AVAX/LINK/SUI/XRP/ONDO longs "
-                "when Aggressive owns both BTC and ETH shorts"
+                "LIVE: block NEW SOL/AVAX/LINK/SUI/XRP/ONDO longs and long "
+                "pyramids when Aggressive owns both BTC and ETH shorts"
             )
             result["entry_leverage"] = leverage
             print(
@@ -713,9 +745,9 @@ def main():
                 f"(live remains {leverage:.0f}x) | observation only"
             )
             print(
-                "    BTC+ETH Dual-Short Long-Block Shadow: "
+                "    BTC+ETH Dual-Short Long Gate: "
                 f"BTC-short={btc_short} | ETH-short={eth_short} | "
-                f"{'BLOCK' if dual_short_block else 'ALLOW'} | observation only"
+                f"{'BLOCK' if dual_short_block else 'ALLOW'} | LIVE"
             )
 
         results.append(result)
