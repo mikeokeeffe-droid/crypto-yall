@@ -249,7 +249,7 @@
       "funding": -0.00127,
       "gross_closed_pnl": -0.26442,
       "incomplete_accounting": [],
-      "last_run": "2026-09-15T09:03:06.936578+00:00",
+      "last_run": "2026-09-15T09:35:01.946636+00:00",
       "leverage_results": {
         "3x": {
           "average_loss": -0.063667,
@@ -350,7 +350,7 @@
     }
   },
   "date_utc": "2026-09-15",
-  "generated_at": "2026-09-15T09:08:27.995246+00:00",
+  "generated_at": "2026-09-15T09:35:04.116436+00:00",
   "report_errors": [],
   "reporting_only": true,
   "schema_version": 2,
@@ -697,29 +697,29 @@
           "LINK": {
             "asset": "LINK",
             "blocked_live_reason": "mid-cap allow_short=False",
-            "current_price": 11.402,
+            "current_price": 11.377,
             "entry_price": 11.553,
             "entry_time": "2026-09-15T01:00:00",
             "ticker": "LINK-USD",
-            "unrealized_gross_return_pct": 1.307
+            "unrealized_gross_return_pct": 1.5234
           },
           "ONDO": {
             "asset": "ONDO",
             "blocked_live_reason": "mid-cap allow_short=False",
-            "current_price": 0.3485,
+            "current_price": 0.34784,
             "entry_price": 0.35383,
             "entry_time": "2026-09-15T00:30:00",
             "ticker": "ONDO-USD",
-            "unrealized_gross_return_pct": 1.5064
+            "unrealized_gross_return_pct": 1.6929
           },
           "SUI": {
             "asset": "SUI",
             "blocked_live_reason": "mid-cap allow_short=False",
-            "current_price": 0.7084,
+            "current_price": 0.70987,
             "entry_price": 0.71919,
             "entry_time": "2026-09-15T00:00:00",
             "ticker": "SUI20947-USD",
-            "unrealized_gross_return_pct": 1.5003
+            "unrealized_gross_return_pct": 1.2959
           }
         },
         "today": {
@@ -898,6 +898,6 @@
     "errors": [],
     "scope": "Shadow-only fresh short signals for SOL/AVAX/LINK/SUI/XRP/ONDO that live trading blocks because mid-cap allow_short=False.",
     "tracking_started_at": "2026-09-10T22:03:23.796957+00:00",
-    "updated_at": "2026-09-15T09:08:27.995246+00:00"
+    "updated_at": "2026-09-15T09:35:04.116436+00:00"
   }
 }
