@@ -1,7 +1,7 @@
 {
   "bots": {
     "aggressive": {
-      "bot_state_drawdown_pct": -0.29089166666666666,
+      "bot_state_drawdown_pct": -0.12297499999999997,
       "by_asset": {
         "SOL": {
           "average_loss": -0.03479,
@@ -282,7 +282,7 @@
       "funding": -0.001155,
       "gross_closed_pnl": -0.2373,
       "incomplete_accounting": [],
-      "last_run": "2026-09-16T18:03:15.381793+00:00",
+      "last_run": "2026-09-16T18:33:23.955460+00:00",
       "leverage_results": {
         "3x": {
           "average_loss": -0.132446,
@@ -481,7 +481,7 @@
     }
   },
   "date_utc": "2026-09-16",
-  "generated_at": "2026-09-16T18:08:28.346496+00:00",
+  "generated_at": "2026-09-16T18:33:25.956991+00:00",
   "report_errors": [],
   "reporting_only": true,
   "schema_version": 2,
@@ -490,12 +490,12 @@
     "bots": {
       "aggressive": {
         "all_time": {
-          "average_loss_pct": -1.2344,
+          "average_loss_pct": -1.2738,
           "average_win_pct": 2.0786,
-          "closed_trades": 31,
-          "cumulative_gross_return_pct": -1.8221,
-          "losses": 20,
-          "win_rate_pct": 35.48,
+          "closed_trades": 33,
+          "cumulative_gross_return_pct": -5.1592,
+          "losses": 22,
+          "win_rate_pct": 33.33,
           "wins": 11
         },
         "closed_trades": [
@@ -870,44 +870,50 @@
             "gross_return_pct": -0.3309,
             "outcome": "loss",
             "ticker": "AVAX-USD"
+          },
+          {
+            "asset": "LINK",
+            "blocked_live_reason": "mid-cap allow_short=False",
+            "entry_price": 10.667,
+            "entry_time": "2026-09-16T14:30:00",
+            "exit_action": "cover_short",
+            "exit_price": 10.857,
+            "exit_time": "2026-09-16T18:00:00",
+            "gross_return_pct": -1.7812,
+            "outcome": "loss",
+            "ticker": "LINK-USD"
+          },
+          {
+            "asset": "SUI",
+            "blocked_live_reason": "mid-cap allow_short=False",
+            "entry_price": 0.68708,
+            "entry_time": "2026-09-16T16:30:00",
+            "exit_action": "cover_short",
+            "exit_price": 0.69777,
+            "exit_time": "2026-09-16T18:00:00",
+            "gross_return_pct": -1.5559,
+            "outcome": "loss",
+            "ticker": "SUI20947-USD"
           }
         ],
         "open_positions": {
-          "LINK": {
-            "asset": "LINK",
-            "blocked_live_reason": "mid-cap allow_short=False",
-            "current_price": 10.69,
-            "entry_price": 10.667,
-            "entry_time": "2026-09-16T14:30:00",
-            "ticker": "LINK-USD",
-            "unrealized_gross_return_pct": -0.2156
-          },
-          "SUI": {
-            "asset": "SUI",
-            "blocked_live_reason": "mid-cap allow_short=False",
-            "current_price": 0.68446,
-            "entry_price": 0.68708,
-            "entry_time": "2026-09-16T16:30:00",
-            "ticker": "SUI20947-USD",
-            "unrealized_gross_return_pct": 0.3813
-          },
           "XRP": {
             "asset": "XRP",
             "blocked_live_reason": "mid-cap allow_short=False",
-            "current_price": 1.2596,
+            "current_price": 1.2859,
             "entry_price": 1.2885,
             "entry_time": "2026-09-16T10:00:00",
             "ticker": "XRP-USD",
-            "unrealized_gross_return_pct": 2.2429
+            "unrealized_gross_return_pct": 0.2018
           }
         },
         "today": {
-          "average_loss_pct": -0.3309,
+          "average_loss_pct": -1.2227,
           "average_win_pct": 5.7205,
-          "closed_trades": 4,
-          "cumulative_gross_return_pct": 16.8307,
-          "losses": 1,
-          "win_rate_pct": 75.0,
+          "closed_trades": 6,
+          "cumulative_gross_return_pct": 13.4936,
+          "losses": 3,
+          "win_rate_pct": 50.0,
           "wins": 3
         }
       },
@@ -1142,6 +1148,6 @@
     "errors": [],
     "scope": "Shadow-only fresh short signals for SOL/AVAX/LINK/SUI/XRP/ONDO that live trading blocks because mid-cap allow_short=False.",
     "tracking_started_at": "2026-09-10T22:03:23.796957+00:00",
-    "updated_at": "2026-09-16T18:08:28.346496+00:00"
+    "updated_at": "2026-09-16T18:33:25.956991+00:00"
   }
 }
