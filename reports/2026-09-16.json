@@ -1,7 +1,7 @@
 {
   "bots": {
     "aggressive": {
-      "bot_state_drawdown_pct": -0.3285861111111111,
+      "bot_state_drawdown_pct": -0.5327342592592593,
       "by_asset": {
         "SOL": {
           "average_loss": -0.03479,
@@ -282,7 +282,7 @@
       "funding": -0.001155,
       "gross_closed_pnl": -0.2373,
       "incomplete_accounting": [],
-      "last_run": "2026-09-16T15:03:11.563827+00:00",
+      "last_run": "2026-09-16T15:33:18.269405+00:00",
       "leverage_results": {
         "3x": {
           "average_loss": -0.132446,
@@ -481,7 +481,7 @@
     }
   },
   "date_utc": "2026-09-16",
-  "generated_at": "2026-09-16T15:08:53.038034+00:00",
+  "generated_at": "2026-09-16T15:33:20.495059+00:00",
   "report_errors": [],
   "reporting_only": true,
   "schema_version": 2,
@@ -876,20 +876,20 @@
           "LINK": {
             "asset": "LINK",
             "blocked_live_reason": "mid-cap allow_short=False",
-            "current_price": 10.667,
+            "current_price": 10.686,
             "entry_price": 10.667,
             "entry_time": "2026-09-16T14:30:00",
             "ticker": "LINK-USD",
-            "unrealized_gross_return_pct": 0.0
+            "unrealized_gross_return_pct": -0.1781
           },
           "XRP": {
             "asset": "XRP",
             "blocked_live_reason": "mid-cap allow_short=False",
-            "current_price": 1.2652,
+            "current_price": 1.2656,
             "entry_price": 1.2885,
             "entry_time": "2026-09-16T10:00:00",
             "ticker": "XRP-USD",
-            "unrealized_gross_return_pct": 1.8083
+            "unrealized_gross_return_pct": 1.7773
           }
         },
         "today": {
@@ -1130,6 +1130,6 @@
     "errors": [],
     "scope": "Shadow-only fresh short signals for SOL/AVAX/LINK/SUI/XRP/ONDO that live trading blocks because mid-cap allow_short=False.",
     "tracking_started_at": "2026-09-10T22:03:23.796957+00:00",
-    "updated_at": "2026-09-16T15:08:53.038034+00:00"
+    "updated_at": "2026-09-16T15:33:20.495059+00:00"
   }
 }
