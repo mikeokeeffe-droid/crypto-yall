@@ -96,6 +96,16 @@ def _update_short_opportunity_check(previous: dict[str, Any], now: dt.datetime) 
         "and funding are not included."
     )
     result.setdefault("bots", {})
+    result.setdefault("dual_short_confirmed_filter", {
+        "scope": (
+            "Shadow-only subset: mid-cap enter_short signals counted only when "
+            "BTC and ETH are both confirmed short in the same strategy snapshot."
+        ),
+        "accounting_note": (
+            "Hypothetical price-only gross returns; trading fees and funding excluded."
+        ),
+        "bots": {},
+    })
     result["errors"] = []
 
     configs = {
@@ -120,12 +130,28 @@ def _update_short_opportunity_check(previous: dict[str, Any], now: dt.datetime) 
         )
         bot_state.setdefault("open_positions", {})
         bot_state.setdefault("closed_trades", [])
+        filtered_state = result["dual_short_confirmed_filter"]["bots"].setdefault(
+            bot_name, {"open_positions": {}, "closed_trades": []}
+        )
+        filtered_state.setdefault("open_positions", {})
+        filtered_state.setdefault("closed_trades", [])
 
         try:
             all_data = fetch_all_intraday(
-                MIDCAP_SHORT_SHADOW_TICKERS,
+                ["BTC-USD", "ETH-USD"] + MIDCAP_SHORT_SHADOW_TICKERS,
                 interval=cfg["interval"],
                 lookback_hours=cfg["lookback_hours"],
+            )
+            direction = {}
+            for major in ("BTC-USD", "ETH-USD"):
+                major_df = all_data.get(major)
+                if major_df is None or major_df.empty or len(major_df) < 50:
+                    direction[major] = False
+                    continue
+                major_sig = cfg["generate"](major_df, allow_short=True)
+                direction[major] = int(major_sig["Signal"].iloc[-1]) == -1
+            dual_short_confirmed = bool(
+                direction.get("BTC-USD") and direction.get("ETH-USD")
             )
         except Exception as exc:
             result["errors"].append(
@@ -152,6 +178,53 @@ def _update_short_opportunity_check(previous: dict[str, Any], now: dt.datetime) 
                     candle_time = str(candle_time)
 
                 open_pos = bot_state["open_positions"].get(asset)
+                filtered_pos = filtered_state["open_positions"].get(asset)
+
+                # Filtered shadow cohort: a fresh mid-cap short is admitted only
+                # when BOTH BTC and ETH are concurrently confirmed short by the
+                # same bot strategy. It never sends a live order.
+                if (
+                    filtered_pos is None
+                    and action == "enter_short"
+                    and dual_short_confirmed
+                ):
+                    filtered_state["open_positions"][asset] = {
+                        "asset": asset,
+                        "ticker": ticker,
+                        "entry_time": candle_time,
+                        "entry_price": price,
+                        "btc_confirmed_short": True,
+                        "eth_confirmed_short": True,
+                        "filter": "BTC+ETH confirmed short + mid-cap enter_short",
+                        "current_price": price,
+                        "unrealized_gross_return_pct": 0.0,
+                    }
+                    filtered_pos = filtered_state["open_positions"][asset]
+
+                if filtered_pos is not None:
+                    f_entry = float(filtered_pos.get("entry_price", 0.0) or 0.0)
+                    filtered_pos["current_price"] = price
+                    filtered_pos["unrealized_gross_return_pct"] = round(
+                        _shadow_return_pct(f_entry, price), 4
+                    )
+                    if last_signal != -1:
+                        f_ret = _shadow_return_pct(f_entry, price)
+                        filtered_state["closed_trades"].append({
+                            "asset": asset,
+                            "ticker": ticker,
+                            "entry_time": filtered_pos.get("entry_time"),
+                            "exit_time": candle_time,
+                            "entry_price": f_entry,
+                            "exit_price": price,
+                            "gross_return_pct": round(f_ret, 4),
+                            "outcome": (
+                                "win" if f_ret > 0 else
+                                "loss" if f_ret < 0 else "breakeven"
+                            ),
+                            "exit_action": action,
+                            "filter": "BTC+ETH confirmed short + mid-cap enter_short",
+                        })
+                        filtered_state["open_positions"].pop(asset, None)
 
                 if open_pos is None and action == "enter_short":
                     bot_state["open_positions"][asset] = {
@@ -202,6 +275,17 @@ def _update_short_opportunity_check(previous: dict[str, Any], now: dt.datetime) 
                 )
 
         bot_state["closed_trades"] = bot_state["closed_trades"][-200:]
+        filtered_state["closed_trades"] = filtered_state["closed_trades"][-200:]
+        filtered_today = [
+            r for r in filtered_state["closed_trades"]
+            if str(r.get("exit_time", "")).startswith(now.date().isoformat())
+        ]
+        filtered_state["today"] = _shadow_stats(filtered_today)
+        filtered_state["all_time"] = _shadow_stats(filtered_state["closed_trades"])
+        filtered_state["btc_confirmed_short_now"] = bool(direction.get("BTC-USD"))
+        filtered_state["eth_confirmed_short_now"] = bool(direction.get("ETH-USD"))
+        filtered_state["dual_short_confirmed_now"] = dual_short_confirmed
+
         today_rows = [
             r for r in bot_state["closed_trades"]
             if str(r.get("exit_time", "")).startswith(now.date().isoformat())
