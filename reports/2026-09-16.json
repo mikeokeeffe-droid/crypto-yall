@@ -121,7 +121,7 @@
       "funding": 0,
       "gross_closed_pnl": 0,
       "incomplete_accounting": [],
-      "last_run": "2026-09-16T04:03:06.420784+00:00",
+      "last_run": "2026-09-16T04:33:07.870914+00:00",
       "leverage_results": {},
       "profit_giveback": 0,
       "profit_protection_exits": [],
@@ -199,7 +199,7 @@
     }
   },
   "date_utc": "2026-09-16",
-  "generated_at": "2026-09-16T04:08:34.599597+00:00",
+  "generated_at": "2026-09-16T04:33:10.181366+00:00",
   "report_errors": [],
   "reporting_only": true,
   "schema_version": 2,
@@ -546,29 +546,29 @@
           "LINK": {
             "asset": "LINK",
             "blocked_live_reason": "mid-cap allow_short=False",
-            "current_price": 10.823,
+            "current_price": 10.826,
             "entry_price": 11.553,
             "entry_time": "2026-09-15T01:00:00",
             "ticker": "LINK-USD",
-            "unrealized_gross_return_pct": 6.3187
+            "unrealized_gross_return_pct": 6.2927
           },
           "ONDO": {
             "asset": "ONDO",
             "blocked_live_reason": "mid-cap allow_short=False",
-            "current_price": 0.32807,
+            "current_price": 0.32991,
             "entry_price": 0.35383,
             "entry_time": "2026-09-15T00:30:00",
             "ticker": "ONDO-USD",
-            "unrealized_gross_return_pct": 7.2803
+            "unrealized_gross_return_pct": 6.7603
           },
           "SUI": {
             "asset": "SUI",
             "blocked_live_reason": "mid-cap allow_short=False",
-            "current_price": 0.68965,
+            "current_price": 0.69357,
             "entry_price": 0.71919,
             "entry_time": "2026-09-15T00:00:00",
             "ticker": "SUI20947-USD",
-            "unrealized_gross_return_pct": 4.1074
+            "unrealized_gross_return_pct": 3.5623
           }
         },
         "today": {
@@ -747,6 +747,6 @@
     "errors": [],
     "scope": "Shadow-only fresh short signals for SOL/AVAX/LINK/SUI/XRP/ONDO that live trading blocks because mid-cap allow_short=False.",
     "tracking_started_at": "2026-09-10T22:03:23.796957+00:00",
-    "updated_at": "2026-09-16T04:08:34.599597+00:00"
+    "updated_at": "2026-09-16T04:33:10.181366+00:00"
   }
 }
