@@ -282,7 +282,7 @@
       "funding": -0.001155,
       "gross_closed_pnl": -0.2373,
       "incomplete_accounting": [],
-      "last_run": "2026-09-16T11:33:09.012637+00:00",
+      "last_run": "2026-09-16T12:03:04.488570+00:00",
       "leverage_results": {
         "3x": {
           "average_loss": -0.132446,
@@ -401,7 +401,7 @@
     }
   },
   "date_utc": "2026-09-16",
-  "generated_at": "2026-09-16T11:33:11.003588+00:00",
+  "generated_at": "2026-09-16T12:03:06.589200+00:00",
   "report_errors": [],
   "reporting_only": true,
   "schema_version": 2,
@@ -784,20 +784,20 @@
           "AVAX": {
             "asset": "AVAX",
             "blocked_live_reason": "mid-cap allow_short=False",
-            "current_price": 7.2718,
+            "current_price": 7.3137,
             "entry_price": 7.2539,
             "entry_time": "2026-09-16T09:00:00",
             "ticker": "AVAX-USD",
-            "unrealized_gross_return_pct": -0.2468
+            "unrealized_gross_return_pct": -0.8244
           },
           "XRP": {
             "asset": "XRP",
             "blocked_live_reason": "mid-cap allow_short=False",
-            "current_price": 1.2888,
+            "current_price": 1.296,
             "entry_price": 1.2885,
             "entry_time": "2026-09-16T10:00:00",
             "ticker": "XRP-USD",
-            "unrealized_gross_return_pct": -0.0233
+            "unrealized_gross_return_pct": -0.5821
           }
         },
         "today": {
@@ -910,56 +910,56 @@
           "AVAX": {
             "asset": "AVAX",
             "blocked_live_reason": "mid-cap allow_short=False",
-            "current_price": 7.2501,
+            "current_price": 7.3137,
             "entry_price": 7.5196,
             "entry_time": "2026-09-15T08:00:00",
             "ticker": "AVAX-USD",
-            "unrealized_gross_return_pct": 3.584
+            "unrealized_gross_return_pct": 2.7382
           },
           "LINK": {
             "asset": "LINK",
             "blocked_live_reason": "mid-cap allow_short=False",
-            "current_price": 10.808,
+            "current_price": 10.868,
             "entry_price": 11.336,
             "entry_time": "2026-09-15T07:00:00",
             "ticker": "LINK-USD",
-            "unrealized_gross_return_pct": 4.6577
+            "unrealized_gross_return_pct": 4.1284
           },
           "ONDO": {
             "asset": "ONDO",
             "blocked_live_reason": "mid-cap allow_short=False",
-            "current_price": 0.32668,
+            "current_price": 0.32895,
             "entry_price": 0.35204,
             "entry_time": "2026-09-15T03:00:00",
             "ticker": "ONDO-USD",
-            "unrealized_gross_return_pct": 7.2037
+            "unrealized_gross_return_pct": 6.5589
           },
           "SOL": {
             "asset": "SOL",
             "blocked_live_reason": "mid-cap allow_short=False",
-            "current_price": 97.174,
+            "current_price": 97.987,
             "entry_price": 101.26,
             "entry_time": "2026-09-15T04:00:00",
             "ticker": "SOL-USD",
-            "unrealized_gross_return_pct": 4.0352
+            "unrealized_gross_return_pct": 3.2323
           },
           "SUI": {
             "asset": "SUI",
             "blocked_live_reason": "mid-cap allow_short=False",
-            "current_price": 0.68928,
+            "current_price": 0.69183,
             "entry_price": 0.71257,
             "entry_time": "2026-09-15T04:00:00",
             "ticker": "SUI20947-USD",
-            "unrealized_gross_return_pct": 3.2685
+            "unrealized_gross_return_pct": 2.9106
           },
           "XRP": {
             "asset": "XRP",
             "blocked_live_reason": "mid-cap allow_short=False",
-            "current_price": 1.2881,
+            "current_price": 1.296,
             "entry_price": 1.4078,
             "entry_time": "2026-09-15T05:00:00",
             "ticker": "XRP-USD",
-            "unrealized_gross_return_pct": 8.5026
+            "unrealized_gross_return_pct": 7.9415
           }
         },
         "today": {
@@ -1013,8 +1013,8 @@
           },
           "btc_confirmed_short_now": true,
           "closed_trades": [],
-          "dual_short_confirmed_now": true,
-          "eth_confirmed_short_now": true,
+          "dual_short_confirmed_now": false,
+          "eth_confirmed_short_now": false,
           "open_positions": {},
           "today": {
             "average_loss_pct": null,
@@ -1032,6 +1032,6 @@
     "errors": [],
     "scope": "Shadow-only fresh short signals for SOL/AVAX/LINK/SUI/XRP/ONDO that live trading blocks because mid-cap allow_short=False.",
     "tracking_started_at": "2026-09-10T22:03:23.796957+00:00",
-    "updated_at": "2026-09-16T11:33:11.003588+00:00"
+    "updated_at": "2026-09-16T12:03:06.589200+00:00"
   }
 }
