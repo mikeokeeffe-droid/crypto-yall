@@ -1,8 +1,19 @@
 {
   "bots": {
     "aggressive": {
-      "bot_state_drawdown_pct": 0.217312037037037,
+      "bot_state_drawdown_pct": -0.11791944444444442,
       "by_asset": {
+        "ONDO": {
+          "average_loss": null,
+          "average_win": 0.221118,
+          "breakeven": 0,
+          "losses": 0,
+          "net_pnl": 0.221118,
+          "profit_giveback": 0.187932,
+          "trades": 1,
+          "win_rate_pct": 100.0,
+          "wins": 1
+        },
         "SOL": {
           "average_loss": -0.03479,
           "average_win": null,
@@ -83,22 +94,50 @@
           "side": "long",
           "time": "2026-09-16T08:33:13.275810+00:00",
           "trading_fees": 0.013359
+        },
+        {
+          "asset": "ONDO",
+          "entry_quality": "STRONG",
+          "entry_type": "sync_hold",
+          "exit_type": "PROFIT PROTECTION",
+          "fee_data_complete": true,
+          "funding": -0.000743,
+          "funding_data_complete": true,
+          "gross_pnl": 0.23535,
+          "leverage": 3.0,
+          "peak_unrealized_pnl": 0.40905,
+          "pnl_source": "hyperliquid_closedPnl+userFunding",
+          "profit_giveback": 0.18793200000000002,
+          "protection_mode": "HIGH LEVERAGE TRAILING PROFIT PROTECTION",
+          "realized_net_pnl": 0.221118,
+          "shadow_bearish_regime_evaluable": true,
+          "shadow_bearish_regime_would_block": false,
+          "shadow_combined_would_block": true,
+          "shadow_dual_short_btc_short": false,
+          "shadow_dual_short_eth_short": false,
+          "shadow_dual_short_long_block_would_block": false,
+          "shadow_dynamic_leverage": 4.0,
+          "shadow_fresh_only_would_block": true,
+          "shadow_market_regime": "BULLISH",
+          "side": "long",
+          "time": "2026-09-16T19:33:13.687608+00:00",
+          "trading_fees": 0.013489
         }
       ],
       "dual_short_long_block_shadow_results": {
         "observation_only": true,
         "rule": "shadow-only: block NEW SOL/AVAX/LINK/SUI/XRP/ONDO longs when Aggressive owns both BTC and ETH shorts",
-        "tagged_trades": 2,
+        "tagged_trades": 3,
         "would_allow": {
           "average_loss": -0.132446,
-          "average_win": null,
+          "average_win": 0.221118,
           "breakeven": 0,
           "losses": 2,
-          "net_pnl": -0.264893,
-          "profit_giveback": 0.117162,
-          "trades": 2,
-          "win_rate_pct": 0.0,
-          "wins": 0
+          "net_pnl": -0.043775,
+          "profit_giveback": 0.305094,
+          "trades": 3,
+          "win_rate_pct": 33.33,
+          "wins": 1
         },
         "would_block": {
           "average_loss": null,
@@ -114,6 +153,17 @@
       },
       "dynamic_leverage_shadow_results": {
         "by_regime": {
+          "BULLISH": {
+            "average_loss": null,
+            "average_win": 0.221118,
+            "breakeven": 0,
+            "losses": 0,
+            "net_pnl": 0.221118,
+            "profit_giveback": 0.187932,
+            "trades": 1,
+            "win_rate_pct": 100.0,
+            "wins": 1
+          },
           "MIXED": {
             "average_loss": -0.230103,
             "average_win": null,
@@ -159,25 +209,36 @@
             "trades": 1,
             "win_rate_pct": 0.0,
             "wins": 0
+          },
+          "4x": {
+            "average_loss": null,
+            "average_win": 0.221118,
+            "breakeven": 0,
+            "losses": 0,
+            "net_pnl": 0.221118,
+            "profit_giveback": 0.187932,
+            "trades": 1,
+            "win_rate_pct": 100.0,
+            "wins": 1
           }
         },
         "observation_only": true,
         "rule": "1x strong bearish; 2x bearish; 3x mixed; 4x bullish; 5x strong bullish",
-        "tagged_trades": 2
+        "tagged_trades": 3
       },
       "entry_filter_shadow_results": {
         "bearish_regime_long_filter": {
           "rule": "block long when ADX>=15, -DI>+DI, and price is below 20-bar rolling VWAP",
           "would_allow": {
             "average_loss": -0.230103,
-            "average_win": null,
+            "average_win": 0.221118,
             "breakeven": 0,
             "losses": 1,
-            "net_pnl": -0.230103,
-            "profit_giveback": 0.044712,
-            "trades": 1,
-            "win_rate_pct": 0.0,
-            "wins": 0
+            "net_pnl": -0.008985,
+            "profit_giveback": 0.232644,
+            "trades": 2,
+            "win_rate_pct": 50.0,
+            "wins": 1
           },
           "would_block": {
             "average_loss": -0.03479,
@@ -205,14 +266,14 @@
           },
           "would_block": {
             "average_loss": -0.03479,
-            "average_win": null,
+            "average_win": 0.221118,
             "breakeven": 0,
             "losses": 1,
-            "net_pnl": -0.03479,
-            "profit_giveback": 0.07245,
-            "trades": 1,
-            "win_rate_pct": 0.0,
-            "wins": 0
+            "net_pnl": 0.186328,
+            "profit_giveback": 0.260382,
+            "trades": 2,
+            "win_rate_pct": 50.0,
+            "wins": 1
           }
         },
         "fresh_only": {
@@ -229,14 +290,14 @@
           },
           "would_block": {
             "average_loss": null,
-            "average_win": null,
+            "average_win": 0.221118,
             "breakeven": 0,
             "losses": 0,
-            "net_pnl": 0,
-            "profit_giveback": 0,
-            "trades": 0,
-            "win_rate_pct": null,
-            "wins": 0
+            "net_pnl": 0.221118,
+            "profit_giveback": 0.187932,
+            "trades": 1,
+            "win_rate_pct": 100.0,
+            "wins": 1
           }
         },
         "observation_only": true
@@ -255,14 +316,14 @@
         },
         "STRONG": {
           "average_loss": -0.230103,
-          "average_win": null,
+          "average_win": 0.221118,
           "breakeven": 0,
           "losses": 1,
-          "net_pnl": -0.230103,
-          "profit_giveback": 0.044712,
-          "trades": 1,
-          "win_rate_pct": 0.0,
-          "wins": 0
+          "net_pnl": -0.008985,
+          "profit_giveback": 0.232644,
+          "trades": 2,
+          "win_rate_pct": 50.0,
+          "wins": 1
         }
       },
       "entry_type_results": {
@@ -276,27 +337,38 @@
           "trades": 2,
           "win_rate_pct": 0.0,
           "wins": 0
+        },
+        "sync": {
+          "average_loss": null,
+          "average_win": 0.221118,
+          "breakeven": 0,
+          "losses": 0,
+          "net_pnl": 0.221118,
+          "profit_giveback": 0.187932,
+          "trades": 1,
+          "win_rate_pct": 100.0,
+          "wins": 1
         }
       },
       "errors": [],
-      "funding": -0.001155,
-      "gross_closed_pnl": -0.2373,
+      "funding": -0.001898,
+      "gross_closed_pnl": -0.00195,
       "incomplete_accounting": [],
-      "last_run": "2026-09-16T19:03:12.790576+00:00",
+      "last_run": "2026-09-16T19:33:13.687797+00:00",
       "leverage_results": {
         "3x": {
           "average_loss": -0.132446,
-          "average_win": null,
+          "average_win": 0.221118,
           "breakeven": 0,
           "losses": 2,
-          "net_pnl": -0.264893,
-          "profit_giveback": 0.117162,
-          "trades": 2,
-          "win_rate_pct": 0.0,
-          "wins": 0
+          "net_pnl": -0.043775,
+          "profit_giveback": 0.305094,
+          "trades": 3,
+          "win_rate_pct": 33.33,
+          "wins": 1
         }
       },
-      "profit_giveback": 0.117162,
+      "profit_giveback": 0.305094,
       "profit_protection_exits": [
         {
           "asset": "SOL",
@@ -325,23 +397,51 @@
           "side": "long",
           "time": "2026-09-16T08:03:14.216064+00:00",
           "trading_fees": 0.013079
+        },
+        {
+          "asset": "ONDO",
+          "entry_quality": "STRONG",
+          "entry_type": "sync_hold",
+          "exit_type": "PROFIT PROTECTION",
+          "fee_data_complete": true,
+          "funding": -0.000743,
+          "funding_data_complete": true,
+          "gross_pnl": 0.23535,
+          "leverage": 3.0,
+          "peak_unrealized_pnl": 0.40905,
+          "pnl_source": "hyperliquid_closedPnl+userFunding",
+          "profit_giveback": 0.18793200000000002,
+          "protection_mode": "HIGH LEVERAGE TRAILING PROFIT PROTECTION",
+          "realized_net_pnl": 0.221118,
+          "shadow_bearish_regime_evaluable": true,
+          "shadow_bearish_regime_would_block": false,
+          "shadow_combined_would_block": true,
+          "shadow_dual_short_btc_short": false,
+          "shadow_dual_short_eth_short": false,
+          "shadow_dual_short_long_block_would_block": false,
+          "shadow_dynamic_leverage": 4.0,
+          "shadow_fresh_only_would_block": true,
+          "shadow_market_regime": "BULLISH",
+          "side": "long",
+          "time": "2026-09-16T19:33:13.687608+00:00",
+          "trading_fees": 0.013489
         }
       ],
-      "realized_net_pnl": -0.264893,
+      "realized_net_pnl": -0.043775,
       "safety_events": [],
       "skipped_orders": [],
       "stats": {
         "average_loss": -0.132446,
-        "average_win": null,
+        "average_win": 0.221118,
         "breakeven": 0,
         "losses": 2,
-        "net_pnl": -0.264893,
-        "profit_giveback": 0.117162,
-        "trades": 2,
-        "win_rate_pct": 0.0,
-        "wins": 0
+        "net_pnl": -0.043775,
+        "profit_giveback": 0.305094,
+        "trades": 3,
+        "win_rate_pct": 33.33,
+        "wins": 1
       },
-      "trading_fees": 0.026438
+      "trading_fees": 0.039927
     },
     "daily": {
       "bot_state_drawdown_pct": 0.0,
@@ -481,7 +581,7 @@
     }
   },
   "date_utc": "2026-09-16",
-  "generated_at": "2026-09-16T19:08:30.839872+00:00",
+  "generated_at": "2026-09-16T19:33:16.422979+00:00",
   "report_errors": [],
   "reporting_only": true,
   "schema_version": 2,
@@ -900,11 +1000,11 @@
           "XRP": {
             "asset": "XRP",
             "blocked_live_reason": "mid-cap allow_short=False",
-            "current_price": 1.2775,
+            "current_price": 1.282,
             "entry_price": 1.2885,
             "entry_time": "2026-09-16T10:00:00",
             "ticker": "XRP-USD",
-            "unrealized_gross_return_pct": 0.8537
+            "unrealized_gross_return_pct": 0.5045
           }
         },
         "today": {
@@ -1148,6 +1248,6 @@
     "errors": [],
     "scope": "Shadow-only fresh short signals for SOL/AVAX/LINK/SUI/XRP/ONDO that live trading blocks because mid-cap allow_short=False.",
     "tracking_started_at": "2026-09-10T22:03:23.796957+00:00",
-    "updated_at": "2026-09-16T19:08:30.839872+00:00"
+    "updated_at": "2026-09-16T19:33:16.422979+00:00"
   }
 }
