@@ -210,7 +210,7 @@
       "funding": -0.002301,
       "gross_closed_pnl": 0.13206,
       "incomplete_accounting": [],
-      "last_run": "2026-09-17T11:33:08.804077+00:00",
+      "last_run": "2026-09-17T12:03:05.811674+00:00",
       "leverage_results": {
         "4x": {
           "average_loss": null,
@@ -329,7 +329,7 @@
     }
   },
   "date_utc": "2026-09-17",
-  "generated_at": "2026-09-17T11:33:11.216332+00:00",
+  "generated_at": "2026-09-17T12:03:07.819989+00:00",
   "report_errors": [],
   "reporting_only": true,
   "schema_version": 2,
@@ -757,13 +757,31 @@
           }
         ],
         "open_positions": {
+          "AVAX": {
+            "asset": "AVAX",
+            "blocked_live_reason": "mid-cap allow_short=False",
+            "current_price": 7.5526,
+            "entry_price": 7.5526,
+            "entry_time": "2026-09-17T11:30:00",
+            "ticker": "AVAX-USD",
+            "unrealized_gross_return_pct": 0.0
+          },
           "ONDO": {
             "asset": "ONDO",
             "blocked_live_reason": "mid-cap allow_short=False",
-            "current_price": 0.34945,
+            "current_price": 0.35042,
             "entry_price": 0.34945,
             "entry_time": "2026-09-17T11:00:00",
             "ticker": "ONDO-USD",
+            "unrealized_gross_return_pct": -0.2776
+          },
+          "SUI": {
+            "asset": "SUI",
+            "blocked_live_reason": "mid-cap allow_short=False",
+            "current_price": 0.72087,
+            "entry_price": 0.72087,
+            "entry_time": "2026-09-17T11:30:00",
+            "ticker": "SUI20947-USD",
             "unrealized_gross_return_pct": 0.0
           }
         },
@@ -1016,6 +1034,6 @@
     "errors": [],
     "scope": "Shadow-only fresh short signals for SOL/AVAX/LINK/SUI/XRP/ONDO that live trading blocks because mid-cap allow_short=False.",
     "tracking_started_at": "2026-09-10T22:03:23.796957+00:00",
-    "updated_at": "2026-09-17T11:33:11.216332+00:00"
+    "updated_at": "2026-09-17T12:03:07.819989+00:00"
   }
 }
