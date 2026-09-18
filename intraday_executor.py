@@ -598,6 +598,9 @@ def main():
         "Intraday executor started at "
         f"{dt.datetime.now(dt.UTC).isoformat()}"
     )
+    protection_only = os.environ.get("INTRADAY_PROTECTION_ONLY", "OFF").upper() == "ON"
+    if protection_only:
+        print("Intraday PROTECTION-ONLY mode: no entries, normal signal exits, or signal recomputation")
 
     if kill_switch_off():
         print("Intraday KILL_SWITCH is OFF — halting")
@@ -619,61 +622,81 @@ def main():
         os.environ.get("INTRADAY_DD_PCT", "5")
     )
 
-    halted, state_update = check_daily_drawdown(
-        state,
-        info,
-        address,
-        capital,
-        threshold,
-    )
-
-    state.update(state_update)
-
-    if halted:
-        msg = (
-            "Intraday halted: "
-            f"{state_update.get('halt_reason')}"
+    if protection_only:
+        # A daily drawdown halt blocks new trading, but existing positions
+        # must continue to receive profit protection.
+        print("Protection-only mode: bypassing daily drawdown entry halt")
+    else:
+        halted, state_update = check_daily_drawdown(
+            state,
+            info,
+            address,
+            capital,
+            threshold,
         )
-        print(msg)
-        _send_email([], msg)
-        save_state(state)
-        sys.exit(0)
 
-    today = dt.date.today().isoformat()
+        state.update(state_update)
 
-    if state.get("halted_today") == today:
-        print(
-            "Already halted today: "
-            f"{state.get('halt_reason')}"
-        )
-        sys.exit(0)
+        if halted:
+            msg = (
+                "Intraday halted: "
+                f"{state_update.get('halt_reason')}"
+            )
+            print(msg)
+            _send_email([], msg)
+            save_state(state)
+            sys.exit(0)
 
-    signals = compute_intraday_signals()
+        today = dt.date.today().isoformat()
+
+        if state.get("halted_today") == today:
+            print(
+                "Already halted today: "
+                f"{state.get('halt_reason')}"
+            )
+            sys.exit(0)
+
+    if protection_only:
+        # Use only the last signals confirmed by the normal hourly executor.
+        # This keeps re-entry locks tied to the confirmed strategy snapshot.
+        signals = state.get("last_signals", {}) or {}
+        print(f"Protection-only mode: using {len(signals)} last confirmed Intraday signal(s)")
+    else:
+        signals = compute_intraday_signals()
+
     open_positions = get_open_positions(info, address)
     max_positions = int(
         os.environ.get("INTRADAY_MAX_POSITIONS", "2")
     )
 
-    # Filter out assets not listed on this Hyperliquid environment
-    available = set(info.all_mids().keys())
+    # Normal runs verify market availability. Protection-only runs avoid
+    # unnecessary signal/market work and keep only known persisted symbols.
+    if protection_only:
+        signals = {
+            t: s
+            for t, s in signals.items()
+            if t in HL_SYMBOL_MAP
+        }
+    else:
+        available = set(info.all_mids().keys())
 
-    signals = {
-        t: s
-        for t, s in signals.items()
-        if HL_SYMBOL_MAP[t] in available
-    }
+        signals = {
+            t: s
+            for t, s in signals.items()
+            if HL_SYMBOL_MAP[t] in available
+        }
 
-    skipped_assets = [
-        t
-        for t in ASSETS
-        if t not in signals
-    ]
+        skipped_assets = [
+            t
+            for t in ASSETS
+            if t not in signals
+        ]
 
-    if skipped_assets:
-        print(
-            "Skipping unavailable assets on this env: "
-            f"{skipped_assets}"
-        )
+        if skipped_assets:
+            print(
+                "Skipping unavailable assets on this env: "
+                f"{skipped_assets}"
+            )
 
     # Ownership tracking: only manage positions this bot opened
     owned_coins = set(
@@ -700,9 +723,11 @@ def main():
         if c in owned_coins
     }
 
-    # Observation-only tracking for currently owned positions.
+    # Peak tracking is required by both normal and protection-only runs.
     update_peak_tracking(state, managed_positions, owned_coins)
-    update_flat_tracking(state, signals, owned_coins)
+    if not protection_only:
+        # Flat tracking belongs to the confirmed hourly strategy cadence.
+        update_flat_tracking(state, signals, owned_coins)
 
     trades = decide_trades(
         signals,
@@ -1013,7 +1038,8 @@ def main():
     # Refresh peaks after any fills so newly opened positions are tracked too.
     update_peak_tracking(state, state["open_positions"], owned_coins)
 
-    state["last_signals"] = signals
+    if not protection_only:
+        state["last_signals"] = signals
     save_state(state)
 
     filled_count = sum(
