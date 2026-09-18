@@ -119,19 +119,37 @@ jobs:
         if: always()
         continue-on-error: true
         run: |
-          python daily_bot_report.py
-
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-          git add reports/latest.json reports/$(date -u +%F).json
+          for attempt in 1 2 3; do
+            echo "Report publish attempt ${attempt}/3"
 
-          if git diff --cached --quiet; then
-            echo "No report changes to commit"
-          else
+            # Start from the current remote head so parallel bot runs cannot
+            # silently overwrite each other's reports/latest.json commit.
+            git fetch origin main
+            git reset --hard origin/main
+
+            python daily_bot_report.py
+            git add reports/latest.json reports/$(date -u +%F).json
+
+            if git diff --cached --quiet; then
+              echo "No report changes to commit"
+              exit 0
+            fi
+
             git commit -m "Update bot report $(date -u +%F)"
-            git push
-          fi
+
+            if git push origin HEAD:main; then
+              exit 0
+            fi
+
+            echo "Report push raced another workflow; retrying from latest main..."
+            sleep 3
+          done
+
+          echo "Report publish failed after 3 attempts"
+          exit 1
         env:
           GIST_TOKEN: ${{ secrets.GIST_TOKEN }}
           GIST_ID: ${{ secrets.GIST_ID }}
