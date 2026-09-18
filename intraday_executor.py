@@ -1056,9 +1056,12 @@ def main():
         "net_dollars": net_closed_dollars,
     }
     state["last_equity"] = equity
-    state["last_run"] = dt.datetime.now(
-        dt.UTC
-    ).isoformat()
+    now_iso = dt.datetime.now(dt.UTC).isoformat()
+    if protection_only:
+        state["last_protection_run"] = now_iso
+    else:
+        state["last_strategy_run"] = now_iso
+        state["last_run"] = now_iso
     state["owned_coins"] = sorted(
         owned_coins
     )
