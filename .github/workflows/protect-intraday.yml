@@ -2,21 +2,23 @@ name: Protect Intraday Positions
 
 on:
   workflow_run:
-    workflows: ["Execute Aggressive"]
+    workflows: ["Execute Intraday"]
     types: [completed]
   workflow_dispatch: {}
 
 permissions:
   contents: read
 
+# Serialize protection with the normal Intraday executor so both can never
+# read/write the same bot state or act on the same owned position at once.
 concurrency:
-  group: protect-intraday-loop
+  group: execute-intraday-live
   cancel-in-progress: false
 
 jobs:
   protect:
     runs-on: ubuntu-latest
-    timeout-minutes: 29
+    timeout-minutes: 62
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
@@ -25,16 +27,14 @@ jobs:
           cache: pip
       - name: Install dependencies
         run: pip install -r requirements.txt
-      - name: Stagger Intraday protector
-        run: sleep 60
       - name: Check Intraday protection every five minutes
         shell: bash
         run: |
           set -e
-          for cycle in 1 2 3 4 5 6; do
-            echo "Intraday protection cycle ${cycle}/6"
+          for cycle in 1 2 3 4 5 6 7 8 9 10 11 12; do
+            echo "Intraday protection cycle ${cycle}/12"
             python intraday_profit_protection.py
-            if [ "$cycle" -lt 6 ]; then
+            if [ "$cycle" -lt 12 ]; then
               sleep 300
             fi
           done
