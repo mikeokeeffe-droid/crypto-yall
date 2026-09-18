@@ -30,7 +30,25 @@ def _fetch_gist(gist_id: str, filename: str) -> dict:
         files = resp.json().get("files", {})
         if filename not in files:
             return {}
-        return json.loads(files[filename]["content"])
+        item = files[filename]
+        if item.get("truncated"):
+            raw_url = item.get("raw_url")
+            if not raw_url:
+                return {}
+            raw = requests.get(
+                raw_url,
+                headers={
+                    "Authorization": f"token {gist_token}",
+                    "Accept": "application/vnd.github.raw",
+                },
+                timeout=20,
+            )
+            if not raw.ok:
+                return {}
+            content = raw.text
+        else:
+            content = item.get("content", "")
+        return json.loads(content)
     except Exception:
         return {}
 
