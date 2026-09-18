@@ -33,6 +33,7 @@ HIGH_LEV_THRESHOLD = _env_float("AGGRESSIVE_HIGH_LEV_THRESHOLD", 3.0)
 SMALL_PROFIT_PEAK_PCT = float(os.environ.get("AGGRESSIVE_SMALL_PROFIT_PEAK_PCT", "1.0"))
 SMALL_PROFIT_FLOOR_PCT = float(os.environ.get("AGGRESSIVE_SMALL_PROFIT_FLOOR_PCT", "0.25"))
 ENABLED = os.environ.get("AGGRESSIVE_PROFIT_PROTECTION", "ON").upper() == "ON"
+PROTECTION_ONLY = os.environ.get("AGGRESSIVE_PROTECTION_ONLY", "OFF").upper() == "ON"
 
 _peak_returns = {}
 _state = None
@@ -58,7 +59,11 @@ def _current_return_pct(position):
 
 
 def decide_trades(signals, open_positions, max_positions, pyramid_state):
-    trades = _original_decide_trades(signals, open_positions, max_positions, pyramid_state)
+    # Protection-only runs must never create, pyramid, or perform normal signal exits.
+    # They only evaluate the live profit-protection rules for positions this bot owns.
+    trades = [] if PROTECTION_ONLY else _original_decide_trades(
+        signals, open_positions, max_positions, pyramid_state
+    )
     if not ENABLED or _state is None:
         return trades
 
@@ -179,6 +184,7 @@ aggressive._send_telegram = send_telegram
 if __name__ == "__main__":
     print(
         f"Aggressive live profit protection: {'ON' if ENABLED else 'OFF'} | "
+        f"mode {'PROTECTION-ONLY' if PROTECTION_ONLY else 'FULL EXECUTOR'} | "
         f"small-profit peak +{SMALL_PROFIT_PEAK_PCT:.2f}% -> floor +{SMALL_PROFIT_FLOOR_PCT:.2f}% | "
         f"low-lev arm +{LOW_LEV_ARM_PCT:.2f}% / {LOW_LEV_GIVEBACK_PCT:.2f}pp | "
         f"high-lev ({HIGH_LEV_THRESHOLD:.0f}x+) arm +{HIGH_LEV_ARM_PCT:.2f}% / "
