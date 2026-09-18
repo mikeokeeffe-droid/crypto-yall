@@ -3,7 +3,7 @@ name: Protect Intraday Positions
 on:
   schedule:
     # UTC: :00, :05, :10 ... :55. Offset from normal Intraday :07 runs.
-    - cron: '*/5 * * * *'
+    - cron: '0-55/5 * * * *'
   workflow_dispatch: {}
 
 permissions:
