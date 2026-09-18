@@ -360,9 +360,9 @@
       "funding": -0.004277,
       "gross_closed_pnl": 0.40264,
       "incomplete_accounting": [],
-      "last_protection_run": "2026-09-18T20:28:53.577858+00:00",
-      "last_run": "2026-09-18T20:33:12.792946+00:00",
-      "last_strategy_run": "2026-09-18T20:33:12.792946+00:00",
+      "last_protection_run": "2026-09-18T20:58:55.416421+00:00",
+      "last_run": "2026-09-18T21:03:10.845879+00:00",
+      "last_strategy_run": "2026-09-18T21:03:10.845879+00:00",
       "leverage_results": {
         "3x": {
           "average_loss": -0.068612,
@@ -557,7 +557,7 @@
       "funding": 0,
       "gross_closed_pnl": 0,
       "incomplete_accounting": [],
-      "last_protection_run": "2026-09-18T20:29:07.490301+00:00",
+      "last_protection_run": "2026-09-18T20:59:48.182126+00:00",
       "last_run": "2026-09-18T20:08:30.686350+00:00",
       "last_strategy_run": "2026-09-18T20:08:30.686350+00:00",
       "profit_giveback": 0,
@@ -580,7 +580,7 @@
     }
   },
   "date_utc": "2026-09-18",
-  "generated_at": "2026-09-18T20:33:15.748615+00:00",
+  "generated_at": "2026-09-18T21:03:13.729442+00:00",
   "report_errors": [],
   "reporting_only": true,
   "schema_version": 2,
@@ -1425,6 +1425,6 @@
     "errors": [],
     "scope": "Shadow-only fresh short signals for SOL/AVAX/LINK/SUI/XRP/ONDO that live trading blocks because mid-cap allow_short=False.",
     "tracking_started_at": "2026-09-10T22:03:23.796957+00:00",
-    "updated_at": "2026-09-18T20:33:15.748615+00:00"
+    "updated_at": "2026-09-18T21:03:13.729442+00:00"
   }
 }
