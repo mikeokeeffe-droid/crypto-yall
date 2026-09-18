@@ -13,7 +13,7 @@ concurrency:
 jobs:
   trade:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@v7
 
@@ -125,3 +125,54 @@ jobs:
           GIST_ID: ${{ secrets.GIST_ID }}
           INTRADAY_GIST_ID: ${{ secrets.INTRADAY_GIST_ID }}
           AGGRESSIVE_GIST_ID: ${{ secrets.AGGRESSIVE_GIST_ID }}
+
+      - name: Monitor Aggressive protection until next strategy run
+        if: always()
+        shell: bash
+        run: |
+          had_failure=0
+          for cycle in 1 2 3 4 5; do
+            echo "Waiting 5 minutes before Aggressive protection check ${cycle}/5"
+            sleep 300
+            ok=0
+            for attempt in 1 2; do
+              echo "Aggressive protection check ${cycle}/5, attempt ${attempt}/2"
+              if python aggressive_profit_protection.py; then
+                ok=1
+                break
+              fi
+              sleep 10
+            done
+            if [ "$ok" -ne 1 ]; then
+              had_failure=1
+            fi
+          done
+          if [ "$had_failure" -ne 0 ]; then
+            exit 1
+          fi
+        env:
+          HL_PRIVATE_KEY: ${{ secrets.HL_PRIVATE_KEY }}
+          HL_ACCOUNT_ADDRESS: ${{ secrets.HL_ACCOUNT_ADDRESS }}
+          HL_TESTNET: ${{ vars.HL_TESTNET }}
+          AGGRESSIVE_CAPITAL: ${{ vars.AGGRESSIVE_CAPITAL }}
+          AGGRESSIVE_TEST_NOTIONAL: ${{ vars.AGGRESSIVE_TEST_NOTIONAL }}
+          AGGRESSIVE_DD_PCT: ${{ vars.AGGRESSIVE_DD_PCT }}
+          AGGRESSIVE_MAX_POSITIONS: ${{ vars.AGGRESSIVE_MAX_POSITIONS }}
+          AGGRESSIVE_KILL_SWITCH: ${{ vars.AGGRESSIVE_KILL_SWITCH }}
+          AGGRESSIVE_LEVERAGE: ${{ vars.AGGRESSIVE_LEVERAGE }}
+          AGGRESSIVE_MAX_LEVERAGE: ${{ vars.AGGRESSIVE_MAX_LEVERAGE }}
+          AGGRESSIVE_PROFIT_PROTECTION: 'ON'
+          AGGRESSIVE_PROTECTION_ONLY: 'ON'
+          AGGRESSIVE_PROFIT_ARM_PCT: '0.5'
+          AGGRESSIVE_PROFIT_GIVEBACK_PCT: '2.0'
+          AGGRESSIVE_LOW_LEV_PROTECTION: ${{ vars.AGGRESSIVE_LOW_LEV_PROTECTION }}
+          AGGRESSIVE_LOW_LEV_GIVEBACK: ${{ vars.AGGRESSIVE_LOW_LEV_GIVEBACK }}
+          AGGRESSIVE_HIGH_LEV_PROTECTION: ${{ vars.AGGRESSIVE_HIGH_LEV_PROTECTION }}
+          AGGRESSIVE_HIGH_LEV_GIVEBACK: ${{ vars.AGGRESSIVE_HIGH_LEV_GIVEBACK }}
+          GIST_TOKEN: ${{ secrets.GIST_TOKEN }}
+          AGGRESSIVE_GIST_ID: ${{ secrets.AGGRESSIVE_GIST_ID }}
+          GMAIL_USER: ${{ secrets.GMAIL_USER }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+          NOTIFY_EMAILS: ${{ secrets.NOTIFY_EMAILS }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
