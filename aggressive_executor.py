@@ -629,8 +629,28 @@ def main():
         if skipped:
             print(f"Skipping unavailable assets on this env: {skipped}")
 
-    # Ownership tracking with stale-position reconciliation
+    # Ownership tracking with stale-position reconciliation.
+    # Recover any entry that filled on Hyperliquid after we persisted a
+    # pre-order claim but before the post-fill state save completed.
     owned_coins = set(state.get("owned_coins", []))
+    pending_claims = state.get("pending_entry_claims", {}) or {}
+    for pending_coin, claim in list(pending_claims.items()):
+        pos = open_positions.get(pending_coin)
+        if pos is None:
+            pending_claims.pop(pending_coin, None)
+            continue
+        claimed_side = str((claim or {}).get("side", "")).lower()
+        actual_side = "long" if float(pos.get("size", 0.0) or 0.0) > 0 else "short"
+        if claimed_side == actual_side:
+            if pending_coin not in owned_coins:
+                print(
+                    f"Recovered Aggressive ownership for {pending_coin} "
+                    f"from persisted pending entry claim"
+                )
+            owned_coins.add(pending_coin)
+            pending_claims.pop(pending_coin, None)
+    state["pending_entry_claims"] = pending_claims
+
     stale_owned = owned_coins - set(open_positions.keys())
     if stale_owned:
         print(f"Dropping stale owned coins (no position on exchange): {stale_owned}")
@@ -704,7 +724,24 @@ def main():
         is_large_cap = float(profile.get("max_bull_leverage", 1.5)) >= 3.0
         leverage = AGGRESSIVE_MAX_LEVERAGE if is_large_cap else AGGRESSIVE_LEVERAGE
         leverage = max(1.0, min(leverage, AGGRESSIVE_MAX_LEVERAGE))
+
+        # Persist ownership intent BEFORE a new external order is submitted.
+        # If Hyperliquid fills but a later Gist write fails, the next run can
+        # safely recover this bot's ownership instead of orphaning the position.
+        is_new_entry = trade.get("action") in ("open_long", "open_short")
+        if is_new_entry:
+            state.setdefault("pending_entry_claims", {})[trade["hl_coin"]] = {
+                "side": trade.get("side"),
+                "created_at": dt.datetime.now(dt.UTC).isoformat(),
+            }
+            state["owned_coins"] = sorted(owned_coins)
+            save_state(state)
+
         result = execute_trade(info, exchange, trade, capital, leverage)
+
+        if is_new_entry and result.get("status") != "filled":
+            state.setdefault("pending_entry_claims", {}).pop(trade["hl_coin"], None)
+            save_state(state)
 
         # Observation only: score newly filled Aggressive entries.
         if (
@@ -949,12 +986,18 @@ def main():
                 pyramid_state[coin] = pyramid_state.get(coin, 0) + 1
             else:
                 owned_coins.add(coin)
+                state.setdefault("pending_entry_claims", {}).pop(coin, None)
                 pyramid_state[coin] = 0
                 record_position_open_time(
                     state,
                     coin,
                     fill_totals,
                 )
+                # Save the ownership immediately after a confirmed fill,
+                # before non-essential accounting/notification work continues.
+                state["owned_coins"] = sorted(owned_coins)
+                state["pyramid_state"] = pyramid_state
+                save_state(state)
 
     history = state.get("history", [])
     for r in results:
