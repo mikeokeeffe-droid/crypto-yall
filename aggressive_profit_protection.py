@@ -125,6 +125,7 @@ def decide_trades(signals, open_positions, max_positions, pyramid_state):
         trades = [t for t in trades if t.get("hl_coin") != coin]
         trades.append({
             "ticker": ticker, "hl_coin": coin, "action": "close", "side": side,
+            "close_size": abs(float(position.get("size", 0.0) or 0.0)),
             "exit_type": "PROFIT PROTECTION",
             "protection_mode": protection_mode,
             "protection_arm_pct": active_arm_pct,
