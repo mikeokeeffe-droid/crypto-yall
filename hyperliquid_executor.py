@@ -1165,7 +1165,26 @@ def main():
         print(f"Skipping unavailable assets on this env: {skipped}")
 
     # Ownership tracking: only manage positions this bot opened.
+    # Recover a position from a persisted pre-order claim if a previous
+    # exchange fill succeeded but the post-fill state save failed.
     owned_coins = set(state.get("owned_coins", []))
+    pending_claims = state.get("pending_entry_claims", {}) or {}
+    for pending_coin, claim in list(pending_claims.items()):
+        pos = open_positions.get(pending_coin)
+        if pos is None:
+            pending_claims.pop(pending_coin, None)
+            continue
+        claimed_side = str((claim or {}).get("side", "")).lower()
+        actual_side = "long" if float(pos.get("size", 0.0) or 0.0) > 0 else "short"
+        if claimed_side == actual_side:
+            if pending_coin not in owned_coins:
+                print(
+                    f"Recovered Daily ownership for {pending_coin} "
+                    f"from persisted pending entry claim"
+                )
+            owned_coins.add(pending_coin)
+            pending_claims.pop(pending_coin, None)
+    state["pending_entry_claims"] = pending_claims
 
     # Reconcile stale ownership
     stale_owned = owned_coins - set(open_positions.keys())
@@ -1215,6 +1234,15 @@ def main():
             min(strategy_leverage * DAILY_LEVERAGE, DAILY_MAX_LEVERAGE),
         )
 
+        is_new_entry = trade.get("action") in ("open_long", "open_short")
+        if is_new_entry:
+            state.setdefault("pending_entry_claims", {})[trade["hl_coin"]] = {
+                "side": trade.get("side"),
+                "created_at": dt.datetime.now(dt.UTC).isoformat(),
+            }
+            state["owned_coins"] = sorted(owned_coins)
+            save_trading_state(state)
+
         result = execute_trade(
             info,
             exchange,
@@ -1222,6 +1250,10 @@ def main():
             capital,
             leverage,
         )
+
+        if is_new_entry and result.get("status") != "filled":
+            state.setdefault("pending_entry_claims", {}).pop(trade["hl_coin"], None)
+            save_trading_state(state)
 
         results.append(result)
 
@@ -1427,11 +1459,14 @@ def main():
                 state.setdefault("peak_return_pct", {}).pop(coin, None)
             else:
                 owned_coins.add(coin)
+                state.setdefault("pending_entry_claims", {}).pop(coin, None)
                 record_position_open_time(
                     state,
                     coin,
                     fill_totals,
                 )
+                state["owned_coins"] = sorted(owned_coins)
+                save_trading_state(state)
 
     # Append to trade history
     history = state.get("history", [])
