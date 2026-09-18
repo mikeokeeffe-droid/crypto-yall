@@ -1,0 +1,51 @@
+name: Protect Intraday Positions
+
+on:
+  schedule:
+    # UTC: :00, :05, :10 ... :55. Offset from normal Intraday :07 runs.
+    - cron: '*/5 * * * *'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: execute-intraday-live
+  cancel-in-progress: false
+
+jobs:
+  protect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+          cache: pip
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Check Intraday profit protection only
+        run: python intraday_profit_protection.py
+        env:
+          HL_PRIVATE_KEY: ${{ secrets.HL_PRIVATE_KEY }}
+          HL_ACCOUNT_ADDRESS: ${{ secrets.HL_ACCOUNT_ADDRESS }}
+          HL_TESTNET: ${{ vars.HL_TESTNET }}
+          INTRADAY_CAPITAL: ${{ vars.INTRADAY_CAPITAL }}
+          INTRADAY_DD_PCT: ${{ vars.INTRADAY_DD_PCT }}
+          INTRADAY_MAX_POSITIONS: ${{ vars.INTRADAY_MAX_POSITIONS }}
+          INTRADAY_KILL_SWITCH: ${{ vars.INTRADAY_KILL_SWITCH }}
+          INTRADAY_LEVERAGE: ${{ vars.INTRADAY_LEVERAGE }}
+          INTRADAY_MAX_LEVERAGE: ${{ vars.INTRADAY_MAX_LEVERAGE }}
+          INTRADAY_TEST_NOTIONAL: ${{ vars.INTRADAY_TEST_NOTIONAL }}
+          INTRADAY_PROFIT_PROTECTION: 'ON'
+          INTRADAY_PROTECTION_ONLY: 'ON'
+          INTRADAY_PROFIT_ARM_PCT: '0.5'
+          INTRADAY_PROFIT_GIVEBACK_PCT: '2.0'
+          GIST_TOKEN: ${{ secrets.GIST_TOKEN }}
+          INTRADAY_GIST_ID: ${{ secrets.INTRADAY_GIST_ID }}
+          GMAIL_USER: ${{ secrets.GMAIL_USER }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+          NOTIFY_EMAILS: ${{ secrets.NOTIFY_EMAILS }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
