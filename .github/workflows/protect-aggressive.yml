@@ -9,14 +9,16 @@ on:
 permissions:
   contents: read
 
+# Serialize protection with the normal Aggressive executor so both can never
+# read/write the same bot state or act on the same owned position at once.
 concurrency:
-  group: protect-aggressive-loop
+  group: execute-aggressive-live
   cancel-in-progress: false
 
 jobs:
   protect:
     runs-on: ubuntu-latest
-    timeout-minutes: 28
+    timeout-minutes: 32
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
