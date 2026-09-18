@@ -7,7 +7,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: execute-aggressive-live
+  group: hyperliquid-live
   cancel-in-progress: false
 
 jobs:
