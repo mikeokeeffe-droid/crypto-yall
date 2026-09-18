@@ -7,7 +7,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: hyperliquid-live
+  group: execute-intraday-live
   cancel-in-progress: false
 
 jobs:
