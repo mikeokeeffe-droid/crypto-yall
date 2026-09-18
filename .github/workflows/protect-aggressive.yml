@@ -3,7 +3,7 @@ name: Protect Aggressive Positions
 on:
   schedule:
     # UTC: :04, :09, :14 ... :59. Offset from normal Aggressive :02/:32 runs.
-    - cron: '4-59/5 * * * *'
+    - cron: '4/5 * * * *'
   workflow_dispatch: {}
 
 permissions:
