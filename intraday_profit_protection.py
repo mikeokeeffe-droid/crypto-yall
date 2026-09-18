@@ -22,13 +22,18 @@ GIVEBACK_PCT = float(os.environ.get("INTRADAY_PROFIT_GIVEBACK_PCT", "2.0"))
 SMALL_PROFIT_PEAK_PCT = float(os.environ.get("INTRADAY_SMALL_PROFIT_PEAK_PCT", "1.0"))
 SMALL_PROFIT_FLOOR_PCT = float(os.environ.get("INTRADAY_SMALL_PROFIT_FLOOR_PCT", "0.25"))
 ENABLED = os.environ.get("INTRADAY_PROFIT_PROTECTION", "ON").upper() != "OFF"
+PROTECTION_ONLY = os.environ.get("INTRADAY_PROTECTION_ONLY", "OFF").upper() == "ON"
 _original_decide_trades = base.decide_trades
 _original_send_telegram = base._send_telegram
 _state: dict | None = None
 
 
 def _protected_decide_trades(signals: dict, open_positions: dict, max_positions: int) -> list[dict]:
-    trades = _original_decide_trades(signals, open_positions, max_positions)
+    # Protection-only runs must never create positions or perform normal signal exits.
+    # They only evaluate profit protection for positions owned by the Intraday bot.
+    trades = [] if PROTECTION_ONLY else _original_decide_trades(
+        signals, open_positions, max_positions
+    )
     if not ENABLED or _state is None:
         return trades
 
@@ -149,6 +154,7 @@ def main() -> None:
     base._send_telegram = _telegram_with_exit_diagnostics
     print(
         f"Intraday profit protection {'ON' if ENABLED else 'OFF'}: "
+        f"mode {'PROTECTION-ONLY' if PROTECTION_ONLY else 'FULL EXECUTOR'} | "
         f"small-profit peak +{SMALL_PROFIT_PEAK_PCT:.2f}% -> floor +{SMALL_PROFIT_FLOOR_PCT:.2f}% | "
         f"trail arm +{ARM_PCT:.2f}% / max giveback {GIVEBACK_PCT:.2f}pp | re-entry lock ON"
     )
