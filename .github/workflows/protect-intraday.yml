@@ -1,22 +1,22 @@
 name: Protect Intraday Positions
 
 on:
-  schedule:
-    # UTC: :00, :05, :10 ... :55. Offset from normal Intraday :07 runs.
-    - cron: '0-55/5 * * * *'
+  workflow_run:
+    workflows: ["Execute Aggressive"]
+    types: [completed]
   workflow_dispatch: {}
 
 permissions:
   contents: read
 
 concurrency:
-  group: execute-intraday-live
+  group: protect-intraday-loop
   cancel-in-progress: false
 
 jobs:
   protect:
     runs-on: ubuntu-latest
-    timeout-minutes: 8
+    timeout-minutes: 29
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
@@ -25,8 +25,19 @@ jobs:
           cache: pip
       - name: Install dependencies
         run: pip install -r requirements.txt
-      - name: Check Intraday profit protection only
-        run: python intraday_profit_protection.py
+      - name: Stagger Intraday protector
+        run: sleep 60
+      - name: Check Intraday protection every five minutes
+        shell: bash
+        run: |
+          set -e
+          for cycle in 1 2 3 4 5 6; do
+            echo "Intraday protection cycle ${cycle}/6"
+            python intraday_profit_protection.py
+            if [ "$cycle" -lt 6 ]; then
+              sleep 300
+            fi
+          done
         env:
           HL_PRIVATE_KEY: ${{ secrets.HL_PRIVATE_KEY }}
           HL_ACCOUNT_ADDRESS: ${{ secrets.HL_ACCOUNT_ADDRESS }}
