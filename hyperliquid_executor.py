@@ -111,9 +111,35 @@ def load_trading_state() -> dict:
                 f"{STATE_FILENAME} not found in Daily Gist"
             )
 
-        state = json.loads(
-            files[STATE_FILENAME]["content"]
-        )
+        state_file = files[STATE_FILENAME]
+        if state_file.get("truncated"):
+            raw_url = state_file.get("raw_url")
+            if not raw_url:
+                raise ValueError(
+                    "Daily Gist state is truncated but has no raw_url"
+                )
+            raw_resp = requests.get(
+                raw_url,
+                headers={
+                    "Authorization": f"token {gist_token}",
+                    "Accept": "application/vnd.github.raw",
+                },
+                timeout=30,
+            )
+            if not raw_resp.ok:
+                raise RuntimeError(
+                    "Failed to load full daily state from Gist raw_url: "
+                    f"HTTP {raw_resp.status_code} {raw_resp.text}"
+                )
+            state_text = raw_resp.text
+            print(
+                "Daily Gist state exceeded the inline API limit; "
+                "loaded complete state from raw_url"
+            )
+        else:
+            state_text = state_file.get("content", "")
+
+        state = json.loads(state_text)
 
         if not isinstance(state, dict):
             raise TypeError("Daily state is not a JSON object")
