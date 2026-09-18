@@ -13,7 +13,7 @@ concurrency:
 jobs:
   trade:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 68
     steps:
       - uses: actions/checkout@v7
 
@@ -155,3 +155,50 @@ jobs:
           GIST_ID: ${{ secrets.GIST_ID }}
           INTRADAY_GIST_ID: ${{ secrets.INTRADAY_GIST_ID }}
           AGGRESSIVE_GIST_ID: ${{ secrets.AGGRESSIVE_GIST_ID }}
+
+      - name: Monitor Intraday protection until next strategy run
+        if: always()
+        shell: bash
+        run: |
+          had_failure=0
+          for cycle in 1 2 3 4 5 6 7 8 9 10 11; do
+            echo "Waiting 5 minutes before Intraday protection check ${cycle}/11"
+            sleep 300
+            ok=0
+            for attempt in 1 2; do
+              echo "Intraday protection check ${cycle}/11, attempt ${attempt}/2"
+              if python intraday_profit_protection.py; then
+                ok=1
+                break
+              fi
+              sleep 10
+            done
+            if [ "$ok" -ne 1 ]; then
+              had_failure=1
+            fi
+          done
+          if [ "$had_failure" -ne 0 ]; then
+            exit 1
+          fi
+        env:
+          HL_PRIVATE_KEY: ${{ secrets.HL_PRIVATE_KEY }}
+          HL_ACCOUNT_ADDRESS: ${{ secrets.HL_ACCOUNT_ADDRESS }}
+          HL_TESTNET: ${{ vars.HL_TESTNET }}
+          INTRADAY_CAPITAL: ${{ vars.INTRADAY_CAPITAL }}
+          INTRADAY_DD_PCT: ${{ vars.INTRADAY_DD_PCT }}
+          INTRADAY_MAX_POSITIONS: ${{ vars.INTRADAY_MAX_POSITIONS }}
+          INTRADAY_KILL_SWITCH: ${{ vars.INTRADAY_KILL_SWITCH }}
+          INTRADAY_LEVERAGE: ${{ vars.INTRADAY_LEVERAGE }}
+          INTRADAY_MAX_LEVERAGE: ${{ vars.INTRADAY_MAX_LEVERAGE }}
+          INTRADAY_TEST_NOTIONAL: ${{ vars.INTRADAY_TEST_NOTIONAL }}
+          INTRADAY_PROFIT_PROTECTION: 'ON'
+          INTRADAY_PROTECTION_ONLY: 'ON'
+          INTRADAY_PROFIT_ARM_PCT: '0.5'
+          INTRADAY_PROFIT_GIVEBACK_PCT: '2.0'
+          GIST_TOKEN: ${{ secrets.GIST_TOKEN }}
+          INTRADAY_GIST_ID: ${{ secrets.INTRADAY_GIST_ID }}
+          GMAIL_USER: ${{ secrets.GMAIL_USER }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+          NOTIFY_EMAILS: ${{ secrets.NOTIFY_EMAILS }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
