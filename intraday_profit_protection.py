@@ -91,6 +91,7 @@ def _protected_decide_trades(signals: dict, open_positions: dict, max_positions:
 
         protection_closes[coin] = {
             "ticker": ticker, "hl_coin": coin, "action": "close", "side": side,
+            "close_size": abs(float(pos.get("size", 0.0) or 0.0)),
             "reason": reason,
             "exit_type": "PROFIT PROTECTION",
             "protection_mode": protection_mode,
