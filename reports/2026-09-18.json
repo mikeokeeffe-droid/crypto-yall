@@ -121,7 +121,7 @@
       "funding": 0,
       "gross_closed_pnl": 0,
       "incomplete_accounting": [],
-      "last_run": "2026-09-18T00:33:02.851080+00:00",
+      "last_run": "2026-09-18T01:03:02.664698+00:00",
       "leverage_results": {},
       "profit_giveback": 0,
       "profit_protection_exits": [],
@@ -199,7 +199,7 @@
     }
   },
   "date_utc": "2026-09-18",
-  "generated_at": "2026-09-18T00:33:04.584011+00:00",
+  "generated_at": "2026-09-18T01:03:04.637534+00:00",
   "report_errors": [],
   "reporting_only": true,
   "schema_version": 2,
@@ -208,12 +208,12 @@
     "bots": {
       "aggressive": {
         "all_time": {
-          "average_loss_pct": -1.2549,
+          "average_loss_pct": -1.3602,
           "average_win_pct": 2.0786,
-          "closed_trades": 37,
-          "cumulative_gross_return_pct": -9.7634,
-          "losses": 26,
-          "win_rate_pct": 29.73,
+          "closed_trades": 39,
+          "cumulative_gross_return_pct": -15.2196,
+          "losses": 28,
+          "win_rate_pct": 28.21,
           "wins": 11
         },
         "closed_trades": [
@@ -660,62 +660,68 @@
             "gross_return_pct": -1.1559,
             "outcome": "loss",
             "ticker": "AVAX-USD"
+          },
+          {
+            "asset": "SUI",
+            "blocked_live_reason": "mid-cap allow_short=False",
+            "entry_price": 0.73549,
+            "entry_time": "2026-09-17T22:30:00",
+            "exit_action": "cover_short",
+            "exit_price": 0.75106,
+            "exit_time": "2026-09-18T00:30:00",
+            "gross_return_pct": -2.117,
+            "outcome": "loss",
+            "ticker": "SUI20947-USD"
+          },
+          {
+            "asset": "ONDO",
+            "blocked_live_reason": "mid-cap allow_short=False",
+            "entry_price": 0.37194,
+            "entry_time": "2026-09-17T23:00:00",
+            "exit_action": "cover_short",
+            "exit_price": 0.38436,
+            "exit_time": "2026-09-18T00:30:00",
+            "gross_return_pct": -3.3392,
+            "outcome": "loss",
+            "ticker": "ONDO-USD"
           }
         ],
         "open_positions": {
           "AVAX": {
             "asset": "AVAX",
             "blocked_live_reason": "mid-cap allow_short=False",
-            "current_price": 7.5892,
+            "current_price": 7.646,
             "entry_price": 7.6229,
             "entry_time": "2026-09-17T20:00:00",
             "ticker": "AVAX-USD",
-            "unrealized_gross_return_pct": 0.4421
+            "unrealized_gross_return_pct": -0.303
           },
           "LINK": {
             "asset": "LINK",
             "blocked_live_reason": "mid-cap allow_short=False",
-            "current_price": 11.344,
+            "current_price": 11.439,
             "entry_price": 11.366,
             "entry_time": "2026-09-17T22:30:00",
             "ticker": "LINK-USD",
-            "unrealized_gross_return_pct": 0.1936
-          },
-          "ONDO": {
-            "asset": "ONDO",
-            "blocked_live_reason": "mid-cap allow_short=False",
-            "current_price": 0.37727,
-            "entry_price": 0.37194,
-            "entry_time": "2026-09-17T23:00:00",
-            "ticker": "ONDO-USD",
-            "unrealized_gross_return_pct": -1.433
-          },
-          "SUI": {
-            "asset": "SUI",
-            "blocked_live_reason": "mid-cap allow_short=False",
-            "current_price": 0.73864,
-            "entry_price": 0.73549,
-            "entry_time": "2026-09-17T22:30:00",
-            "ticker": "SUI20947-USD",
-            "unrealized_gross_return_pct": -0.4283
+            "unrealized_gross_return_pct": -0.6423
           },
           "XRP": {
             "asset": "XRP",
             "blocked_live_reason": "mid-cap allow_short=False",
-            "current_price": 1.2926,
+            "current_price": 1.3004,
             "entry_price": 1.2982,
             "entry_time": "2026-09-17T20:30:00",
             "ticker": "XRP-USD",
-            "unrealized_gross_return_pct": 0.4314
+            "unrealized_gross_return_pct": -0.1695
           }
         },
         "today": {
-          "average_loss_pct": null,
+          "average_loss_pct": -2.7281,
           "average_win_pct": null,
-          "closed_trades": 0,
-          "cumulative_gross_return_pct": 0,
-          "losses": 0,
-          "win_rate_pct": null,
+          "closed_trades": 2,
+          "cumulative_gross_return_pct": -5.4562,
+          "losses": 2,
+          "win_rate_pct": 0.0,
           "wins": 0
         }
       },
@@ -891,20 +897,20 @@
           "AVAX": {
             "asset": "AVAX",
             "blocked_live_reason": "mid-cap allow_short=False",
-            "current_price": 7.6081,
+            "current_price": 7.646,
             "entry_price": 7.5889,
             "entry_time": "2026-09-17T22:00:00",
             "ticker": "AVAX-USD",
-            "unrealized_gross_return_pct": -0.253
+            "unrealized_gross_return_pct": -0.7524
           },
           "XRP": {
             "asset": "XRP",
             "blocked_live_reason": "mid-cap allow_short=False",
-            "current_price": 1.2961,
+            "current_price": 1.3004,
             "entry_price": 1.3004,
             "entry_time": "2026-09-17T14:00:00",
             "ticker": "XRP-USD",
-            "unrealized_gross_return_pct": 0.3307
+            "unrealized_gross_return_pct": 0.0
           }
         },
         "today": {
@@ -958,8 +964,8 @@
           },
           "btc_confirmed_short_now": true,
           "closed_trades": [],
-          "dual_short_confirmed_now": false,
-          "eth_confirmed_short_now": false,
+          "dual_short_confirmed_now": true,
+          "eth_confirmed_short_now": true,
           "open_positions": {},
           "today": {
             "average_loss_pct": null,
@@ -977,6 +983,6 @@
     "errors": [],
     "scope": "Shadow-only fresh short signals for SOL/AVAX/LINK/SUI/XRP/ONDO that live trading blocks because mid-cap allow_short=False.",
     "tracking_started_at": "2026-09-10T22:03:23.796957+00:00",
-    "updated_at": "2026-09-18T00:33:04.584011+00:00"
+    "updated_at": "2026-09-18T01:03:04.637534+00:00"
   }
 }
