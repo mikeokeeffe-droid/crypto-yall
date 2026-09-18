@@ -1,0 +1,39 @@
+name: Code Safety Check
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: code-safety-check-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+          cache: pip
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Compile all Python
+        run: python -m compileall -q .
+      - name: Parse JSON reports
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          for path in Path("reports").glob("*.json"):
+              json.loads(path.read_text(encoding="utf-8"))
+          print("Python compilation and JSON parsing passed")
+          PY
