@@ -352,6 +352,7 @@ def decide_trades(signals: dict, open_positions: dict, max_positions: int) -> li
                 "hl_coin": hl_coin,
                 "action": "close",
                 "side": "long" if is_long else "short",
+                "close_size": abs(float(current_pos.get("size", 0.0) or 0.0)),
                 "reason": reason,
             })
 
@@ -427,7 +428,12 @@ def execute_trade(info, exchange, trade: dict, capital: float, leverage: float) 
     coin = trade["hl_coin"]
 
     if trade["action"] == "close":
-        resp = exchange.market_close(coin)
+        close_size = float(trade.get("close_size", 0.0) or 0.0)
+        resp = (
+            exchange.market_close(coin, sz=close_size)
+            if close_size > 0
+            else exchange.market_close(coin)
+        )
         return _parse_response(trade, resp, info, coin)
 
     mid = get_mid_price(info, coin)
