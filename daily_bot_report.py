@@ -491,6 +491,8 @@ def _summarize(name: str, state: dict[str, Any], day: dt.date) -> dict[str, Any]
         "safety_events": safety,
         "incomplete_accounting": incomplete,
         "last_run": state.get("last_run"),
+        "last_strategy_run": state.get("last_strategy_run", state.get("last_run")),
+        "last_protection_run": state.get("last_protection_run"),
     }
 
     if name == "aggressive":
