@@ -1,0 +1,85 @@
+name: Protect Open Positions
+
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hyperliquid-live
+  cancel-in-progress: false
+
+jobs:
+  protect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Check Aggressive profit protection only
+        run: python aggressive_profit_protection.py
+        env:
+          HL_PRIVATE_KEY: ${{ secrets.HL_PRIVATE_KEY }}
+          HL_ACCOUNT_ADDRESS: ${{ secrets.HL_ACCOUNT_ADDRESS }}
+          HL_TESTNET: ${{ vars.HL_TESTNET }}
+          AGGRESSIVE_CAPITAL: ${{ vars.AGGRESSIVE_CAPITAL }}
+          AGGRESSIVE_TEST_NOTIONAL: ${{ vars.AGGRESSIVE_TEST_NOTIONAL }}
+          AGGRESSIVE_DD_PCT: ${{ vars.AGGRESSIVE_DD_PCT }}
+          AGGRESSIVE_MAX_POSITIONS: ${{ vars.AGGRESSIVE_MAX_POSITIONS }}
+          AGGRESSIVE_KILL_SWITCH: ${{ vars.AGGRESSIVE_KILL_SWITCH }}
+          AGGRESSIVE_LEVERAGE: ${{ vars.AGGRESSIVE_LEVERAGE }}
+          AGGRESSIVE_MAX_LEVERAGE: ${{ vars.AGGRESSIVE_MAX_LEVERAGE }}
+          AGGRESSIVE_PROFIT_PROTECTION: 'ON'
+          AGGRESSIVE_PROTECTION_ONLY: 'ON'
+          AGGRESSIVE_PROFIT_ARM_PCT: '0.5'
+          AGGRESSIVE_PROFIT_GIVEBACK_PCT: '2.0'
+          AGGRESSIVE_LOW_LEV_PROTECTION: ${{ vars.AGGRESSIVE_LOW_LEV_PROTECTION }}
+          AGGRESSIVE_LOW_LEV_GIVEBACK: ${{ vars.AGGRESSIVE_LOW_LEV_GIVEBACK }}
+          AGGRESSIVE_HIGH_LEV_PROTECTION: ${{ vars.AGGRESSIVE_HIGH_LEV_PROTECTION }}
+          AGGRESSIVE_HIGH_LEV_GIVEBACK: ${{ vars.AGGRESSIVE_HIGH_LEV_GIVEBACK }}
+          GIST_TOKEN: ${{ secrets.GIST_TOKEN }}
+          AGGRESSIVE_GIST_ID: ${{ secrets.AGGRESSIVE_GIST_ID }}
+          GMAIL_USER: ${{ secrets.GMAIL_USER }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+          NOTIFY_EMAILS: ${{ secrets.NOTIFY_EMAILS }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+
+      - name: Brief stagger before Intraday check
+        run: sleep 30
+
+      - name: Check Intraday profit protection only
+        run: python intraday_profit_protection.py
+        env:
+          HL_PRIVATE_KEY: ${{ secrets.HL_PRIVATE_KEY }}
+          HL_ACCOUNT_ADDRESS: ${{ secrets.HL_ACCOUNT_ADDRESS }}
+          HL_TESTNET: ${{ vars.HL_TESTNET }}
+          INTRADAY_CAPITAL: ${{ vars.INTRADAY_CAPITAL }}
+          INTRADAY_DD_PCT: ${{ vars.INTRADAY_DD_PCT }}
+          INTRADAY_MAX_POSITIONS: ${{ vars.INTRADAY_MAX_POSITIONS }}
+          INTRADAY_KILL_SWITCH: ${{ vars.INTRADAY_KILL_SWITCH }}
+          INTRADAY_LEVERAGE: ${{ vars.INTRADAY_LEVERAGE }}
+          INTRADAY_MAX_LEVERAGE: ${{ vars.INTRADAY_MAX_LEVERAGE }}
+          INTRADAY_TEST_NOTIONAL: ${{ vars.INTRADAY_TEST_NOTIONAL }}
+          INTRADAY_PROFIT_PROTECTION: 'ON'
+          INTRADAY_PROTECTION_ONLY: 'ON'
+          INTRADAY_PROFIT_ARM_PCT: '0.5'
+          INTRADAY_PROFIT_GIVEBACK_PCT: '2.0'
+          GIST_TOKEN: ${{ secrets.GIST_TOKEN }}
+          INTRADAY_GIST_ID: ${{ secrets.INTRADAY_GIST_ID }}
+          GMAIL_USER: ${{ secrets.GMAIL_USER }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+          NOTIFY_EMAILS: ${{ secrets.NOTIFY_EMAILS }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
