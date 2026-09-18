@@ -561,6 +561,9 @@ def check_daily_drawdown(
 
 def main():
     print(f"Aggressive executor started at {dt.datetime.now(dt.UTC).isoformat()}")
+    protection_only = os.environ.get("AGGRESSIVE_PROTECTION_ONLY", "OFF").upper() == "ON"
+    if protection_only:
+        print("Aggressive PROTECTION-ONLY mode: no entries, pyramids, normal signal exits, or signal recomputation")
 
     if kill_switch_off():
         print("Aggressive KILL_SWITCH is OFF — halting")
@@ -577,37 +580,54 @@ def main():
     equity = get_account_equity(info, address)
     capital = float(os.environ.get("AGGRESSIVE_CAPITAL", "3000"))
     threshold = float(os.environ.get("AGGRESSIVE_DD_PCT", "3"))
-    halted, state_update = check_daily_drawdown(
-        state,
-        info,
-        address,
-        capital,
-        threshold,
-    )
-    state.update(state_update)
+    if protection_only:
+        # A daily drawdown halt blocks new trading, but must not disable
+        # protection for positions the bot already owns.
+        print("Protection-only mode: bypassing daily drawdown entry halt")
+    else:
+        halted, state_update = check_daily_drawdown(
+            state,
+            info,
+            address,
+            capital,
+            threshold,
+        )
+        state.update(state_update)
 
-    if halted:
-        msg = f"Aggressive halted: {state_update.get('halt_reason')}"
-        print(msg)
-        _send_email([], msg)
-        save_state(state)
-        sys.exit(0)
+        if halted:
+            msg = f"Aggressive halted: {state_update.get('halt_reason')}"
+            print(msg)
+            _send_email([], msg)
+            save_state(state)
+            sys.exit(0)
 
-    today = dt.date.today().isoformat()
-    if state.get("halted_today") == today:
-        print(f"Already halted today: {state.get('halt_reason')}")
-        sys.exit(0)
+        today = dt.date.today().isoformat()
+        if state.get("halted_today") == today:
+            print(f"Already halted today: {state.get('halt_reason')}")
+            sys.exit(0)
 
-    signals = compute_aggressive_signals()
+    if protection_only:
+        # Use only the last signals confirmed by the normal 30-minute executor.
+        # This prevents a 5-minute protection check from releasing re-entry
+        # locks based on a still-forming 30-minute candle.
+        signals = state.get("last_signals", {}) or {}
+        print(f"Protection-only mode: using {len(signals)} last confirmed Aggressive signal(s)")
+    else:
+        signals = compute_aggressive_signals()
+
     open_positions = get_open_positions(info, address)
     max_positions = int(os.environ.get("AGGRESSIVE_MAX_POSITIONS", "4"))
 
-    # Filter assets to those listed on this Hyperliquid environment
-    available = set(info.all_mids().keys())
-    signals = {t: s for t, s in signals.items() if HL_SYMBOL_MAP[t] in available}
-    skipped = [t for t in ASSETS if t not in signals]
-    if skipped:
-        print(f"Skipping unavailable assets on this env: {skipped}")
+    # Normal runs verify market availability. Protection-only runs avoid
+    # unnecessary market/signal work and keep only known persisted symbols.
+    if protection_only:
+        signals = {t: s for t, s in signals.items() if t in HL_SYMBOL_MAP}
+    else:
+        available = set(info.all_mids().keys())
+        signals = {t: s for t, s in signals.items() if HL_SYMBOL_MAP[t] in available}
+        skipped = [t for t in ASSETS if t not in signals]
+        if skipped:
+            print(f"Skipping unavailable assets on this env: {skipped}")
 
     # Ownership tracking with stale-position reconciliation
     owned_coins = set(state.get("owned_coins", []))
@@ -989,13 +1009,14 @@ def main():
     # Refresh peaks after any fills so newly opened positions get tracked too.
     update_peak_tracking(state, state["open_positions"], owned_coins)
 
-    state["last_signals"] = {
-        ticker: {
-            k: v for k, v in signal_info.items()
-            if not k.startswith("_entry_")
+    if not protection_only:
+        state["last_signals"] = {
+            ticker: {
+                k: v for k, v in signal_info.items()
+                if not k.startswith("_entry_")
+            }
+            for ticker, signal_info in signals.items()
         }
-        for ticker, signal_info in signals.items()
-    }
     save_state(state)
 
     filled_count = sum(1 for r in results if r.get("status") == "filled")
