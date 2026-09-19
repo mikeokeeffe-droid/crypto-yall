@@ -366,7 +366,7 @@
       "funding": -0.003738,
       "gross_closed_pnl": -0.268414,
       "incomplete_accounting": [],
-      "last_protection_run": "2026-09-19T21:58:43.742798+00:00",
+      "last_protection_run": "2026-09-19T22:08:26.877963+00:00",
       "last_run": "2026-09-19T22:03:09.032543+00:00",
       "last_strategy_run": "2026-09-19T22:03:09.032543+00:00",
       "leverage_results": {
@@ -574,7 +574,7 @@
       "trading_fees": 0
     },
     "intraday": {
-      "bot_state_drawdown_pct": 0.11814259259259195,
+      "bot_state_drawdown_pct": 0.1316425925925916,
       "by_asset": {
         "LINK": {
           "average_loss": -0.004743,
@@ -701,9 +701,9 @@
       "funding": -0.013206,
       "gross_closed_pnl": 2.2871,
       "incomplete_accounting": [],
-      "last_protection_run": "2026-09-19T21:59:44.314818+00:00",
-      "last_run": "2026-09-19T21:08:27.012233+00:00",
-      "last_strategy_run": "2026-09-19T21:08:27.012233+00:00",
+      "last_protection_run": "2026-09-19T22:04:50.077473+00:00",
+      "last_run": "2026-09-19T22:08:26.897380+00:00",
+      "last_strategy_run": "2026-09-19T22:08:26.897380+00:00",
       "profit_giveback": 0.709368,
       "profit_protection_exits": [
         {
@@ -809,7 +809,7 @@
     }
   },
   "date_utc": "2026-09-19",
-  "generated_at": "2026-09-19T22:03:11.648146+00:00",
+  "generated_at": "2026-09-19T22:08:29.902939+00:00",
   "report_errors": [],
   "reporting_only": true,
   "schema_version": 2,
@@ -1740,6 +1740,6 @@
     "errors": [],
     "scope": "Shadow-only fresh short signals for SOL/AVAX/LINK/SUI/XRP/ONDO that live trading blocks because mid-cap allow_short=False.",
     "tracking_started_at": "2026-09-10T22:03:23.796957+00:00",
-    "updated_at": "2026-09-19T22:03:11.648146+00:00"
+    "updated_at": "2026-09-19T22:08:29.902939+00:00"
   }
 }
