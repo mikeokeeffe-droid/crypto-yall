@@ -121,9 +121,9 @@
       "funding": 0,
       "gross_closed_pnl": 0,
       "incomplete_accounting": [],
-      "last_protection_run": "2026-09-20T11:08:20.134739+00:00",
-      "last_run": "2026-09-20T11:03:04.226878+00:00",
-      "last_strategy_run": "2026-09-20T11:03:04.226878+00:00",
+      "last_protection_run": "2026-09-20T11:28:42.456501+00:00",
+      "last_run": "2026-09-20T11:33:08.684895+00:00",
+      "last_strategy_run": "2026-09-20T11:33:08.684895+00:00",
       "leverage_results": {},
       "profit_giveback": 0,
       "profit_protection_exits": [],
@@ -182,7 +182,7 @@
       "funding": 0,
       "gross_closed_pnl": 0,
       "incomplete_accounting": [],
-      "last_protection_run": "2026-09-20T11:04:46.715269+00:00",
+      "last_protection_run": "2026-09-20T11:29:04.492051+00:00",
       "last_run": "2026-09-20T11:08:27.431387+00:00",
       "last_strategy_run": "2026-09-20T11:08:27.431387+00:00",
       "profit_giveback": 0,
@@ -205,7 +205,7 @@
     }
   },
   "date_utc": "2026-09-20",
-  "generated_at": "2026-09-20T11:08:30.218769+00:00",
+  "generated_at": "2026-09-20T11:33:10.823699+00:00",
   "report_errors": [],
   "reporting_only": true,
   "schema_version": 2,
@@ -214,12 +214,12 @@
     "bots": {
       "aggressive": {
         "all_time": {
-          "average_loss_pct": -1.4806,
+          "average_loss_pct": -1.5457,
           "average_win_pct": 2.0786,
-          "closed_trades": 48,
-          "cumulative_gross_return_pct": -31.9168,
-          "losses": 37,
-          "win_rate_pct": 22.92,
+          "closed_trades": 49,
+          "cumulative_gross_return_pct": -35.8719,
+          "losses": 38,
+          "win_rate_pct": 22.45,
           "wins": 11
         },
         "closed_trades": [
@@ -798,35 +798,38 @@
             "gross_return_pct": -3.1419,
             "outcome": "loss",
             "ticker": "AVAX-USD"
+          },
+          {
+            "asset": "AVAX",
+            "blocked_live_reason": "mid-cap allow_short=False",
+            "entry_price": 9.5825,
+            "entry_time": "2026-09-20T03:00:00",
+            "exit_action": "cover_short",
+            "exit_price": 9.9615,
+            "exit_time": "2026-09-20T11:00:00",
+            "gross_return_pct": -3.9551,
+            "outcome": "loss",
+            "ticker": "AVAX-USD"
           }
         ],
         "open_positions": {
-          "AVAX": {
-            "asset": "AVAX",
-            "blocked_live_reason": "mid-cap allow_short=False",
-            "current_price": 9.7641,
-            "entry_price": 9.5825,
-            "entry_time": "2026-09-20T03:00:00",
-            "ticker": "AVAX-USD",
-            "unrealized_gross_return_pct": -1.8951
-          },
           "SOL": {
             "asset": "SOL",
             "blocked_live_reason": "mid-cap allow_short=False",
-            "current_price": 108.04,
+            "current_price": 108.19,
             "entry_price": 113.69,
             "entry_time": "2026-09-19T00:30:00",
             "ticker": "SOL-USD",
-            "unrealized_gross_return_pct": 4.9697
+            "unrealized_gross_return_pct": 4.8377
           }
         },
         "today": {
-          "average_loss_pct": null,
+          "average_loss_pct": -3.9551,
           "average_win_pct": null,
-          "closed_trades": 0,
-          "cumulative_gross_return_pct": 0,
-          "losses": 0,
-          "win_rate_pct": null,
+          "closed_trades": 1,
+          "cumulative_gross_return_pct": -3.9551,
+          "losses": 1,
+          "win_rate_pct": 0.0,
           "wins": 0
         }
       },
@@ -1217,6 +1220,6 @@
     "errors": [],
     "scope": "Shadow-only fresh short signals for SOL/AVAX/LINK/SUI/XRP/ONDO that live trading blocks because mid-cap allow_short=False.",
     "tracking_started_at": "2026-09-10T22:03:23.796957+00:00",
-    "updated_at": "2026-09-20T11:08:30.218769+00:00"
+    "updated_at": "2026-09-20T11:33:10.823699+00:00"
   }
 }
