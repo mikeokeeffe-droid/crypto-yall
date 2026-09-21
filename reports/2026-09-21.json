@@ -349,9 +349,9 @@
       "funding": -0.005301,
       "gross_closed_pnl": 1.306787,
       "incomplete_accounting": [],
-      "last_protection_run": "2026-09-21T14:28:51.407469+00:00",
-      "last_run": "2026-09-21T14:33:07.745874+00:00",
-      "last_strategy_run": "2026-09-21T14:33:07.745874+00:00",
+      "last_protection_run": "2026-09-21T14:58:46.720662+00:00",
+      "last_run": "2026-09-21T15:03:24.620405+00:00",
+      "last_strategy_run": "2026-09-21T15:03:24.620405+00:00",
       "leverage_results": {
         "3x": {
           "average_loss": null,
@@ -665,7 +665,7 @@
       "funding": -0.00905,
       "gross_closed_pnl": 0.2805,
       "incomplete_accounting": [],
-      "last_protection_run": "2026-09-21T14:29:01.836419+00:00",
+      "last_protection_run": "2026-09-21T14:59:41.843087+00:00",
       "last_run": "2026-09-21T14:08:22.797080+00:00",
       "last_strategy_run": "2026-09-21T14:08:22.797080+00:00",
       "profit_giveback": 0.756549,
@@ -773,7 +773,7 @@
     }
   },
   "date_utc": "2026-09-21",
-  "generated_at": "2026-09-21T14:33:09.964814+00:00",
+  "generated_at": "2026-09-21T15:03:34.977253+00:00",
   "report_errors": [],
   "reporting_only": true,
   "schema_version": 2,
@@ -1695,11 +1695,11 @@
           "LINK": {
             "asset": "LINK",
             "blocked_live_reason": "mid-cap allow_short=False",
-            "current_price": 13.046,
+            "current_price": 13.013,
             "entry_price": 12.837,
             "entry_time": "2026-09-21T08:00:00",
             "ticker": "LINK-USD",
-            "unrealized_gross_return_pct": -1.6281
+            "unrealized_gross_return_pct": -1.371
           }
         },
         "today": {
@@ -1821,6 +1821,6 @@
     "errors": [],
     "scope": "Shadow-only fresh short signals for SOL/AVAX/LINK/SUI/XRP/ONDO that live trading blocks because mid-cap allow_short=False.",
     "tracking_started_at": "2026-09-10T22:03:23.796957+00:00",
-    "updated_at": "2026-09-21T14:33:09.964814+00:00"
+    "updated_at": "2026-09-21T15:03:34.977253+00:00"
   }
 }
