@@ -349,9 +349,9 @@
       "funding": -0.005301,
       "gross_closed_pnl": 1.306787,
       "incomplete_accounting": [],
-      "last_protection_run": "2026-09-21T19:59:27.990623+00:00",
-      "last_run": "2026-09-21T20:03:11.043787+00:00",
-      "last_strategy_run": "2026-09-21T20:03:11.043787+00:00",
+      "last_protection_run": "2026-09-21T20:28:50.328167+00:00",
+      "last_run": "2026-09-21T20:33:05.105319+00:00",
+      "last_strategy_run": "2026-09-21T20:33:05.105319+00:00",
       "leverage_results": {
         "3x": {
           "average_loss": null,
@@ -665,7 +665,7 @@
       "funding": -0.00905,
       "gross_closed_pnl": 0.2805,
       "incomplete_accounting": [],
-      "last_protection_run": "2026-09-21T20:04:51.059822+00:00",
+      "last_protection_run": "2026-09-21T20:29:04.728606+00:00",
       "last_run": "2026-09-21T20:08:24.950651+00:00",
       "last_strategy_run": "2026-09-21T20:08:24.950651+00:00",
       "profit_giveback": 0.756549,
@@ -773,7 +773,7 @@
     }
   },
   "date_utc": "2026-09-21",
-  "generated_at": "2026-09-21T20:08:27.516291+00:00",
+  "generated_at": "2026-09-21T20:33:07.300532+00:00",
   "report_errors": [],
   "reporting_only": true,
   "schema_version": 2,
@@ -782,12 +782,12 @@
     "bots": {
       "aggressive": {
         "all_time": {
-          "average_loss_pct": -1.5457,
+          "average_loss_pct": -1.587,
           "average_win_pct": 2.203,
-          "closed_trades": 50,
-          "cumulative_gross_return_pct": -32.3008,
-          "losses": 38,
-          "win_rate_pct": 24.0,
+          "closed_trades": 51,
+          "cumulative_gross_return_pct": -35.4571,
+          "losses": 39,
+          "win_rate_pct": 23.53,
           "wins": 12
         },
         "closed_trades": [
@@ -1390,26 +1390,28 @@
             "gross_return_pct": 3.5711,
             "outcome": "win",
             "ticker": "SOL-USD"
-          }
-        ],
-        "open_positions": {
-          "LINK": {
+          },
+          {
             "asset": "LINK",
             "blocked_live_reason": "mid-cap allow_short=False",
-            "current_price": 13.043,
             "entry_price": 12.863,
             "entry_time": "2026-09-21T18:00:00",
-            "ticker": "LINK-USD",
-            "unrealized_gross_return_pct": -1.3994
+            "exit_action": "cover_short",
+            "exit_price": 13.269,
+            "exit_time": "2026-09-21T20:00:00",
+            "gross_return_pct": -3.1563,
+            "outcome": "loss",
+            "ticker": "LINK-USD"
           }
-        },
+        ],
+        "open_positions": {},
         "today": {
-          "average_loss_pct": null,
+          "average_loss_pct": -3.1563,
           "average_win_pct": null,
-          "closed_trades": 0,
-          "cumulative_gross_return_pct": 0,
-          "losses": 0,
-          "win_rate_pct": null,
+          "closed_trades": 1,
+          "cumulative_gross_return_pct": -3.1563,
+          "losses": 1,
+          "win_rate_pct": 0.0,
           "wins": 0
         }
       },
@@ -1831,6 +1833,6 @@
     "errors": [],
     "scope": "Shadow-only fresh short signals for SOL/AVAX/LINK/SUI/XRP/ONDO that live trading blocks because mid-cap allow_short=False.",
     "tracking_started_at": "2026-09-10T22:03:23.796957+00:00",
-    "updated_at": "2026-09-21T20:08:27.516291+00:00"
+    "updated_at": "2026-09-21T20:33:07.300532+00:00"
   }
 }
