@@ -349,9 +349,9 @@
       "funding": -0.005301,
       "gross_closed_pnl": 1.306787,
       "incomplete_accounting": [],
-      "last_protection_run": "2026-09-21T15:29:16.447362+00:00",
-      "last_run": "2026-09-21T15:33:10.846751+00:00",
-      "last_strategy_run": "2026-09-21T15:33:10.846751+00:00",
+      "last_protection_run": "2026-09-21T15:58:49.980382+00:00",
+      "last_run": "2026-09-21T16:03:19.297121+00:00",
+      "last_strategy_run": "2026-09-21T16:03:19.297121+00:00",
       "leverage_results": {
         "3x": {
           "average_loss": null,
@@ -665,7 +665,7 @@
       "funding": -0.00905,
       "gross_closed_pnl": 0.2805,
       "incomplete_accounting": [],
-      "last_protection_run": "2026-09-21T15:29:07.021649+00:00",
+      "last_protection_run": "2026-09-21T15:59:48.922632+00:00",
       "last_run": "2026-09-21T15:08:26.428466+00:00",
       "last_strategy_run": "2026-09-21T15:08:26.428466+00:00",
       "profit_giveback": 0.756549,
@@ -773,7 +773,7 @@
     }
   },
   "date_utc": "2026-09-21",
-  "generated_at": "2026-09-21T15:33:13.568900+00:00",
+  "generated_at": "2026-09-21T16:03:21.745957+00:00",
   "report_errors": [],
   "reporting_only": true,
   "schema_version": 2,
@@ -1695,11 +1695,11 @@
           "LINK": {
             "asset": "LINK",
             "blocked_live_reason": "mid-cap allow_short=False",
-            "current_price": 13.013,
+            "current_price": 13.03,
             "entry_price": 12.837,
             "entry_time": "2026-09-21T08:00:00",
             "ticker": "LINK-USD",
-            "unrealized_gross_return_pct": -1.371
+            "unrealized_gross_return_pct": -1.5035
           }
         },
         "today": {
@@ -1821,6 +1821,6 @@
     "errors": [],
     "scope": "Shadow-only fresh short signals for SOL/AVAX/LINK/SUI/XRP/ONDO that live trading blocks because mid-cap allow_short=False.",
     "tracking_started_at": "2026-09-10T22:03:23.796957+00:00",
-    "updated_at": "2026-09-21T15:33:13.568900+00:00"
+    "updated_at": "2026-09-21T16:03:21.745957+00:00"
   }
 }
