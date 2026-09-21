@@ -349,9 +349,9 @@
       "funding": -0.005301,
       "gross_closed_pnl": 1.306787,
       "incomplete_accounting": [],
-      "last_protection_run": "2026-09-21T22:58:47.814679+00:00",
-      "last_run": "2026-09-21T23:03:14.211862+00:00",
-      "last_strategy_run": "2026-09-21T23:03:14.211862+00:00",
+      "last_protection_run": "2026-09-21T23:28:55.599437+00:00",
+      "last_run": "2026-09-21T23:33:05.191282+00:00",
+      "last_strategy_run": "2026-09-21T23:33:05.191282+00:00",
       "leverage_results": {
         "3x": {
           "average_loss": null,
@@ -665,7 +665,7 @@
       "funding": -0.00905,
       "gross_closed_pnl": 0.2805,
       "incomplete_accounting": [],
-      "last_protection_run": "2026-09-21T23:04:47.140966+00:00",
+      "last_protection_run": "2026-09-21T23:29:07.479375+00:00",
       "last_run": "2026-09-21T23:08:29.517438+00:00",
       "last_strategy_run": "2026-09-21T23:08:29.517438+00:00",
       "profit_giveback": 0.756549,
@@ -773,7 +773,7 @@
     }
   },
   "date_utc": "2026-09-21",
-  "generated_at": "2026-09-21T23:08:32.663382+00:00",
+  "generated_at": "2026-09-21T23:33:07.728160+00:00",
   "report_errors": [],
   "reporting_only": true,
   "schema_version": 2,
@@ -1408,11 +1408,11 @@
           "SOL": {
             "asset": "SOL",
             "blocked_live_reason": "mid-cap allow_short=False",
-            "current_price": 119.5,
+            "current_price": 118.97,
             "entry_price": 119.26,
             "entry_time": "2026-09-21T20:30:00",
             "ticker": "SOL-USD",
-            "unrealized_gross_return_pct": -0.2012
+            "unrealized_gross_return_pct": 0.2432
           }
         },
         "today": {
@@ -1845,6 +1845,6 @@
     "errors": [],
     "scope": "Shadow-only fresh short signals for SOL/AVAX/LINK/SUI/XRP/ONDO that live trading blocks because mid-cap allow_short=False.",
     "tracking_started_at": "2026-09-10T22:03:23.796957+00:00",
-    "updated_at": "2026-09-21T23:08:32.663382+00:00"
+    "updated_at": "2026-09-21T23:33:07.728160+00:00"
   }
 }
