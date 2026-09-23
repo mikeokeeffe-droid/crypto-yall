@@ -501,6 +501,7 @@ def _summarize(name: str, state: dict[str, Any], day: dt.date) -> dict[str, Any]
             lambda r: f"{float(r.get('entry_leverage') or r.get('leverage')):g}x"
             if (r.get("entry_leverage") is not None or r.get("leverage") is not None) else None,
         )
+        result["profit_retention_shadow"] = state.get("aggressive_profit_retention_shadow", {})
         result["entry_quality_results"] = _group(closes, lambda r: r.get("entry_quality"))
         result["entry_type_results"] = _group(
             closes,
