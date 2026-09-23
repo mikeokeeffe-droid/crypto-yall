@@ -1,7 +1,7 @@
 {
   "bots": {
     "aggressive": {
-      "bot_state_drawdown_pct": -0.02481333333333317,
+      "bot_state_drawdown_pct": -0.029884999999999867,
       "by_asset": {
         "ONDO": {
           "average_loss": -0.045076,
@@ -210,9 +210,9 @@
       "funding": 0.0,
       "gross_closed_pnl": -0.03162,
       "incomplete_accounting": [],
-      "last_protection_run": "2026-09-23T03:28:57.516909+00:00",
-      "last_run": "2026-09-23T03:33:09.415231+00:00",
-      "last_strategy_run": "2026-09-23T03:33:09.415231+00:00",
+      "last_protection_run": "2026-09-23T03:58:48.239898+00:00",
+      "last_run": "2026-09-23T04:03:15.772458+00:00",
+      "last_strategy_run": "2026-09-23T04:03:15.772458+00:00",
       "leverage_results": {
         "3x": {
           "average_loss": -0.045076,
@@ -317,6 +317,17 @@
           "win_rate_pct": 0.0,
           "wins": 0
         },
+        "ETH": {
+          "average_loss": -0.227268,
+          "average_win": null,
+          "breakeven": 0,
+          "losses": 1,
+          "net_pnl": -0.227268,
+          "profit_giveback": 0.11124,
+          "trades": 1,
+          "win_rate_pct": 0.0,
+          "wins": 0
+        },
         "SOL": {
           "average_loss": -0.002839,
           "average_win": null,
@@ -329,7 +340,7 @@
           "wins": 0
         }
       },
-      "closed_trade_max_drawdown": 0.209115,
+      "closed_trade_max_drawdown": 0.436383,
       "closed_trades": [
         {
           "asset": "BTC",
@@ -386,16 +397,44 @@
           "side": "long",
           "time": "2026-09-23T01:49:29.083915+00:00",
           "trading_fees": 0.012761
+        },
+        {
+          "asset": "ETH",
+          "entry_quality": null,
+          "entry_type": null,
+          "exit_type": "PROFIT PROTECTION",
+          "fee_data_complete": true,
+          "funding": 0.004851,
+          "funding_data_complete": true,
+          "gross_pnl": -0.2187,
+          "leverage": null,
+          "peak_unrealized_pnl": 0.11124,
+          "pnl_source": "hyperliquid_closedPnl+userFunding",
+          "profit_giveback": 0.11124,
+          "protection_mode": "TRAILING PROFIT PROTECTION",
+          "realized_net_pnl": -0.227268,
+          "shadow_bearish_regime_evaluable": null,
+          "shadow_bearish_regime_would_block": null,
+          "shadow_combined_would_block": null,
+          "shadow_dual_short_btc_short": null,
+          "shadow_dual_short_eth_short": null,
+          "shadow_dual_short_long_block_would_block": null,
+          "shadow_dynamic_leverage": null,
+          "shadow_fresh_only_would_block": null,
+          "shadow_market_regime": null,
+          "side": "short",
+          "time": "2026-09-23T03:44:10.672150+00:00",
+          "trading_fees": 0.013419
         }
       ],
       "errors": [],
-      "funding": 0.003224,
-      "gross_closed_pnl": -0.1864,
+      "funding": 0.008075,
+      "gross_closed_pnl": -0.4051,
       "incomplete_accounting": [],
-      "last_protection_run": "2026-09-23T03:28:51.765932+00:00",
+      "last_protection_run": "2026-09-23T03:59:27.633054+00:00",
       "last_run": "2026-09-23T03:08:20.231823+00:00",
       "last_strategy_run": "2026-09-23T03:08:20.231823+00:00",
-      "profit_giveback": 0.19807,
+      "profit_giveback": 0.30931,
       "profit_protection_exits": [
         {
           "asset": "SOL",
@@ -424,27 +463,55 @@
           "side": "long",
           "time": "2026-09-23T01:49:29.083915+00:00",
           "trading_fees": 0.012761
+        },
+        {
+          "asset": "ETH",
+          "entry_quality": null,
+          "entry_type": null,
+          "exit_type": "PROFIT PROTECTION",
+          "fee_data_complete": true,
+          "funding": 0.004851,
+          "funding_data_complete": true,
+          "gross_pnl": -0.2187,
+          "leverage": null,
+          "peak_unrealized_pnl": 0.11124,
+          "pnl_source": "hyperliquid_closedPnl+userFunding",
+          "profit_giveback": 0.11124,
+          "protection_mode": "TRAILING PROFIT PROTECTION",
+          "realized_net_pnl": -0.227268,
+          "shadow_bearish_regime_evaluable": null,
+          "shadow_bearish_regime_would_block": null,
+          "shadow_combined_would_block": null,
+          "shadow_dual_short_btc_short": null,
+          "shadow_dual_short_eth_short": null,
+          "shadow_dual_short_long_block_would_block": null,
+          "shadow_dynamic_leverage": null,
+          "shadow_fresh_only_would_block": null,
+          "shadow_market_regime": null,
+          "side": "short",
+          "time": "2026-09-23T03:44:10.672150+00:00",
+          "trading_fees": 0.013419
         }
       ],
-      "realized_net_pnl": -0.209115,
+      "realized_net_pnl": -0.436383,
       "safety_events": [],
       "skipped_orders": [],
       "stats": {
-        "average_loss": -0.104557,
+        "average_loss": -0.145461,
         "average_win": null,
         "breakeven": 0,
-        "losses": 2,
-        "net_pnl": -0.209115,
-        "profit_giveback": 0.19807,
-        "trades": 2,
+        "losses": 3,
+        "net_pnl": -0.436383,
+        "profit_giveback": 0.30931,
+        "trades": 3,
         "win_rate_pct": 0.0,
         "wins": 0
       },
-      "trading_fees": 0.025939
+      "trading_fees": 0.039358
     }
   },
   "date_utc": "2026-09-23",
-  "generated_at": "2026-09-23T03:33:11.352655+00:00",
+  "generated_at": "2026-09-23T04:03:18.035689+00:00",
   "report_errors": [],
   "reporting_only": true,
   "schema_version": 2,
@@ -1091,11 +1158,11 @@
           "SOL": {
             "asset": "SOL",
             "blocked_live_reason": "mid-cap allow_short=False",
-            "current_price": 119.1,
+            "current_price": 119.23,
             "entry_price": 119.26,
             "entry_time": "2026-09-21T20:30:00",
             "ticker": "SOL-USD",
-            "unrealized_gross_return_pct": 0.1342
+            "unrealized_gross_return_pct": 0.0252
           }
         },
         "today": {
@@ -1110,12 +1177,12 @@
       },
       "intraday": {
         "all_time": {
-          "average_loss_pct": -3.414,
+          "average_loss_pct": -3.3269,
           "average_win_pct": 2.9653,
-          "closed_trades": 25,
-          "cumulative_gross_return_pct": -21.5578,
-          "losses": 15,
-          "win_rate_pct": 40.0,
+          "closed_trades": 26,
+          "cumulative_gross_return_pct": -23.5771,
+          "losses": 16,
+          "win_rate_pct": 38.46,
           "wins": 10
         },
         "closed_trades": [
@@ -1418,35 +1485,38 @@
             "gross_return_pct": -4.9782,
             "outcome": "loss",
             "ticker": "XRP-USD"
+          },
+          {
+            "asset": "SOL",
+            "blocked_live_reason": "mid-cap allow_short=False",
+            "entry_price": 116.87,
+            "entry_time": "2026-09-22T03:00:00",
+            "exit_action": "cover_short",
+            "exit_price": 119.23,
+            "exit_time": "2026-09-23T03:00:00",
+            "gross_return_pct": -2.0193,
+            "outcome": "loss",
+            "ticker": "SOL-USD"
           }
         ],
         "open_positions": {
-          "SOL": {
-            "asset": "SOL",
-            "blocked_live_reason": "mid-cap allow_short=False",
-            "current_price": 118.56,
-            "entry_price": 116.87,
-            "entry_time": "2026-09-22T03:00:00",
-            "ticker": "SOL-USD",
-            "unrealized_gross_return_pct": -1.4461
-          },
           "XRP": {
             "asset": "XRP",
             "blocked_live_reason": "mid-cap allow_short=False",
-            "current_price": 1.6002,
+            "current_price": 1.6198,
             "entry_price": 1.5733,
             "entry_time": "2026-09-22T23:00:00",
             "ticker": "XRP-USD",
-            "unrealized_gross_return_pct": -1.7098
+            "unrealized_gross_return_pct": -2.9556
           }
         },
         "today": {
-          "average_loss_pct": null,
+          "average_loss_pct": -2.0193,
           "average_win_pct": null,
-          "closed_trades": 0,
-          "cumulative_gross_return_pct": 0,
-          "losses": 0,
-          "win_rate_pct": null,
+          "closed_trades": 1,
+          "cumulative_gross_return_pct": -2.0193,
+          "losses": 1,
+          "win_rate_pct": 0.0,
           "wins": 0
         }
       }
@@ -1558,13 +1628,13 @@
             "XRP": {
               "asset": "XRP",
               "btc_confirmed_short": true,
-              "current_price": 1.6002,
+              "current_price": 1.6198,
               "entry_price": 1.5733,
               "entry_time": "2026-09-22T23:00:00",
               "eth_confirmed_short": true,
               "filter": "BTC+ETH confirmed short + mid-cap enter_short",
               "ticker": "XRP-USD",
-              "unrealized_gross_return_pct": -1.7098
+              "unrealized_gross_return_pct": -2.9556
             }
           },
           "today": {
@@ -1583,6 +1653,6 @@
     "errors": [],
     "scope": "Shadow-only fresh short signals for SOL/AVAX/LINK/SUI/XRP/ONDO that live trading blocks because mid-cap allow_short=False.",
     "tracking_started_at": "2026-09-10T22:03:23.796957+00:00",
-    "updated_at": "2026-09-23T03:33:11.352655+00:00"
+    "updated_at": "2026-09-23T04:03:18.035689+00:00"
   }
 }
