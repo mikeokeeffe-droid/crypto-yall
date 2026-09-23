@@ -130,6 +130,7 @@ def main() -> None:
     ticker_by_coin = {coin: ticker for ticker, coin in HL_SYMBOL_MAP.items()}
     shadow = state.setdefault("aggressive_exit_shadow", {})
     rsi_armed = state.setdefault("aggressive_rsi_armed", {})
+    retention = state.setdefault("aggressive_profit_retention_shadow", {})
 
     for coin, pos in managed.items():
         ticker = ticker_by_coin.get(coin)
@@ -190,6 +191,49 @@ def main() -> None:
         upnl = float(pos.get("unrealized_pnl", 0.0) or 0.0)
         ret = upnl / (entry * size) * 100.0 if entry > 0 and size > 0 else 0.0
 
+        # Observation-only profit-retention shadow. This never changes live
+        # protection or sends an order. It records the first sampled point at
+        # which tighter 0.40pp / 0.30pp giveback rules, or a 50%-of-peak floor,
+        # would have asked to exit. The peak-floor test arms after +0.50%.
+        rec = retention.get(coin, {}) if isinstance(retention.get(coin), dict) else {}
+        same_position = (
+            rec.get("side") == side
+            and abs(float(rec.get("entry_px", 0.0) or 0.0) - entry) <= max(1e-12, entry * 1e-8)
+        )
+        if not same_position:
+            rec = {
+                "side": side,
+                "entry_px": entry,
+                "started_at": dt.datetime.now(dt.UTC).isoformat(),
+                "peak_return_pct": ret,
+                "tests": {},
+            }
+        peak_ret = max(float(rec.get("peak_return_pct", ret) or ret), ret)
+        rec["peak_return_pct"] = peak_ret
+        rec["current_return_pct"] = ret
+        rec["updated_at"] = dt.datetime.now(dt.UTC).isoformat()
+        rec["observation_only"] = True
+        rec["accounting_note"] = (
+            "Sampled hypothetical return only; no order is sent and fees/funding "
+            "are not estimated here."
+        )
+        tests = rec.setdefault("tests", {})
+        candidates = {
+            "giveback_0_40pp": peak_ret >= 0.40 and (peak_ret - ret) >= 0.40,
+            "giveback_0_30pp": peak_ret >= 0.40 and (peak_ret - ret) >= 0.30,
+            "keep_50pct_of_peak": peak_ret >= 0.50 and ret <= (peak_ret * 0.50),
+        }
+        for test_name, triggered in candidates.items():
+            item = tests.setdefault(test_name, {"triggered": False})
+            if triggered and not item.get("triggered"):
+                item.update({
+                    "triggered": True,
+                    "triggered_at": dt.datetime.now(dt.UTC).isoformat(),
+                    "sampled_exit_return_pct": ret,
+                    "peak_return_pct_at_trigger": peak_ret,
+                })
+        retention[coin] = rec
+
         shadow[coin] = {
             "side": side,
             "price": current,
@@ -216,6 +260,7 @@ def main() -> None:
 
     state["aggressive_exit_shadow"] = shadow
     state["aggressive_rsi_armed"] = rsi_armed
+    state["aggressive_profit_retention_shadow"] = retention
     save_state(state)
     print("Aggressive exit shadow suite done")
 
