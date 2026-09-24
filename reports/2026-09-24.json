@@ -634,9 +634,9 @@
           "pnl_source": "price_fallback+userFunding"
         }
       ],
-      "last_protection_run": "2026-09-24T20:29:02.152399+00:00",
-      "last_run": "2026-09-24T20:33:03.152910+00:00",
-      "last_strategy_run": "2026-09-24T20:33:03.152910+00:00",
+      "last_protection_run": "2026-09-24T20:58:43.105311+00:00",
+      "last_run": "2026-09-24T21:03:10.393901+00:00",
+      "last_strategy_run": "2026-09-24T21:03:10.393901+00:00",
       "leverage_results": {
         "3x": {
           "average_loss": -0.033993,
@@ -1190,7 +1190,7 @@
           "pnl_source": "price_fallback+userFunding"
         }
       ],
-      "last_protection_run": "2026-09-24T20:29:12.023607+00:00",
+      "last_protection_run": "2026-09-24T20:59:53.101497+00:00",
       "last_run": "2026-09-24T20:08:31.321518+00:00",
       "last_strategy_run": "2026-09-24T20:08:31.321518+00:00",
       "profit_giveback": 1.002149,
@@ -1298,7 +1298,7 @@
     }
   },
   "date_utc": "2026-09-24",
-  "generated_at": "2026-09-24T20:33:05.542945+00:00",
+  "generated_at": "2026-09-24T21:03:12.940013+00:00",
   "report_errors": [],
   "reporting_only": true,
   "schema_version": 2,
@@ -2540,6 +2540,6 @@
     "errors": [],
     "scope": "Shadow-only fresh short signals for SOL/AVAX/LINK/SUI/XRP/ONDO that live trading blocks because mid-cap allow_short=False.",
     "tracking_started_at": "2026-09-10T22:03:23.796957+00:00",
-    "updated_at": "2026-09-24T20:33:05.542945+00:00"
+    "updated_at": "2026-09-24T21:03:12.940013+00:00"
   }
 }
