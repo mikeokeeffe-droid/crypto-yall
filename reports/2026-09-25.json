@@ -511,9 +511,9 @@
           "pnl_source": "price_fallback+userFunding"
         }
       ],
-      "last_protection_run": "2026-09-25T12:28:47.194238+00:00",
-      "last_run": "2026-09-25T12:33:13.743828+00:00",
-      "last_strategy_run": "2026-09-25T12:33:13.743828+00:00",
+      "last_protection_run": "2026-09-25T12:58:52.426644+00:00",
+      "last_run": "2026-09-25T13:03:13.679837+00:00",
+      "last_strategy_run": "2026-09-25T13:03:13.679837+00:00",
       "leverage_results": {
         "3x": {
           "average_loss": -0.037157,
@@ -1023,7 +1023,7 @@
       "funding": -0.004064,
       "gross_closed_pnl": 0.579,
       "incomplete_accounting": [],
-      "last_protection_run": "2026-09-25T12:29:12.280095+00:00",
+      "last_protection_run": "2026-09-25T13:00:00.112422+00:00",
       "last_run": "2026-09-25T12:08:28.181814+00:00",
       "last_strategy_run": "2026-09-25T12:08:28.181814+00:00",
       "profit_giveback": 0.729898,
@@ -1103,7 +1103,7 @@
     }
   },
   "date_utc": "2026-09-25",
-  "generated_at": "2026-09-25T12:33:16.331182+00:00",
+  "generated_at": "2026-09-25T13:03:16.104813+00:00",
   "report_errors": [],
   "reporting_only": true,
   "schema_version": 2,
@@ -1878,7 +1878,17 @@
             "ticker": "LINK-USD"
           }
         ],
-        "open_positions": {},
+        "open_positions": {
+          "ONDO": {
+            "asset": "ONDO",
+            "blocked_live_reason": "mid-cap allow_short=False",
+            "current_price": 0.54961,
+            "entry_price": 0.54961,
+            "entry_time": "2026-09-25T12:30:00",
+            "ticker": "ONDO-USD",
+            "unrealized_gross_return_pct": 0.0
+          }
+        },
         "today": {
           "average_loss_pct": -2.7231,
           "average_win_pct": 0.0196,
@@ -2393,6 +2403,6 @@
     "errors": [],
     "scope": "Shadow-only fresh short signals for SOL/AVAX/LINK/SUI/XRP/ONDO that live trading blocks because mid-cap allow_short=False.",
     "tracking_started_at": "2026-09-10T22:03:23.796957+00:00",
-    "updated_at": "2026-09-25T12:33:16.331182+00:00"
+    "updated_at": "2026-09-25T13:03:16.104813+00:00"
   }
 }
