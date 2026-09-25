@@ -511,9 +511,9 @@
           "pnl_source": "price_fallback+userFunding"
         }
       ],
-      "last_protection_run": "2026-09-25T16:58:50.650789+00:00",
-      "last_run": "2026-09-25T17:03:12.712033+00:00",
-      "last_strategy_run": "2026-09-25T17:03:12.712033+00:00",
+      "last_protection_run": "2026-09-25T17:28:57.817697+00:00",
+      "last_run": "2026-09-25T17:33:18.312462+00:00",
+      "last_strategy_run": "2026-09-25T17:33:18.312462+00:00",
       "leverage_results": {
         "3x": {
           "average_loss": -0.037157,
@@ -1062,7 +1062,7 @@
       "funding": -0.004254,
       "gross_closed_pnl": 0.6087,
       "incomplete_accounting": [],
-      "last_protection_run": "2026-09-25T17:05:08.772542+00:00",
+      "last_protection_run": "2026-09-25T17:29:02.814850+00:00",
       "last_run": "2026-09-25T17:08:22.823076+00:00",
       "last_strategy_run": "2026-09-25T17:08:22.823076+00:00",
       "profit_giveback": 1.001407,
@@ -1170,7 +1170,7 @@
     }
   },
   "date_utc": "2026-09-25",
-  "generated_at": "2026-09-25T17:08:25.351922+00:00",
+  "generated_at": "2026-09-25T17:33:21.703980+00:00",
   "report_errors": [],
   "reporting_only": true,
   "schema_version": 2,
@@ -1949,20 +1949,20 @@
           "LINK": {
             "asset": "LINK",
             "blocked_live_reason": "mid-cap allow_short=False",
-            "current_price": 13.767,
+            "current_price": 13.774,
             "entry_price": 13.767,
             "entry_time": "2026-09-25T16:30:00",
             "ticker": "LINK-USD",
-            "unrealized_gross_return_pct": 0.0
+            "unrealized_gross_return_pct": -0.0508
           },
           "ONDO": {
             "asset": "ONDO",
             "blocked_live_reason": "mid-cap allow_short=False",
-            "current_price": 0.53468,
+            "current_price": 0.53747,
             "entry_price": 0.54961,
             "entry_time": "2026-09-25T12:30:00",
             "ticker": "ONDO-USD",
-            "unrealized_gross_return_pct": 2.7165
+            "unrealized_gross_return_pct": 2.2088
           }
         },
         "today": {
@@ -2362,8 +2362,8 @@
           },
           "btc_confirmed_short_now": true,
           "closed_trades": [],
-          "dual_short_confirmed_now": false,
-          "eth_confirmed_short_now": false,
+          "dual_short_confirmed_now": true,
+          "eth_confirmed_short_now": true,
           "open_positions": {},
           "today": {
             "average_loss_pct": null,
@@ -2479,6 +2479,6 @@
     "errors": [],
     "scope": "Shadow-only fresh short signals for SOL/AVAX/LINK/SUI/XRP/ONDO that live trading blocks because mid-cap allow_short=False.",
     "tracking_started_at": "2026-09-10T22:03:23.796957+00:00",
-    "updated_at": "2026-09-25T17:08:25.351922+00:00"
+    "updated_at": "2026-09-25T17:33:21.703980+00:00"
   }
 }
