@@ -210,9 +210,9 @@
       "funding": 0.001089,
       "gross_closed_pnl": -0.01088,
       "incomplete_accounting": [],
-      "last_protection_run": "2026-09-26T00:58:52.698634+00:00",
-      "last_run": "2026-09-26T01:03:09.462927+00:00",
-      "last_strategy_run": "2026-09-26T01:03:09.462927+00:00",
+      "last_protection_run": "2026-09-26T01:28:53.871008+00:00",
+      "last_run": "2026-09-26T01:33:10.947026+00:00",
+      "last_strategy_run": "2026-09-26T01:33:10.947026+00:00",
       "leverage_results": {
         "4x": {
           "average_loss": -0.02261,
@@ -465,7 +465,7 @@
       "funding": 0,
       "gross_closed_pnl": 0,
       "incomplete_accounting": [],
-      "last_protection_run": "2026-09-26T01:04:41.209077+00:00",
+      "last_protection_run": "2026-09-26T01:29:04.968500+00:00",
       "last_run": "2026-09-26T01:08:25.890936+00:00",
       "last_strategy_run": "2026-09-26T01:08:25.890936+00:00",
       "profit_giveback": 0,
@@ -488,7 +488,7 @@
     }
   },
   "date_utc": "2026-09-26",
-  "generated_at": "2026-09-26T01:08:29.251909+00:00",
+  "generated_at": "2026-09-26T01:33:13.579989+00:00",
   "report_errors": [],
   "reporting_only": true,
   "schema_version": 2,
@@ -497,12 +497,12 @@
     "bots": {
       "aggressive": {
         "all_time": {
-          "average_loss_pct": -1.6666,
+          "average_loss_pct": -1.6789,
           "average_win_pct": 2.8441,
-          "closed_trades": 64,
-          "cumulative_gross_return_pct": -25.4698,
-          "losses": 46,
-          "win_rate_pct": 28.12,
+          "closed_trades": 65,
+          "cumulative_gross_return_pct": -27.7166,
+          "losses": 47,
+          "win_rate_pct": 27.69,
           "wins": 18
         },
         "closed_trades": [
@@ -1273,43 +1273,46 @@
             "gross_return_pct": -2.1355,
             "outcome": "loss",
             "ticker": "LINK-USD"
+          },
+          {
+            "asset": "AVAX",
+            "blocked_live_reason": "mid-cap allow_short=False",
+            "entry_price": 10.504,
+            "entry_time": "2026-09-25T18:00:00",
+            "exit_action": "cover_short",
+            "exit_price": 10.74,
+            "exit_time": "2026-09-26T01:00:00",
+            "gross_return_pct": -2.2468,
+            "outcome": "loss",
+            "ticker": "AVAX-USD"
           }
         ],
         "open_positions": {
-          "AVAX": {
-            "asset": "AVAX",
-            "blocked_live_reason": "mid-cap allow_short=False",
-            "current_price": 10.589,
-            "entry_price": 10.504,
-            "entry_time": "2026-09-25T18:00:00",
-            "ticker": "AVAX-USD",
-            "unrealized_gross_return_pct": -0.8092
-          },
           "ONDO": {
             "asset": "ONDO",
             "blocked_live_reason": "mid-cap allow_short=False",
-            "current_price": 0.54665,
+            "current_price": 0.54369,
             "entry_price": 0.54961,
             "entry_time": "2026-09-25T12:30:00",
             "ticker": "ONDO-USD",
-            "unrealized_gross_return_pct": 0.5386
+            "unrealized_gross_return_pct": 1.0771
           },
           "XRP": {
             "asset": "XRP",
             "blocked_live_reason": "mid-cap allow_short=False",
-            "current_price": 1.564,
+            "current_price": 1.5703,
             "entry_price": 1.5685,
             "entry_time": "2026-09-25T18:30:00",
             "ticker": "XRP-USD",
-            "unrealized_gross_return_pct": 0.2869
+            "unrealized_gross_return_pct": -0.1148
           }
         },
         "today": {
-          "average_loss_pct": -2.1355,
+          "average_loss_pct": -2.1911,
           "average_win_pct": null,
-          "closed_trades": 1,
-          "cumulative_gross_return_pct": -2.1355,
-          "losses": 1,
+          "closed_trades": 2,
+          "cumulative_gross_return_pct": -4.3823,
+          "losses": 2,
           "win_rate_pct": 0.0,
           "wins": 0
         }
@@ -1701,49 +1704,51 @@
       "bots": {
         "aggressive": {
           "all_time": {
-            "average_loss_pct": null,
+            "average_loss_pct": -2.2468,
             "average_win_pct": null,
-            "closed_trades": 0,
-            "cumulative_gross_return_pct": 0,
-            "losses": 0,
-            "win_rate_pct": null,
+            "closed_trades": 1,
+            "cumulative_gross_return_pct": -2.2468,
+            "losses": 1,
+            "win_rate_pct": 0.0,
             "wins": 0
           },
           "btc_confirmed_short_now": false,
-          "closed_trades": [],
+          "closed_trades": [
+            {
+              "asset": "AVAX",
+              "entry_price": 10.504,
+              "entry_time": "2026-09-25T18:00:00",
+              "exit_action": "cover_short",
+              "exit_price": 10.74,
+              "exit_time": "2026-09-26T01:00:00",
+              "filter": "BTC+ETH confirmed short + mid-cap enter_short",
+              "gross_return_pct": -2.2468,
+              "outcome": "loss",
+              "ticker": "AVAX-USD"
+            }
+          ],
           "dual_short_confirmed_now": false,
           "eth_confirmed_short_now": true,
           "open_positions": {
-            "AVAX": {
-              "asset": "AVAX",
-              "btc_confirmed_short": true,
-              "current_price": 10.589,
-              "entry_price": 10.504,
-              "entry_time": "2026-09-25T18:00:00",
-              "eth_confirmed_short": true,
-              "filter": "BTC+ETH confirmed short + mid-cap enter_short",
-              "ticker": "AVAX-USD",
-              "unrealized_gross_return_pct": -0.8092
-            },
             "XRP": {
               "asset": "XRP",
               "btc_confirmed_short": true,
-              "current_price": 1.564,
+              "current_price": 1.5703,
               "entry_price": 1.5685,
               "entry_time": "2026-09-25T18:30:00",
               "eth_confirmed_short": true,
               "filter": "BTC+ETH confirmed short + mid-cap enter_short",
               "ticker": "XRP-USD",
-              "unrealized_gross_return_pct": 0.2869
+              "unrealized_gross_return_pct": -0.1148
             }
           },
           "today": {
-            "average_loss_pct": null,
+            "average_loss_pct": -2.2468,
             "average_win_pct": null,
-            "closed_trades": 0,
-            "cumulative_gross_return_pct": 0,
-            "losses": 0,
-            "win_rate_pct": null,
+            "closed_trades": 1,
+            "cumulative_gross_return_pct": -2.2468,
+            "losses": 1,
+            "win_rate_pct": 0.0,
             "wins": 0
           }
         },
@@ -1851,6 +1856,6 @@
     "errors": [],
     "scope": "Shadow-only fresh short signals for SOL/AVAX/LINK/SUI/XRP/ONDO that live trading blocks because mid-cap allow_short=False.",
     "tracking_started_at": "2026-09-10T22:03:23.796957+00:00",
-    "updated_at": "2026-09-26T01:08:29.251909+00:00"
+    "updated_at": "2026-09-26T01:33:13.579989+00:00"
   }
 }
