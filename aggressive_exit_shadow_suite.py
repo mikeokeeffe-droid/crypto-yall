@@ -275,6 +275,36 @@ def main() -> None:
                 })
         loss_shadow[coin] = loss_rec
 
+        # Observation-only live thesis monitor. Research only: no orders.
+        thesis_shadow = state.setdefault("aggressive_live_thesis_shadow", {})
+        thesis_rec = thesis_shadow.get(coin, {}) if isinstance(thesis_shadow.get(coin), dict) else {}
+        thesis_same_position = (
+            thesis_rec.get("side") == side
+            and abs(float(thesis_rec.get("entry_px", 0.0) or 0.0) - entry) <= max(1e-12, entry * 1e-8)
+        )
+        if not thesis_same_position:
+            thesis_rec = {"side": side, "entry_px": entry, "started_at": dt.datetime.now(dt.UTC).isoformat(), "first_adverse_turn": None}
+        close_s = df["Close"].astype(float)
+        ema_fast = close_s.ewm(span=8, adjust=False).mean()
+        ema_slow = close_s.ewm(span=21, adjust=False).mean()
+        fast_now = float(ema_fast.iloc[-1])
+        slow_now = float(ema_slow.iloc[-1])
+        fast_prev = float(ema_fast.iloc[-2])
+        momentum = current - float(close_s.iloc[-2])
+        if side == "long":
+            trend_against = fast_now < slow_now
+            momentum_against = momentum < 0 and fast_now < fast_prev
+        else:
+            trend_against = fast_now > slow_now
+            momentum_against = momentum > 0 and fast_now > fast_prev
+        adverse_score = int(trend_against) + int(momentum_against)
+        adverse_turn = adverse_score >= 2
+        now_iso = dt.datetime.now(dt.UTC).isoformat()
+        thesis_rec.update({"current_return_pct": ret, "ema8": fast_now, "ema21": slow_now, "trend_against_trade": bool(trend_against), "momentum_against_trade": bool(momentum_against), "adverse_score": adverse_score, "adverse_turn": bool(adverse_turn), "updated_at": now_iso, "observation_only": True, "rule": "flag when EMA8/EMA21 trend and latest 30m momentum both turn against the open trade", "accounting_note": "Research signal only; no live exit/order is sent."})
+        if adverse_turn and thesis_rec.get("first_adverse_turn") is None:
+            thesis_rec["first_adverse_turn"] = {"timestamp": now_iso, "sampled_return_pct": ret}
+        thesis_shadow[coin] = thesis_rec
+
         shadow[coin] = {
             "side": side,
             "price": current,
