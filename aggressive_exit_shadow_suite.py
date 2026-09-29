@@ -234,6 +234,47 @@ def main() -> None:
                 })
         retention[coin] = rec
 
+        # Observation-only downside-risk shadow for adverse entries, especially
+        # longs that struggle during falling markets. It never sends an order
+        # or changes a live stop.
+        loss_shadow = state.setdefault("aggressive_loss_protection_shadow", {})
+        loss_rec = loss_shadow.get(coin, {}) if isinstance(loss_shadow.get(coin), dict) else {}
+        loss_same_position = (
+            loss_rec.get("side") == side
+            and abs(float(loss_rec.get("entry_px", 0.0) or 0.0) - entry) <= max(1e-12, entry * 1e-8)
+        )
+        if not loss_same_position:
+            loss_rec = {
+                "side": side,
+                "entry_px": entry,
+                "started_at": dt.datetime.now(dt.UTC).isoformat(),
+                "worst_return_pct": ret,
+                "tests": {},
+            }
+        loss_rec["worst_return_pct"] = min(float(loss_rec.get("worst_return_pct", ret) or ret), ret)
+        loss_rec["current_return_pct"] = ret
+        loss_rec["updated_at"] = dt.datetime.now(dt.UTC).isoformat()
+        loss_rec["observation_only"] = True
+        loss_rec["research_focus"] = "downtrend / adverse-entry loss containment"
+        loss_rec["accounting_note"] = (
+            "Sampled hypothetical return only; no order is sent and fees/funding "
+            "are not estimated here."
+        )
+        loss_tests = loss_rec.setdefault("tests", {})
+        for test_name, threshold in {
+            "loss_cap_0_75pct": -0.75,
+            "loss_cap_1_00pct": -1.00,
+            "loss_cap_1_50pct": -1.50,
+        }.items():
+            item = loss_tests.setdefault(test_name, {"triggered": False, "threshold_pct": threshold})
+            if ret <= threshold and not item.get("triggered"):
+                item.update({
+                    "triggered": True,
+                    "triggered_at": dt.datetime.now(dt.UTC).isoformat(),
+                    "sampled_exit_return_pct": ret,
+                })
+        loss_shadow[coin] = loss_rec
+
         shadow[coin] = {
             "side": side,
             "price": current,
