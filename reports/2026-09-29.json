@@ -510,7 +510,7 @@
       "funding": -0.001402,
       "gross_closed_pnl": -0.45446,
       "incomplete_accounting": [],
-      "last_protection_run": "2026-09-29T19:29:05.700760+00:00",
+      "last_protection_run": "2026-09-29T19:58:50.761972+00:00",
       "last_run": "2026-09-29T19:33:13.620473+00:00",
       "last_strategy_run": "2026-09-29T19:33:13.620473+00:00",
       "leverage_results": {
@@ -1130,7 +1130,7 @@
       "funding": -0.003027,
       "gross_closed_pnl": 0.53449,
       "incomplete_accounting": [],
-      "last_protection_run": "2026-09-29T19:29:47.096780+00:00",
+      "last_protection_run": "2026-09-29T20:00:33.501365+00:00",
       "last_run": "2026-09-29T19:09:05.316861+00:00",
       "last_strategy_run": "2026-09-29T19:09:05.316861+00:00",
       "profit_giveback": 0.845086,
@@ -1238,7 +1238,7 @@
     }
   },
   "date_utc": "2026-09-29",
-  "generated_at": "2026-09-29T19:33:16.665230+00:00",
+  "generated_at": "2026-09-29T20:03:04.349686+00:00",
   "report_errors": [],
   "reporting_only": true,
   "schema_version": 2,
@@ -2197,29 +2197,29 @@
           "AVAX": {
             "asset": "AVAX",
             "blocked_live_reason": "mid-cap allow_short=False",
-            "current_price": 11.345,
+            "current_price": 11.341,
             "entry_price": 11.115,
             "entry_time": "2026-09-29T17:00:00",
             "ticker": "AVAX-USD",
-            "unrealized_gross_return_pct": -2.0693
+            "unrealized_gross_return_pct": -2.0333
           },
           "LINK": {
             "asset": "LINK",
             "blocked_live_reason": "mid-cap allow_short=False",
-            "current_price": 14.644,
+            "current_price": 14.633,
             "entry_price": 14.815,
             "entry_time": "2026-09-29T15:00:00",
             "ticker": "LINK-USD",
-            "unrealized_gross_return_pct": 1.1542
+            "unrealized_gross_return_pct": 1.2285
           },
           "XRP": {
             "asset": "XRP",
             "blocked_live_reason": "mid-cap allow_short=False",
-            "current_price": 1.4996,
+            "current_price": 1.4937,
             "entry_price": 1.4911,
             "entry_time": "2026-09-29T18:00:00",
             "ticker": "XRP-USD",
-            "unrealized_gross_return_pct": -0.57
+            "unrealized_gross_return_pct": -0.1744
           }
         },
         "today": {
@@ -2674,24 +2674,24 @@
             "AVAX": {
               "asset": "AVAX",
               "btc_confirmed_short": true,
-              "current_price": 11.345,
+              "current_price": 11.341,
               "entry_price": 11.115,
               "entry_time": "2026-09-29T17:00:00",
               "eth_confirmed_short": true,
               "filter": "BTC+ETH confirmed short + mid-cap enter_short",
               "ticker": "AVAX-USD",
-              "unrealized_gross_return_pct": -2.0693
+              "unrealized_gross_return_pct": -2.0333
             },
             "XRP": {
               "asset": "XRP",
               "btc_confirmed_short": true,
-              "current_price": 1.4996,
+              "current_price": 1.4937,
               "entry_price": 1.4911,
               "entry_time": "2026-09-29T18:00:00",
               "eth_confirmed_short": true,
               "filter": "BTC+ETH confirmed short + mid-cap enter_short",
               "ticker": "XRP-USD",
-              "unrealized_gross_return_pct": -0.57
+              "unrealized_gross_return_pct": -0.1744
             }
           },
           "today": {
@@ -2714,7 +2714,7 @@
             "win_rate_pct": 16.67,
             "wins": 1
           },
-          "btc_confirmed_short_now": false,
+          "btc_confirmed_short_now": true,
           "closed_trades": [
             {
               "asset": "AVAX",
@@ -2808,6 +2808,6 @@
     "errors": [],
     "scope": "Shadow-only fresh short signals for SOL/AVAX/LINK/SUI/XRP/ONDO that live trading blocks because mid-cap allow_short=False.",
     "tracking_started_at": "2026-09-10T22:03:23.796957+00:00",
-    "updated_at": "2026-09-29T19:33:16.665230+00:00"
+    "updated_at": "2026-09-29T20:03:04.349686+00:00"
   }
 }
