@@ -1,7 +1,7 @@
 {
   "bots": {
     "aggressive": {
-      "bot_state_drawdown_pct": -0.39288416666666676,
+      "bot_state_drawdown_pct": -0.35805083333333343,
       "by_asset": {
         "BTC": {
           "average_loss": null,
@@ -410,9 +410,9 @@
       "funding": -0.000838,
       "gross_closed_pnl": -0.53531,
       "incomplete_accounting": [],
-      "last_protection_run": "2026-09-29T11:58:43.838779+00:00",
-      "last_run": "2026-09-29T12:03:15.912130+00:00",
-      "last_strategy_run": "2026-09-29T12:03:15.912130+00:00",
+      "last_protection_run": "2026-09-29T12:28:57.336831+00:00",
+      "last_run": "2026-09-29T12:33:12.229690+00:00",
+      "last_strategy_run": "2026-09-29T12:33:12.229690+00:00",
       "leverage_results": {
         "3x": {
           "average_loss": -0.228579,
@@ -606,10 +606,10 @@
         },
         "ETH": {
           "accounting_note": "Sampled hypothetical return only; no order is sent and fees/funding are not estimated here.",
-          "current_return_pct": 0.9791243303159061,
+          "current_return_pct": 1.2562349898392757,
           "entry_px": 2706.5,
           "observation_only": true,
-          "peak_return_pct": 0.9791243303159061,
+          "peak_return_pct": 1.2562349898392757,
           "side": "long",
           "started_at": "2026-09-29T09:33:12.943169+00:00",
           "tests": {
@@ -623,7 +623,7 @@
               "triggered": false
             }
           },
-          "updated_at": "2026-09-29T12:03:04.451359+00:00"
+          "updated_at": "2026-09-29T12:33:02.652254+00:00"
         },
         "LINK": {
           "accounting_note": "Sampled hypothetical return only; no order is sent and fees/funding are not estimated here.",
@@ -905,7 +905,7 @@
       "funding": -0.001123,
       "gross_closed_pnl": 0.79908,
       "incomplete_accounting": [],
-      "last_protection_run": "2026-09-29T12:05:03.303513+00:00",
+      "last_protection_run": "2026-09-29T12:29:04.109296+00:00",
       "last_run": "2026-09-29T12:08:25.831434+00:00",
       "last_strategy_run": "2026-09-29T12:08:25.831434+00:00",
       "profit_giveback": 0.635086,
@@ -985,7 +985,7 @@
     }
   },
   "date_utc": "2026-09-29",
-  "generated_at": "2026-09-29T12:08:28.529807+00:00",
+  "generated_at": "2026-09-29T12:33:14.634495+00:00",
   "report_errors": [],
   "reporting_only": true,
   "schema_version": 2,
@@ -2504,6 +2504,6 @@
     "errors": [],
     "scope": "Shadow-only fresh short signals for SOL/AVAX/LINK/SUI/XRP/ONDO that live trading blocks because mid-cap allow_short=False.",
     "tracking_started_at": "2026-09-10T22:03:23.796957+00:00",
-    "updated_at": "2026-09-29T12:08:28.529807+00:00"
+    "updated_at": "2026-09-29T12:33:14.634495+00:00"
   }
 }
