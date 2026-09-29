@@ -633,38 +633,79 @@
       "trading_fees": 0
     },
     "intraday": {
-      "bot_state_drawdown_pct": 0.5751333333333338,
-      "by_asset": {},
-      "closed_trade_max_drawdown": 0.0,
-      "closed_trades": [],
+      "bot_state_drawdown_pct": 0.8856333333333339,
+      "by_asset": {
+        "ETH": {
+          "average_loss": -0.295792,
+          "average_win": null,
+          "breakeven": 0,
+          "losses": 1,
+          "net_pnl": -0.295792,
+          "profit_giveback": 0.0168,
+          "trades": 1,
+          "win_rate_pct": 0.0,
+          "wins": 0
+        }
+      },
+      "closed_trade_max_drawdown": 0.295792,
+      "closed_trades": [
+        {
+          "asset": "ETH",
+          "entry_quality": null,
+          "entry_type": null,
+          "exit_type": null,
+          "fee_data_complete": true,
+          "funding": 0.000565,
+          "funding_data_complete": true,
+          "gross_pnl": -0.2828,
+          "leverage": null,
+          "peak_unrealized_pnl": 0.0168,
+          "pnl_source": "hyperliquid_closedPnl+userFunding",
+          "profit_giveback": 0.0168,
+          "protection_mode": null,
+          "realized_net_pnl": -0.295792,
+          "shadow_bearish_regime_evaluable": null,
+          "shadow_bearish_regime_would_block": null,
+          "shadow_combined_would_block": null,
+          "shadow_dual_short_btc_short": null,
+          "shadow_dual_short_eth_short": null,
+          "shadow_dual_short_long_block_would_block": null,
+          "shadow_dynamic_leverage": null,
+          "shadow_fresh_only_would_block": null,
+          "shadow_market_regime": null,
+          "side": "short",
+          "time": "2026-09-29T08:08:15.973307+00:00",
+          "trading_fees": 0.013557
+        }
+      ],
       "errors": [],
-      "funding": 0,
-      "gross_closed_pnl": 0,
+      "funding": 0.000565,
+      "gross_closed_pnl": -0.2828,
       "incomplete_accounting": [],
-      "last_protection_run": "2026-09-29T07:59:46.898465+00:00",
-      "last_run": "2026-09-29T07:08:27.349552+00:00",
-      "last_strategy_run": "2026-09-29T07:08:27.349552+00:00",
-      "profit_giveback": 0,
+      "last_protection_run": "2026-09-29T08:04:54.243138+00:00",
+      "last_run": "2026-09-29T08:08:15.973416+00:00",
+      "last_strategy_run": "2026-09-29T08:08:15.973416+00:00",
+      "profit_giveback": 0.0168,
       "profit_protection_exits": [],
-      "realized_net_pnl": 0,
+      "realized_net_pnl": -0.295792,
       "safety_events": [],
       "skipped_orders": [],
       "stats": {
-        "average_loss": null,
+        "average_loss": -0.295792,
         "average_win": null,
         "breakeven": 0,
-        "losses": 0,
-        "net_pnl": 0,
-        "profit_giveback": 0,
-        "trades": 0,
-        "win_rate_pct": null,
+        "losses": 1,
+        "net_pnl": -0.295792,
+        "profit_giveback": 0.0168,
+        "trades": 1,
+        "win_rate_pct": 0.0,
         "wins": 0
       },
-      "trading_fees": 0
+      "trading_fees": 0.013557
     }
   },
   "date_utc": "2026-09-29",
-  "generated_at": "2026-09-29T08:03:10.658645+00:00",
+  "generated_at": "2026-09-29T08:08:20.396743+00:00",
   "report_errors": [],
   "reporting_only": true,
   "schema_version": 2,
@@ -2181,6 +2222,6 @@
     "errors": [],
     "scope": "Shadow-only fresh short signals for SOL/AVAX/LINK/SUI/XRP/ONDO that live trading blocks because mid-cap allow_short=False.",
     "tracking_started_at": "2026-09-10T22:03:23.796957+00:00",
-    "updated_at": "2026-09-29T08:03:10.658645+00:00"
+    "updated_at": "2026-09-29T08:08:20.396743+00:00"
   }
 }
