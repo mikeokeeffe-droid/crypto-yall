@@ -293,9 +293,9 @@
       "funding": -0.000787,
       "gross_closed_pnl": 0.10986,
       "incomplete_accounting": [],
-      "last_protection_run": "2026-09-30T05:28:46.105777+00:00",
-      "last_run": "2026-09-30T05:33:05.147605+00:00",
-      "last_strategy_run": "2026-09-30T05:33:05.147605+00:00",
+      "last_protection_run": "2026-09-30T05:58:44.492141+00:00",
+      "last_run": "2026-09-30T06:03:05.344097+00:00",
+      "last_strategy_run": "2026-09-30T06:03:05.344097+00:00",
       "leverage_results": {
         "3x": {
           "average_loss": null,
@@ -593,7 +593,7 @@
       "funding": 0,
       "gross_closed_pnl": 0,
       "incomplete_accounting": [],
-      "last_protection_run": "2026-09-30T05:29:14.307164+00:00",
+      "last_protection_run": "2026-09-30T05:59:59.035695+00:00",
       "last_run": "2026-09-30T05:08:35.264016+00:00",
       "last_strategy_run": "2026-09-30T05:08:35.264016+00:00",
       "profit_giveback": 0,
@@ -616,7 +616,7 @@
     }
   },
   "date_utc": "2026-09-30",
-  "generated_at": "2026-09-30T05:33:07.714626+00:00",
+  "generated_at": "2026-09-30T06:03:08.193478+00:00",
   "report_errors": [],
   "reporting_only": true,
   "schema_version": 2,
@@ -1599,11 +1599,11 @@
           "LINK": {
             "asset": "LINK",
             "blocked_live_reason": "mid-cap allow_short=False",
-            "current_price": 14.379,
+            "current_price": 14.419,
             "entry_price": 14.815,
             "entry_time": "2026-09-29T15:00:00",
             "ticker": "LINK-USD",
-            "unrealized_gross_return_pct": 2.943
+            "unrealized_gross_return_pct": 2.673
           }
         },
         "today": {
@@ -2004,20 +2004,20 @@
           "AVAX": {
             "asset": "AVAX",
             "blocked_live_reason": "mid-cap allow_short=False",
-            "current_price": 11.283,
+            "current_price": 11.282,
             "entry_price": 11.429,
             "entry_time": "2026-09-30T00:00:00",
             "ticker": "AVAX-USD",
-            "unrealized_gross_return_pct": 1.2775
+            "unrealized_gross_return_pct": 1.2862
           },
           "XRP": {
             "asset": "XRP",
             "blocked_live_reason": "mid-cap allow_short=False",
-            "current_price": 1.4936,
+            "current_price": 1.5034,
             "entry_price": 1.4937,
             "entry_time": "2026-09-29T22:00:00",
             "ticker": "XRP-USD",
-            "unrealized_gross_return_pct": 0.0067
+            "unrealized_gross_return_pct": -0.6494
           }
         },
         "today": {
@@ -2199,24 +2199,24 @@
             "AVAX": {
               "asset": "AVAX",
               "btc_confirmed_short": true,
-              "current_price": 11.283,
+              "current_price": 11.282,
               "entry_price": 11.429,
               "entry_time": "2026-09-30T00:00:00",
               "eth_confirmed_short": true,
               "filter": "BTC+ETH confirmed short + mid-cap enter_short",
               "ticker": "AVAX-USD",
-              "unrealized_gross_return_pct": 1.2775
+              "unrealized_gross_return_pct": 1.2862
             },
             "XRP": {
               "asset": "XRP",
               "btc_confirmed_short": true,
-              "current_price": 1.4936,
+              "current_price": 1.5034,
               "entry_price": 1.4937,
               "entry_time": "2026-09-29T22:00:00",
               "eth_confirmed_short": true,
               "filter": "BTC+ETH confirmed short + mid-cap enter_short",
               "ticker": "XRP-USD",
-              "unrealized_gross_return_pct": 0.0067
+              "unrealized_gross_return_pct": -0.6494
             }
           },
           "today": {
@@ -2235,6 +2235,6 @@
     "errors": [],
     "scope": "Shadow-only fresh short signals for SOL/AVAX/LINK/SUI/XRP/ONDO that live trading blocks because mid-cap allow_short=False.",
     "tracking_started_at": "2026-09-10T22:03:23.796957+00:00",
-    "updated_at": "2026-09-30T05:33:07.714626+00:00"
+    "updated_at": "2026-09-30T06:03:08.193478+00:00"
   }
 }
