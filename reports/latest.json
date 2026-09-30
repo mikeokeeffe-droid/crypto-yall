@@ -293,9 +293,9 @@
       "funding": -0.000787,
       "gross_closed_pnl": 0.10986,
       "incomplete_accounting": [],
-      "last_protection_run": "2026-09-30T06:28:45.290237+00:00",
-      "last_run": "2026-09-30T06:33:09.973536+00:00",
-      "last_strategy_run": "2026-09-30T06:33:09.973536+00:00",
+      "last_protection_run": "2026-09-30T06:58:53.899357+00:00",
+      "last_run": "2026-09-30T07:03:19.327173+00:00",
+      "last_strategy_run": "2026-09-30T07:03:19.327173+00:00",
       "leverage_results": {
         "3x": {
           "average_loss": null,
@@ -593,7 +593,7 @@
       "funding": 0,
       "gross_closed_pnl": 0,
       "incomplete_accounting": [],
-      "last_protection_run": "2026-09-30T06:28:54.708600+00:00",
+      "last_protection_run": "2026-09-30T06:59:36.926907+00:00",
       "last_run": "2026-09-30T06:08:16.211288+00:00",
       "last_strategy_run": "2026-09-30T06:08:16.211288+00:00",
       "profit_giveback": 0,
@@ -616,7 +616,7 @@
     }
   },
   "date_utc": "2026-09-30",
-  "generated_at": "2026-09-30T06:33:12.339285+00:00",
+  "generated_at": "2026-09-30T07:03:22.049690+00:00",
   "report_errors": [],
   "reporting_only": true,
   "schema_version": 2,
@@ -1599,11 +1599,11 @@
           "LINK": {
             "asset": "LINK",
             "blocked_live_reason": "mid-cap allow_short=False",
-            "current_price": 14.348,
+            "current_price": 14.288,
             "entry_price": 14.815,
             "entry_time": "2026-09-29T15:00:00",
             "ticker": "LINK-USD",
-            "unrealized_gross_return_pct": 3.1522
+            "unrealized_gross_return_pct": 3.5572
           }
         },
         "today": {
@@ -2004,20 +2004,20 @@
           "AVAX": {
             "asset": "AVAX",
             "blocked_live_reason": "mid-cap allow_short=False",
-            "current_price": 11.282,
+            "current_price": 11.105,
             "entry_price": 11.429,
             "entry_time": "2026-09-30T00:00:00",
             "ticker": "AVAX-USD",
-            "unrealized_gross_return_pct": 1.2862
+            "unrealized_gross_return_pct": 2.8349
           },
           "XRP": {
             "asset": "XRP",
             "blocked_live_reason": "mid-cap allow_short=False",
-            "current_price": 1.5034,
+            "current_price": 1.4928,
             "entry_price": 1.4937,
             "entry_time": "2026-09-29T22:00:00",
             "ticker": "XRP-USD",
-            "unrealized_gross_return_pct": -0.6494
+            "unrealized_gross_return_pct": 0.0603
           }
         },
         "today": {
@@ -2199,24 +2199,24 @@
             "AVAX": {
               "asset": "AVAX",
               "btc_confirmed_short": true,
-              "current_price": 11.282,
+              "current_price": 11.105,
               "entry_price": 11.429,
               "entry_time": "2026-09-30T00:00:00",
               "eth_confirmed_short": true,
               "filter": "BTC+ETH confirmed short + mid-cap enter_short",
               "ticker": "AVAX-USD",
-              "unrealized_gross_return_pct": 1.2862
+              "unrealized_gross_return_pct": 2.8349
             },
             "XRP": {
               "asset": "XRP",
               "btc_confirmed_short": true,
-              "current_price": 1.5034,
+              "current_price": 1.4928,
               "entry_price": 1.4937,
               "entry_time": "2026-09-29T22:00:00",
               "eth_confirmed_short": true,
               "filter": "BTC+ETH confirmed short + mid-cap enter_short",
               "ticker": "XRP-USD",
-              "unrealized_gross_return_pct": -0.6494
+              "unrealized_gross_return_pct": 0.0603
             }
           },
           "today": {
@@ -2235,6 +2235,6 @@
     "errors": [],
     "scope": "Shadow-only fresh short signals for SOL/AVAX/LINK/SUI/XRP/ONDO that live trading blocks because mid-cap allow_short=False.",
     "tracking_started_at": "2026-09-10T22:03:23.796957+00:00",
-    "updated_at": "2026-09-30T06:33:12.339285+00:00"
+    "updated_at": "2026-09-30T07:03:22.049690+00:00"
   }
 }
