@@ -1,7 +1,7 @@
 {
   "bots": {
     "aggressive": {
-      "bot_state_drawdown_pct": -0.14162333333333332,
+      "bot_state_drawdown_pct": -0.1528383333333333,
       "by_asset": {
         "BTC": {
           "average_loss": -0.142342,
@@ -471,9 +471,9 @@
       "funding": -0.000982,
       "gross_closed_pnl": -0.12771,
       "incomplete_accounting": [],
-      "last_protection_run": "2026-09-30T20:58:59.318565+00:00",
-      "last_run": "2026-09-30T21:03:24.876811+00:00",
-      "last_strategy_run": "2026-09-30T21:03:24.876811+00:00",
+      "last_protection_run": "2026-09-30T21:29:09.693984+00:00",
+      "last_run": "2026-09-30T21:32:53.749652+00:00",
+      "last_strategy_run": "2026-09-30T21:32:53.749652+00:00",
       "leverage_results": {
         "3x": {
           "average_loss": -0.191894,
@@ -1052,7 +1052,7 @@
       "funding": 0.001986,
       "gross_closed_pnl": -0.17121,
       "incomplete_accounting": [],
-      "last_protection_run": "2026-09-30T21:05:08.256785+00:00",
+      "last_protection_run": "2026-09-30T21:29:11.668309+00:00",
       "last_run": "2026-09-30T21:08:29.546495+00:00",
       "last_strategy_run": "2026-09-30T21:08:29.546495+00:00",
       "profit_giveback": 0.719485,
@@ -1188,7 +1188,7 @@
     }
   },
   "date_utc": "2026-09-30",
-  "generated_at": "2026-09-30T21:08:32.833450+00:00",
+  "generated_at": "2026-09-30T21:32:56.118039+00:00",
   "report_errors": [],
   "reporting_only": true,
   "schema_version": 2,
@@ -2183,20 +2183,20 @@
           "ONDO": {
             "asset": "ONDO",
             "blocked_live_reason": "mid-cap allow_short=False",
-            "current_price": 0.49542,
+            "current_price": 0.49596,
             "entry_price": 0.48843,
             "entry_time": "2026-09-30T19:00:00",
             "ticker": "ONDO-USD",
-            "unrealized_gross_return_pct": -1.4311
+            "unrealized_gross_return_pct": -1.5417
           },
           "XRP": {
             "asset": "XRP",
             "blocked_live_reason": "mid-cap allow_short=False",
-            "current_price": 1.4918,
+            "current_price": 1.4893,
             "entry_price": 1.5118,
             "entry_time": "2026-09-30T16:30:00",
             "ticker": "XRP-USD",
-            "unrealized_gross_return_pct": 1.3229
+            "unrealized_gross_return_pct": 1.4883
           }
         },
         "today": {
@@ -2859,6 +2859,6 @@
     "errors": [],
     "scope": "Shadow-only fresh short signals for SOL/AVAX/LINK/SUI/XRP/ONDO that live trading blocks because mid-cap allow_short=False.",
     "tracking_started_at": "2026-09-10T22:03:23.796957+00:00",
-    "updated_at": "2026-09-30T21:08:32.833450+00:00"
+    "updated_at": "2026-09-30T21:32:56.118039+00:00"
   }
 }
