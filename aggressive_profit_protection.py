@@ -9,7 +9,7 @@ Two live protection layers are applied on entry-notional return:
    2.00 percentage-point giveback from the tracked peak.
 
 After any protection exit, same-setup re-entry is blocked until the signal
-resets or flips.
+resets or flips, or after a 15-minute cooldown.
 """
 
 import os
@@ -34,6 +34,7 @@ SMALL_PROFIT_PEAK_PCT = float(os.environ.get("AGGRESSIVE_SMALL_PROFIT_PEAK_PCT",
 SMALL_PROFIT_FLOOR_PCT = float(os.environ.get("AGGRESSIVE_SMALL_PROFIT_FLOOR_PCT", "0.25"))
 ENABLED = os.environ.get("AGGRESSIVE_PROFIT_PROTECTION", "ON").upper() == "ON"
 PROTECTION_ONLY = os.environ.get("AGGRESSIVE_PROTECTION_ONLY", "OFF").upper() == "ON"
+REENTRY_COOLDOWN_MINUTES = 15
 
 _peak_returns = {}
 _state = None
@@ -67,8 +68,18 @@ def decide_trades(signals, open_positions, max_positions, pyramid_state):
     if not ENABLED or _state is None:
         return trades
 
-    locks = refresh_locks(_state, signals, HL_SYMBOL_MAP, open_positions)
-    trades = block_locked_entries(trades, locks)
+    locks = refresh_locks(
+        _state,
+        signals,
+        HL_SYMBOL_MAP,
+        open_positions,
+        cooldown_minutes=REENTRY_COOLDOWN_MINUTES,
+    )
+    trades = block_locked_entries(
+        trades,
+        locks,
+        cooldown_minutes=REENTRY_COOLDOWN_MINUTES,
+    )
     already_closing = {t["hl_coin"] for t in trades if t.get("action") == "close"}
     ticker_by_coin = {coin: ticker for ticker, coin in HL_SYMBOL_MAP.items()}
 
