@@ -210,9 +210,9 @@
       "funding": -0.000186,
       "gross_closed_pnl": 0.0,
       "incomplete_accounting": [],
-      "last_protection_run": "2026-10-02T04:28:34.220491+00:00",
-      "last_run": "2026-10-02T04:33:11.527415+00:00",
-      "last_strategy_run": "2026-10-02T04:33:11.527415+00:00",
+      "last_protection_run": "2026-10-02T04:58:50.527604+00:00",
+      "last_run": "2026-10-02T05:03:12.385496+00:00",
+      "last_strategy_run": "2026-10-02T05:03:12.385496+00:00",
       "leverage_results": {
         "3x": {
           "average_loss": -0.013624,
@@ -491,7 +491,7 @@
       "funding": 0,
       "gross_closed_pnl": 0,
       "incomplete_accounting": [],
-      "last_protection_run": "2026-10-02T04:29:05.463554+00:00",
+      "last_protection_run": "2026-10-02T04:59:48.315583+00:00",
       "last_run": "2026-10-02T04:08:25.434617+00:00",
       "last_strategy_run": "2026-10-02T04:08:25.434617+00:00",
       "profit_giveback": 0,
@@ -514,7 +514,7 @@
     }
   },
   "date_utc": "2026-10-02",
-  "generated_at": "2026-10-02T04:33:13.956307+00:00",
+  "generated_at": "2026-10-02T05:03:15.094990+00:00",
   "report_errors": [],
   "reporting_only": true,
   "schema_version": 2,
@@ -1638,12 +1638,12 @@
       },
       "intraday": {
         "all_time": {
-          "average_loss_pct": -3.0043,
+          "average_loss_pct": -2.9244,
           "average_win_pct": 3.0227,
-          "closed_trades": 37,
-          "cumulative_gross_return_pct": -26.7807,
-          "losses": 23,
-          "win_rate_pct": 37.84,
+          "closed_trades": 38,
+          "cumulative_gross_return_pct": -27.8689,
+          "losses": 24,
+          "win_rate_pct": 36.84,
           "wins": 14
         },
         "closed_trades": [
@@ -2090,26 +2090,28 @@
             "gross_return_pct": -0.6379,
             "outcome": "loss",
             "ticker": "XRP-USD"
-          }
-        ],
-        "open_positions": {
-          "ONDO": {
+          },
+          {
             "asset": "ONDO",
             "blocked_live_reason": "mid-cap allow_short=False",
-            "current_price": 0.49846,
             "entry_price": 0.50174,
             "entry_time": "2026-10-01T10:00:00",
-            "ticker": "ONDO-USD",
-            "unrealized_gross_return_pct": 0.6537
+            "exit_action": "cover_short",
+            "exit_price": 0.5072,
+            "exit_time": "2026-10-02T04:00:00",
+            "gross_return_pct": -1.0882,
+            "outcome": "loss",
+            "ticker": "ONDO-USD"
           }
-        },
+        ],
+        "open_positions": {},
         "today": {
-          "average_loss_pct": null,
+          "average_loss_pct": -1.0882,
           "average_win_pct": null,
-          "closed_trades": 0,
-          "cumulative_gross_return_pct": 0,
-          "losses": 0,
-          "win_rate_pct": null,
+          "closed_trades": 1,
+          "cumulative_gross_return_pct": -1.0882,
+          "losses": 1,
+          "win_rate_pct": 0.0,
           "wins": 0
         }
       }
@@ -2241,12 +2243,12 @@
         },
         "intraday": {
           "all_time": {
-            "average_loss_pct": -5.4701,
+            "average_loss_pct": -4.8441,
             "average_win_pct": 2.0201,
-            "closed_trades": 8,
-            "cumulative_gross_return_pct": -28.7807,
-            "losses": 6,
-            "win_rate_pct": 25.0,
+            "closed_trades": 9,
+            "cumulative_gross_return_pct": -29.8689,
+            "losses": 7,
+            "win_rate_pct": 22.22,
             "wins": 2
           },
           "btc_confirmed_short_now": false,
@@ -2346,30 +2348,30 @@
               "gross_return_pct": 2.6074,
               "outcome": "win",
               "ticker": "AVAX-USD"
+            },
+            {
+              "asset": "ONDO",
+              "entry_price": 0.50174,
+              "entry_time": "2026-10-01T10:00:00",
+              "exit_action": "cover_short",
+              "exit_price": 0.5072,
+              "exit_time": "2026-10-02T04:00:00",
+              "filter": "BTC+ETH confirmed short + mid-cap enter_short",
+              "gross_return_pct": -1.0882,
+              "outcome": "loss",
+              "ticker": "ONDO-USD"
             }
           ],
           "dual_short_confirmed_now": false,
-          "eth_confirmed_short_now": true,
-          "open_positions": {
-            "ONDO": {
-              "asset": "ONDO",
-              "btc_confirmed_short": true,
-              "current_price": 0.49846,
-              "entry_price": 0.50174,
-              "entry_time": "2026-10-01T10:00:00",
-              "eth_confirmed_short": true,
-              "filter": "BTC+ETH confirmed short + mid-cap enter_short",
-              "ticker": "ONDO-USD",
-              "unrealized_gross_return_pct": 0.6537
-            }
-          },
+          "eth_confirmed_short_now": false,
+          "open_positions": {},
           "today": {
-            "average_loss_pct": null,
+            "average_loss_pct": -1.0882,
             "average_win_pct": null,
-            "closed_trades": 0,
-            "cumulative_gross_return_pct": 0,
-            "losses": 0,
-            "win_rate_pct": null,
+            "closed_trades": 1,
+            "cumulative_gross_return_pct": -1.0882,
+            "losses": 1,
+            "win_rate_pct": 0.0,
             "wins": 0
           }
         }
@@ -2379,6 +2381,6 @@
     "errors": [],
     "scope": "Shadow-only fresh short signals for SOL/AVAX/LINK/SUI/XRP/ONDO that live trading blocks because mid-cap allow_short=False.",
     "tracking_started_at": "2026-09-10T22:03:23.796957+00:00",
-    "updated_at": "2026-10-02T04:33:13.956307+00:00"
+    "updated_at": "2026-10-02T05:03:15.094990+00:00"
   }
 }
