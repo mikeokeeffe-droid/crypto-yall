@@ -2,8 +2,8 @@
 
 A lock is side-specific and remains active while the strategy is still in the
 same long/short holding condition that produced the closed trade. The lock is
-released only after the signal resets or flips, allowing a genuinely fresh
-setup later.
+released when the signal resets or flips, or after a short cooldown so a
+continuing trend can be re-entered without waiting indefinitely.
 """
 
 from __future__ import annotations
@@ -13,6 +13,7 @@ import datetime as dt
 LOCK_KEY = "profit_reentry_locks"
 LONG_ACTIONS = {"buy", "hold_long"}
 SHORT_ACTIONS = {"enter_short", "hold_short"}
+REENTRY_COOLDOWN_MINUTES = 15
 
 
 def _signal_action_for_coin(signals: dict, symbol_map: dict, coin: str) -> str | None:
@@ -42,6 +43,23 @@ def refresh_locks(state: dict, signals: dict, symbol_map: dict, open_positions: 
             lock["pending"] = False
             lock["confirmed_at"] = dt.datetime.now(dt.UTC).isoformat()
 
+        created_at_raw = lock.get("confirmed_at") or lock.get("created_at")
+        if created_at_raw:
+            try:
+                created_at = dt.datetime.fromisoformat(str(created_at_raw).replace("Z", "+00:00"))
+                if created_at.tzinfo is None:
+                    created_at = created_at.replace(tzinfo=dt.UTC)
+                elapsed = dt.datetime.now(dt.UTC) - created_at
+                if elapsed >= dt.timedelta(minutes=REENTRY_COOLDOWN_MINUTES):
+                    print(
+                        f"Profit re-entry lock released for {coin}: "
+                        f"{REENTRY_COOLDOWN_MINUTES}-minute cooldown elapsed"
+                    )
+                    locks.pop(coin, None)
+                    continue
+            except (TypeError, ValueError):
+                pass
+
         action = _signal_action_for_coin(signals, symbol_map, coin)
         if action is None:
             continue
@@ -64,7 +82,10 @@ def block_locked_entries(trades: list[dict], locks: dict) -> list[dict]:
         action = str(trade.get("action", ""))
         coin = str(trade.get("hl_coin", ""))
         if action in {"open_long", "open_short"} and coin in locks:
-            print(f"Profit re-entry lock blocked {action} for {coin}; waiting for a fresh signal reset")
+            print(
+                f"Profit re-entry lock blocked {action} for {coin}; "
+                f"waiting for signal reset or {REENTRY_COOLDOWN_MINUTES}-minute cooldown"
+            )
             continue
         filtered.append(trade)
     return filtered
