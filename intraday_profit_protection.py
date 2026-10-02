@@ -13,6 +13,7 @@ signal resets or flips.
 """
 
 from __future__ import annotations
+import datetime as dt
 import os
 import intraday_executor as base
 from reentry_lock import block_locked_entries, mark_pending_lock, refresh_locks
@@ -23,6 +24,7 @@ SMALL_PROFIT_PEAK_PCT = float(os.environ.get("INTRADAY_SMALL_PROFIT_PEAK_PCT", "
 SMALL_PROFIT_FLOOR_PCT = float(os.environ.get("INTRADAY_SMALL_PROFIT_FLOOR_PCT", "0.25"))
 ENABLED = os.environ.get("INTRADAY_PROFIT_PROTECTION", "ON").upper() != "OFF"
 PROTECTION_ONLY = os.environ.get("INTRADAY_PROTECTION_ONLY", "OFF").upper() == "ON"
+LOCK_REVIEW_AFTER_HOURS = 2
 _original_decide_trades = base.decide_trades
 _original_send_telegram = base._send_telegram
 _state: dict | None = None
@@ -38,6 +40,30 @@ def _protected_decide_trades(signals: dict, open_positions: dict, max_positions:
         return trades
 
     locks = refresh_locks(_state, signals, base.HL_SYMBOL_MAP, open_positions)
+
+    # Keep Telegram quiet: do not send a separate alert. If a genuine Intraday
+    # entry is blocked by the same re-entry lock for 2+ hours, flag that lock
+    # so the next normal Telegram trade report gets one short review line.
+    now = dt.datetime.now(dt.UTC)
+    for trade in trades:
+        if trade.get("action") not in {"open_long", "open_short"}:
+            continue
+        coin = str(trade.get("hl_coin", ""))
+        lock = locks.get(coin)
+        if not isinstance(lock, dict) or lock.get("review_notified"):
+            continue
+        started_raw = lock.get("confirmed_at") or lock.get("created_at")
+        if not started_raw:
+            continue
+        try:
+            started = dt.datetime.fromisoformat(str(started_raw).replace("Z", "+00:00"))
+            if started.tzinfo is None:
+                started = started.replace(tzinfo=dt.UTC)
+        except (TypeError, ValueError):
+            continue
+        if now - started >= dt.timedelta(hours=LOCK_REVIEW_AFTER_HOURS):
+            lock["review_needed"] = True
+
     trades = block_locked_entries(trades, locks)
     signal_closes = {t["hl_coin"] for t in trades if t.get("action") == "close"}
     peak_returns = _state.get("peak_return_pct", {}) or {}
@@ -137,7 +163,27 @@ def _telegram_with_exit_diagnostics(results: list[dict], summary: str) -> None:
                 details.append("Re-entry: locked until signal reset")
             r["reason"] = reason + " | " + " | ".join(details)
         enriched.append(r)
+    review_locks = []
+    if _state is not None:
+        raw_locks = _state.get("profit_reentry_locks", {}) or {}
+        review_locks = [
+            lock
+            for lock in raw_locks.values()
+            if isinstance(lock, dict)
+            and lock.get("review_needed")
+            and not lock.get("review_notified")
+        ]
+
+    if review_locks:
+        summary = summary + "\nIntraday lock needs reviewing"
+
     _original_send_telegram(enriched, summary)
+
+    if review_locks and _state is not None:
+        for lock in review_locks:
+            lock["review_needed"] = False
+            lock["review_notified"] = True
+        base.save_state(_state)
 
 
 def main() -> None:
