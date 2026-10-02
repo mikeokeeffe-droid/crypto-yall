@@ -2,8 +2,8 @@
 
 A lock is side-specific and remains active while the strategy is still in the
 same long/short holding condition that produced the closed trade. The lock is
-released when the signal resets or flips, or after a short cooldown so a
-continuing trend can be re-entered without waiting indefinitely.
+released when the signal resets or flips. Callers may optionally supply a
+cooldown so a continuing trend can be re-entered without waiting indefinitely.
 """
 
 from __future__ import annotations
@@ -13,7 +13,6 @@ import datetime as dt
 LOCK_KEY = "profit_reentry_locks"
 LONG_ACTIONS = {"buy", "hold_long"}
 SHORT_ACTIONS = {"enter_short", "hold_short"}
-REENTRY_COOLDOWN_MINUTES = 15
 
 
 def _signal_action_for_coin(signals: dict, symbol_map: dict, coin: str) -> str | None:
@@ -27,7 +26,13 @@ def _signal_action_for_coin(signals: dict, symbol_map: dict, coin: str) -> str |
     return None
 
 
-def refresh_locks(state: dict, signals: dict, symbol_map: dict, open_positions: dict) -> dict:
+def refresh_locks(
+    state: dict,
+    signals: dict,
+    symbol_map: dict,
+    open_positions: dict,
+    cooldown_minutes: int | None = None,
+) -> dict:
     raw = state.get(LOCK_KEY, {}) or {}
     locks = {str(coin): dict(value) for coin, value in raw.items() if isinstance(value, dict)}
 
@@ -44,16 +49,16 @@ def refresh_locks(state: dict, signals: dict, symbol_map: dict, open_positions: 
             lock["confirmed_at"] = dt.datetime.now(dt.UTC).isoformat()
 
         created_at_raw = lock.get("confirmed_at") or lock.get("created_at")
-        if created_at_raw:
+        if cooldown_minutes is not None and created_at_raw:
             try:
                 created_at = dt.datetime.fromisoformat(str(created_at_raw).replace("Z", "+00:00"))
                 if created_at.tzinfo is None:
                     created_at = created_at.replace(tzinfo=dt.UTC)
                 elapsed = dt.datetime.now(dt.UTC) - created_at
-                if elapsed >= dt.timedelta(minutes=REENTRY_COOLDOWN_MINUTES):
+                if elapsed >= dt.timedelta(minutes=cooldown_minutes):
                     print(
                         f"Profit re-entry lock released for {coin}: "
-                        f"{REENTRY_COOLDOWN_MINUTES}-minute cooldown elapsed"
+                        f"{cooldown_minutes}-minute cooldown elapsed"
                     )
                     locks.pop(coin, None)
                     continue
@@ -76,16 +81,22 @@ def refresh_locks(state: dict, signals: dict, symbol_map: dict, open_positions: 
     return locks
 
 
-def block_locked_entries(trades: list[dict], locks: dict) -> list[dict]:
+def block_locked_entries(
+    trades: list[dict],
+    locks: dict,
+    cooldown_minutes: int | None = None,
+) -> list[dict]:
     filtered = []
     for trade in trades:
         action = str(trade.get("action", ""))
         coin = str(trade.get("hl_coin", ""))
         if action in {"open_long", "open_short"} and coin in locks:
-            print(
-                f"Profit re-entry lock blocked {action} for {coin}; "
-                f"waiting for signal reset or {REENTRY_COOLDOWN_MINUTES}-minute cooldown"
+            wait_for = (
+                f"signal reset or {cooldown_minutes}-minute cooldown"
+                if cooldown_minutes is not None
+                else "a fresh signal reset"
             )
+            print(f"Profit re-entry lock blocked {action} for {coin}; waiting for {wait_for}")
             continue
         filtered.append(trade)
     return filtered
