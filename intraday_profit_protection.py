@@ -62,7 +62,7 @@ def _protected_decide_trades(signals: dict, open_positions: dict, max_positions:
         except (TypeError, ValueError):
             continue
         if now - started >= dt.timedelta(hours=LOCK_REVIEW_AFTER_HOURS):
-            lock["review_needed"] = True
+            _state["intraday_lock_review_needed"] = True
 
     trades = block_locked_entries(trades, locks)
     signal_closes = {t["hl_coin"] for t in trades if t.get("action") == "close"}
@@ -163,26 +163,18 @@ def _telegram_with_exit_diagnostics(results: list[dict], summary: str) -> None:
                 details.append("Re-entry: locked until signal reset")
             r["reason"] = reason + " | " + " | ".join(details)
         enriched.append(r)
-    review_locks = []
-    if _state is not None:
-        raw_locks = _state.get("profit_reentry_locks", {}) or {}
-        review_locks = [
-            lock
-            for lock in raw_locks.values()
-            if isinstance(lock, dict)
-            and lock.get("review_needed")
-            and not lock.get("review_notified")
-        ]
+    review_needed = bool(
+        _state is not None
+        and _state.get("intraday_lock_review_needed")
+    )
 
-    if review_locks:
+    if review_needed:
         summary = summary + "\nIntraday lock needs reviewing"
 
     _original_send_telegram(enriched, summary)
 
-    if review_locks and _state is not None:
-        for lock in review_locks:
-            lock["review_needed"] = False
-            lock["review_notified"] = True
+    if review_needed and _state is not None:
+        _state["intraday_lock_review_needed"] = False
         base.save_state(_state)
 
 
