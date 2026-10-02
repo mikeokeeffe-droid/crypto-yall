@@ -210,9 +210,9 @@
       "funding": -0.000186,
       "gross_closed_pnl": 0.0,
       "incomplete_accounting": [],
-      "last_protection_run": "2026-10-02T10:28:54.127974+00:00",
-      "last_run": "2026-10-02T10:33:14.191428+00:00",
-      "last_strategy_run": "2026-10-02T10:33:14.191428+00:00",
+      "last_protection_run": "2026-10-02T10:59:00.390112+00:00",
+      "last_run": "2026-10-02T11:02:57.288843+00:00",
+      "last_strategy_run": "2026-10-02T11:02:57.288843+00:00",
       "leverage_results": {
         "3x": {
           "average_loss": -0.013624,
@@ -532,7 +532,7 @@
       "funding": 0.002597,
       "gross_closed_pnl": -0.2827,
       "incomplete_accounting": [],
-      "last_protection_run": "2026-10-02T10:29:05.300734+00:00",
+      "last_protection_run": "2026-10-02T10:59:49.740373+00:00",
       "last_run": "2026-10-02T10:08:24.331581+00:00",
       "last_strategy_run": "2026-10-02T10:08:24.331581+00:00",
       "profit_giveback": 0.04587,
@@ -555,7 +555,7 @@
     }
   },
   "date_utc": "2026-10-02",
-  "generated_at": "2026-10-02T10:33:16.805202+00:00",
+  "generated_at": "2026-10-02T11:03:00.126458+00:00",
   "report_errors": [],
   "reporting_only": true,
   "schema_version": 2,
@@ -1666,7 +1666,17 @@
             "ticker": "XRP-USD"
           }
         ],
-        "open_positions": {},
+        "open_positions": {
+          "LINK": {
+            "asset": "LINK",
+            "blocked_live_reason": "mid-cap allow_short=False",
+            "current_price": 14.41,
+            "entry_price": 14.41,
+            "entry_time": "2026-10-02T10:30:00",
+            "ticker": "LINK-USD",
+            "unrealized_gross_return_pct": 0.0
+          }
+        },
         "today": {
           "average_loss_pct": -1.0869,
           "average_win_pct": null,
@@ -2422,6 +2432,6 @@
     "errors": [],
     "scope": "Shadow-only fresh short signals for SOL/AVAX/LINK/SUI/XRP/ONDO that live trading blocks because mid-cap allow_short=False.",
     "tracking_started_at": "2026-09-10T22:03:23.796957+00:00",
-    "updated_at": "2026-10-02T10:33:16.805202+00:00"
+    "updated_at": "2026-10-02T11:03:00.126458+00:00"
   }
 }
