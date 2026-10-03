@@ -1,23 +1,16 @@
-"""
-intraday_peak_profit_shadow.py — read-only peak-profit protection research.
+"""Read-only Intraday peak-profit shadow research.
 
-This script never creates an Exchange client and never receives HL_PRIVATE_KEY.
-It reads the Intraday-owned Hyperliquid positions, tracks the best unrealized
-return reached by each position, and compares four hypothetical profit exits:
+No private key or Exchange client is used. This module observes Intraday-owned
+positions and records hypothetical exits only; it cannot place orders.
 
-  1) give back 1.0 percentage point from peak
-  2) give back 2.0 percentage points from peak
-  3) give back 3.0 percentage points from peak
-  4) retain 50% of the peak return
+It keeps the original fixed fallback comparisons and adds an adaptive tier:
+  EARLY       peak >= +0.50% and < +3.00%: break-even floor (0.00%)
+  ESTABLISHED peak >= +3.00% and < +5.00%: trail peak by 1.50pp
+  STRONG      peak >= +5.00%: trail peak by 2.00pp
 
-All rules arm after the position has reached +1.0% return on entry notional.
-Once armed, the hypothetical exit level is floored at 0.0% so the research is
-focused on protecting a winner rather than intentionally allowing it to become
-a loser. The actual Intraday strategy remains unchanged.
-
-Return percentage here is unrealized P&L divided by entry notional. It is not
-Hyperliquid leveraged ROE. Shadow results are stored in the existing Intraday
-Gist for later comparison with the actual live close.
+The strong tier is deliberately looser. ATR/Chandelier remain separate shadow
+signals in intraday_shadow_report.py; this study records the tiered percentage
+trail beside them without changing live execution.
 """
 
 from __future__ import annotations
@@ -32,10 +25,16 @@ from intraday_shadow_report import (
     save_state,
 )
 
-
 ARM_RETURN_PCT = 1.0
 PERCENTAGE_POINT_FALLBACKS = (1.0, 2.0, 3.0)
 RETENTION_FRACTION = 0.50
+
+ADAPTIVE_EARLY_ARM_PCT = 0.50
+ADAPTIVE_ESTABLISHED_PCT = 3.00
+ADAPTIVE_STRONG_PCT = 5.00
+ADAPTIVE_ESTABLISHED_GIVEBACK_PP = 1.50
+ADAPTIVE_STRONG_GIVEBACK_PP = 2.00
+
 MAX_HISTORY = 1500
 MAX_COMPLETED = 300
 
@@ -52,7 +51,6 @@ def return_pct(position: dict) -> float:
 
 
 def rule_levels(peak_pct: float) -> dict[str, float]:
-    """Return hypothetical exit levels in percentage points of entry notional."""
     levels = {
         f"fallback_{int(fallback)}pp": max(0.0, peak_pct - fallback)
         for fallback in PERCENTAGE_POINT_FALLBACKS
@@ -61,23 +59,43 @@ def rule_levels(peak_pct: float) -> dict[str, float]:
     return levels
 
 
+def adaptive_level(peak_pct: float) -> tuple[str, bool, float | None]:
+    """Return (tier, armed, hypothetical exit return %)."""
+    if peak_pct < ADAPTIVE_EARLY_ARM_PCT:
+        return "UNARMED", False, None
+    if peak_pct < ADAPTIVE_ESTABLISHED_PCT:
+        return "EARLY", True, 0.0
+    if peak_pct < ADAPTIVE_STRONG_PCT:
+        return (
+            "ESTABLISHED",
+            True,
+            max(0.0, peak_pct - ADAPTIVE_ESTABLISHED_GIVEBACK_PP),
+        )
+    return (
+        "STRONG",
+        True,
+        max(0.0, peak_pct - ADAPTIVE_STRONG_GIVEBACK_PP),
+    )
+
+
+def new_trigger_state() -> dict:
+    return {
+        "armed": False,
+        "triggered": False,
+        "triggered_at": None,
+        "trigger_level_pct": None,
+        "observed_return_pct": None,
+        "peak_at_trigger_pct": None,
+        "approx_trigger_pnl": None,
+    }
+
+
 def new_rule_state() -> dict[str, dict]:
     names = [
         *(f"fallback_{int(fallback)}pp" for fallback in PERCENTAGE_POINT_FALLBACKS),
         "retain_50pct",
     ]
-    return {
-        name: {
-            "armed": False,
-            "triggered": False,
-            "triggered_at": None,
-            "trigger_level_pct": None,
-            "observed_return_pct": None,
-            "peak_at_trigger_pct": None,
-            "approx_trigger_pnl": None,
-        }
-        for name in names
-    }
+    return {name: new_trigger_state() for name in names}
 
 
 def ensure_rule_state(episode: dict) -> dict[str, dict]:
@@ -85,8 +103,6 @@ def ensure_rule_state(episode: dict) -> dict[str, dict]:
     if not isinstance(rules, dict):
         rules = new_rule_state()
         episode["rules"] = rules
-        return rules
-
     for name, default in new_rule_state().items():
         if not isinstance(rules.get(name), dict):
             rules[name] = default
@@ -96,22 +112,19 @@ def ensure_rule_state(episode: dict) -> dict[str, dict]:
     return rules
 
 
-def finalize_episode(
-    state: dict,
-    episode: dict,
-    now: dt.datetime,
-    reason: str,
-) -> dict:
-    outcome = {
-        **episode,
-        "ended_at": now.isoformat(),
-        "end_reason": reason,
-    }
+def ensure_adaptive_state(episode: dict) -> dict:
+    adaptive = episode.get("adaptive_tier")
+    if not isinstance(adaptive, dict):
+        adaptive = new_trigger_state()
+        adaptive.update({"tier": "UNARMED", "highest_tier": "UNARMED"})
+        episode["adaptive_tier"] = adaptive
+    return adaptive
 
+
+def finalize_episode(state: dict, episode: dict, now: dt.datetime, reason: str) -> dict:
+    outcome = {**episode, "ended_at": now.isoformat(), "end_reason": reason}
     close = latest_filled_close(
-        state,
-        str(episode.get("coin")),
-        episode.get("started_at"),
+        state, str(episode.get("coin")), episode.get("started_at")
     )
     if close is not None:
         outcome.update({
@@ -127,9 +140,7 @@ def finalize_episode(
 
 
 def update_peak_profit_research(
-    state: dict,
-    managed_positions: dict,
-    now: dt.datetime,
+    state: dict, managed_positions: dict, now: dt.datetime
 ) -> list[str]:
     active = {
         str(k): dict(v)
@@ -141,18 +152,13 @@ def update_peak_profit_research(
     hour_key = now.strftime("%Y-%m-%dT%H:00Z")
     summary_lines: list[str] = []
 
-    # Finalize positions that have disappeared since the previous observation.
     for coin in list(active):
-        if coin in managed_positions:
-            continue
-        completed.append(
-            finalize_episode(
-                state,
-                active.pop(coin),
-                now,
-                "position_no_longer_owned",
+        if coin not in managed_positions:
+            completed.append(
+                finalize_episode(
+                    state, active.pop(coin), now, "position_no_longer_owned"
+                )
             )
-        )
 
     for coin, position in sorted(managed_positions.items()):
         side = "long" if float(position["size"]) > 0 else "short"
@@ -162,14 +168,11 @@ def update_peak_profit_research(
         current_pnl = float(position["unrealized_pnl"])
         episode = active.get(coin)
 
-        # Reset research state if this is a new/reversed/re-entered position.
         if episode is not None and (
             episode.get("side") != side
             or abs(float(episode.get("entry_px", entry_px)) - entry_px) > 1e-12
         ):
-            completed.append(
-                finalize_episode(state, episode, now, "position_changed")
-            )
+            completed.append(finalize_episode(state, episode, now, "position_changed"))
             active.pop(coin, None)
             episode = None
 
@@ -184,6 +187,11 @@ def update_peak_profit_research(
                 "peak_unrealized_pnl": current_pnl,
                 "last_counted_hour": None,
                 "rules": new_rule_state(),
+                "adaptive_tier": {
+                    **new_trigger_state(),
+                    "tier": "UNARMED",
+                    "highest_tier": "UNARMED",
+                },
             }
             active[coin] = episode
 
@@ -198,17 +206,11 @@ def update_peak_profit_research(
         levels = rule_levels(peak_pct)
         rules = ensure_rule_state(episode)
         armed = peak_pct >= ARM_RETURN_PCT
-
         for name, level in levels.items():
             rule = rules[name]
             if armed:
                 rule["armed"] = True
-
-            if (
-                rule.get("armed")
-                and not rule.get("triggered")
-                and current_pct <= level
-            ):
+            if rule.get("armed") and not rule.get("triggered") and current_pct <= level:
                 rule.update({
                     "triggered": True,
                     "triggered_at": now.isoformat(),
@@ -217,6 +219,32 @@ def update_peak_profit_research(
                     "peak_at_trigger_pct": peak_pct,
                     "approx_trigger_pnl": notional * level / 100.0,
                 })
+
+        tier, adaptive_armed, adaptive_exit = adaptive_level(peak_pct)
+        adaptive = ensure_adaptive_state(episode)
+        adaptive["tier"] = tier
+        tier_rank = {"UNARMED": 0, "EARLY": 1, "ESTABLISHED": 2, "STRONG": 3}
+        if tier_rank[tier] > tier_rank.get(str(adaptive.get("highest_tier")), 0):
+            adaptive["highest_tier"] = tier
+            adaptive["tier_changed_at"] = now.isoformat()
+        if adaptive_armed:
+            adaptive["armed"] = True
+        adaptive["current_exit_level_pct"] = adaptive_exit
+        if (
+            adaptive_armed
+            and adaptive_exit is not None
+            and not adaptive.get("triggered")
+            and current_pct <= adaptive_exit
+        ):
+            adaptive.update({
+                "triggered": True,
+                "triggered_at": now.isoformat(),
+                "trigger_level_pct": adaptive_exit,
+                "observed_return_pct": current_pct,
+                "peak_at_trigger_pct": peak_pct,
+                "approx_trigger_pnl": notional * adaptive_exit / 100.0,
+                "tier_at_trigger": tier,
+            })
 
         if episode.get("last_counted_hour") != hour_key:
             episode["last_counted_hour"] = hour_key
@@ -229,35 +257,30 @@ def update_peak_profit_research(
                 "unrealized_pnl": current_pnl,
                 "return_pct": current_pct,
                 "peak_return_pct": peak_pct,
-                "armed": armed,
+                "adaptive_tier": tier,
+                "adaptive_armed": adaptive_armed,
+                "adaptive_exit_level_pct": adaptive_exit,
+                "adaptive_triggered": bool(adaptive.get("triggered")),
                 "levels": levels,
-                "rule_status": {
-                    name: {
-                        "armed": bool(rules[name].get("armed")),
-                        "triggered": bool(rules[name].get("triggered")),
-                    }
-                    for name in levels
-                },
                 "comparison_note": (
-                    "Return is unrealized P&L / entry notional, not leveraged ROE. "
-                    "Hypothetical trigger P&L excludes closing fee, funding and slippage."
+                    "Shadow only. Return is unrealized P&L / entry notional, not "
+                    "leveraged ROE. Hypothetical exits exclude closing fee, funding "
+                    "and slippage."
                 ),
             })
 
-        statuses = []
-        for name, level in levels.items():
-            rule = rules[name]
-            if rule.get("triggered"):
-                status = "TRIGGERED"
-            elif rule.get("armed"):
-                status = f"HOLD>{level:.2f}%"
-            else:
-                status = "NOT_ARMED"
-            statuses.append(f"{name}={status}")
+        if adaptive.get("triggered"):
+            adaptive_status = (
+                f"{tier}=TRIGGERED@{float(adaptive.get('trigger_level_pct', 0.0)):.2f}%"
+            )
+        elif adaptive_armed and adaptive_exit is not None:
+            adaptive_status = f"{tier}=HOLD>{adaptive_exit:.2f}%"
+        else:
+            adaptive_status = "UNARMED"
 
         summary_lines.append(
             f"PeakProfit {coin} {side.upper()} | current={current_pct:+.3f}% "
-            f"peak={peak_pct:+.3f}% | " + " | ".join(statuses)
+            f"peak={peak_pct:+.3f}% | adaptive={adaptive_status}"
         )
 
     state["shadow_peak_profit_active"] = active
@@ -265,15 +288,21 @@ def update_peak_profit_research(
     state["shadow_peak_profit_completed"] = completed[-MAX_COMPLETED:]
     state["last_peak_profit_shadow_snapshot"] = {
         "timestamp": now.isoformat(),
-        "arm_return_pct": ARM_RETURN_PCT,
-        "fallback_percentage_points": list(PERCENTAGE_POINT_FALLBACKS),
-        "retention_fraction": RETENTION_FRACTION,
+        "adaptive_config": {
+            "early_arm_pct": ADAPTIVE_EARLY_ARM_PCT,
+            "established_pct": ADAPTIVE_ESTABLISHED_PCT,
+            "strong_pct": ADAPTIVE_STRONG_PCT,
+            "established_giveback_pp": ADAPTIVE_ESTABLISHED_GIVEBACK_PP,
+            "strong_giveback_pp": ADAPTIVE_STRONG_GIVEBACK_PP,
+            "live_orders": False,
+        },
         "positions": [
             {
                 "coin": coin,
                 "side": active[coin].get("side"),
                 "current_return_pct": active[coin].get("last_return_pct"),
                 "peak_return_pct": active[coin].get("peak_return_pct"),
+                "adaptive_tier": active[coin].get("adaptive_tier"),
                 "rules": active[coin].get("rules"),
             }
             for coin in sorted(active)
@@ -286,26 +315,20 @@ def main() -> None:
     now = dt.datetime.now(dt.UTC)
     print(f"Intraday peak-profit shadow started at {now.isoformat()}")
     print("READ ONLY: no private key, no Exchange client, no order methods")
-
     state = load_state()
     info, address = get_info_and_address()
     exchange_positions = get_open_positions(info, address)
     owned_coins = set(state.get("owned_coins", []) or [])
     managed = {
-        coin: pos
-        for coin, pos in exchange_positions.items()
-        if coin in owned_coins
+        coin: pos for coin, pos in exchange_positions.items() if coin in owned_coins
     }
-
     lines = update_peak_profit_research(state, managed, now)
     save_state(state)
-
     if not managed:
         print("PeakProfit shadow: no owned Intraday positions")
     else:
         for line in lines:
             print(line)
-
     print("Intraday peak-profit shadow done")
 
 
