@@ -505,9 +505,9 @@
       "funding": -0.001242,
       "gross_closed_pnl": -0.7698,
       "incomplete_accounting": [],
-      "last_protection_run": "2026-10-06T11:08:32.900189+00:00",
-      "last_run": "2026-10-06T11:03:13.322864+00:00",
-      "last_strategy_run": "2026-10-06T11:03:13.322864+00:00",
+      "last_protection_run": "2026-10-06T11:28:56.867843+00:00",
+      "last_run": "2026-10-06T11:33:15.238884+00:00",
+      "last_strategy_run": "2026-10-06T11:33:15.238884+00:00",
       "leverage_results": {
         "3x": {
           "average_loss": -0.207337,
@@ -816,7 +816,7 @@
       "funding": 0,
       "gross_closed_pnl": 0,
       "incomplete_accounting": [],
-      "last_protection_run": "2026-10-06T11:04:46.944799+00:00",
+      "last_protection_run": "2026-10-06T11:29:12.703613+00:00",
       "last_run": "2026-10-06T11:08:33.862134+00:00",
       "last_strategy_run": "2026-10-06T11:08:33.862134+00:00",
       "profit_giveback": 0,
@@ -839,7 +839,7 @@
     }
   },
   "date_utc": "2026-10-06",
-  "generated_at": "2026-10-06T11:08:36.855952+00:00",
+  "generated_at": "2026-10-06T11:33:18.422152+00:00",
   "report_errors": [],
   "reporting_only": true,
   "schema_version": 2,
@@ -2218,11 +2218,11 @@
           "SOL": {
             "asset": "SOL",
             "blocked_live_reason": "mid-cap allow_short=False",
-            "current_price": 120.2,
+            "current_price": 120.16,
             "entry_price": 120.23,
             "entry_time": "2026-10-06T04:00:00",
             "ticker": "SOL-USD",
-            "unrealized_gross_return_pct": 0.025
+            "unrealized_gross_return_pct": 0.0582
           }
         },
         "today": {
@@ -3029,13 +3029,13 @@
             "SOL": {
               "asset": "SOL",
               "btc_confirmed_short": true,
-              "current_price": 120.2,
+              "current_price": 120.16,
               "entry_price": 120.23,
               "entry_time": "2026-10-06T04:00:00",
               "eth_confirmed_short": true,
               "filter": "BTC+ETH confirmed short + mid-cap enter_short",
               "ticker": "SOL-USD",
-              "unrealized_gross_return_pct": 0.025
+              "unrealized_gross_return_pct": 0.0582
             }
           },
           "today": {
@@ -3259,6 +3259,6 @@
     "errors": [],
     "scope": "Shadow-only fresh short signals for SOL/AVAX/LINK/SUI/XRP/ONDO that live trading blocks because mid-cap allow_short=False.",
     "tracking_started_at": "2026-09-10T22:03:23.796957+00:00",
-    "updated_at": "2026-10-06T11:08:36.855952+00:00"
+    "updated_at": "2026-10-06T11:33:18.422152+00:00"
   }
 }
