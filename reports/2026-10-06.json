@@ -613,7 +613,7 @@
           "pnl_source": "price_fallback+userFunding"
         }
       ],
-      "last_protection_run": "2026-10-06T16:59:02.995185+00:00",
+      "last_protection_run": "2026-10-06T17:29:25.002769+00:00",
       "last_run": "2026-10-06T17:03:38.794782+00:00",
       "last_strategy_run": "2026-10-06T17:03:38.794782+00:00",
       "leverage_results": {
@@ -1127,7 +1127,7 @@
       "funding": -0.008143,
       "gross_closed_pnl": 0.88927,
       "incomplete_accounting": [],
-      "last_protection_run": "2026-10-06T17:05:15.328885+00:00",
+      "last_protection_run": "2026-10-06T17:29:16.379033+00:00",
       "last_run": "2026-10-06T17:08:31.276016+00:00",
       "last_strategy_run": "2026-10-06T17:08:31.276016+00:00",
       "profit_giveback": 0.991749,
@@ -1235,7 +1235,7 @@
     }
   },
   "date_utc": "2026-10-06",
-  "generated_at": "2026-10-06T17:08:35.299004+00:00",
+  "generated_at": "2026-10-06T17:33:06.046413+00:00",
   "report_errors": [],
   "reporting_only": true,
   "schema_version": 2,
@@ -3440,7 +3440,7 @@
             }
           ],
           "dual_short_confirmed_now": false,
-          "eth_confirmed_short_now": false,
+          "eth_confirmed_short_now": true,
           "open_positions": {},
           "today": {
             "average_loss_pct": -0.7979,
@@ -3664,6 +3664,6 @@
     "errors": [],
     "scope": "Shadow-only fresh short signals for SOL/AVAX/LINK/SUI/XRP/ONDO that live trading blocks because mid-cap allow_short=False.",
     "tracking_started_at": "2026-09-10T22:03:23.796957+00:00",
-    "updated_at": "2026-10-06T17:08:35.299004+00:00"
+    "updated_at": "2026-10-06T17:33:06.046413+00:00"
   }
 }
