@@ -1,7 +1,7 @@
 {
   "bots": {
     "aggressive": {
-      "bot_state_drawdown_pct": -0.7077274999999998,
+      "bot_state_drawdown_pct": -0.7191441666666664,
       "by_asset": {
         "BTC": {
           "average_loss": -0.102627,
@@ -663,9 +663,9 @@
           "pnl_source": "price_fallback+userFunding"
         }
       ],
-      "last_protection_run": "2026-10-06T21:59:12.493100+00:00",
-      "last_run": "2026-10-06T22:03:14.366475+00:00",
-      "last_strategy_run": "2026-10-06T22:03:14.366475+00:00",
+      "last_protection_run": "2026-10-06T22:28:55.594552+00:00",
+      "last_run": "2026-10-06T22:33:14.287658+00:00",
+      "last_strategy_run": "2026-10-06T22:33:14.287658+00:00",
       "leverage_results": {
         "3x": {
           "average_loss": -0.126904,
@@ -906,7 +906,7 @@
         },
         "ETH": {
           "accounting_note": "Sampled hypothetical return only; no order is sent and fees/funding are not estimated here.",
-          "current_return_pct": -0.21739130434782608,
+          "current_return_pct": -0.1635079895949461,
           "entry_px": 2691.0,
           "observation_only": true,
           "peak_return_pct": -0.011148272017837236,
@@ -923,11 +923,11 @@
               "triggered": false
             }
           },
-          "updated_at": "2026-10-06T22:03:04.347502+00:00"
+          "updated_at": "2026-10-06T22:33:03.397512+00:00"
         },
         "LINK": {
           "accounting_note": "Sampled hypothetical return only; no order is sent and fees/funding are not estimated here.",
-          "current_return_pct": -0.2004438399312764,
+          "current_return_pct": -0.40804638843152696,
           "entry_px": 13.969,
           "observation_only": true,
           "peak_return_pct": 0.17180900565537977,
@@ -944,7 +944,7 @@
               "triggered": false
             }
           },
-          "updated_at": "2026-10-06T22:03:04.356634+00:00"
+          "updated_at": "2026-10-06T22:33:03.408490+00:00"
         },
         "ONDO": {
           "accounting_note": "Sampled hypothetical return only; no order is sent and fees/funding are not estimated here.",
@@ -969,10 +969,10 @@
         },
         "SOL": {
           "accounting_note": "Sampled hypothetical return only; no order is sent and fees/funding are not estimated here.",
-          "current_return_pct": -0.2883268803031551,
+          "current_return_pct": -0.21418568251091527,
           "entry_px": 121.39,
           "observation_only": true,
-          "peak_return_pct": -0.2553752368399374,
+          "peak_return_pct": -0.21418568251091527,
           "side": "long",
           "started_at": "2026-10-06T16:02:56.714760+00:00",
           "tests": {
@@ -986,7 +986,7 @@
               "triggered": false
             }
           },
-          "updated_at": "2026-10-06T22:03:04.352190+00:00"
+          "updated_at": "2026-10-06T22:33:03.403946+00:00"
         },
         "SUI": {
           "accounting_note": "Sampled hypothetical return only; no order is sent and fees/funding are not estimated here.",
@@ -1205,7 +1205,7 @@
       "funding": -0.008143,
       "gross_closed_pnl": 0.88927,
       "incomplete_accounting": [],
-      "last_protection_run": "2026-10-06T22:04:58.313851+00:00",
+      "last_protection_run": "2026-10-06T22:29:03.426681+00:00",
       "last_run": "2026-10-06T22:08:21.423060+00:00",
       "last_strategy_run": "2026-10-06T22:08:21.423060+00:00",
       "profit_giveback": 0.991749,
@@ -1313,7 +1313,7 @@
     }
   },
   "date_utc": "2026-10-06",
-  "generated_at": "2026-10-06T22:08:24.858793+00:00",
+  "generated_at": "2026-10-06T22:33:16.940785+00:00",
   "report_errors": [],
   "reporting_only": true,
   "schema_version": 2,
@@ -2704,20 +2704,20 @@
           "AVAX": {
             "asset": "AVAX",
             "blocked_live_reason": "mid-cap allow_short=False",
-            "current_price": 11.547,
+            "current_price": 11.58,
             "entry_price": 11.46,
             "entry_time": "2026-10-06T19:30:00",
             "ticker": "AVAX-USD",
-            "unrealized_gross_return_pct": -0.7592
+            "unrealized_gross_return_pct": -1.0471
           },
           "LINK": {
             "asset": "LINK",
             "blocked_live_reason": "mid-cap allow_short=False",
-            "current_price": 13.938,
+            "current_price": 13.884,
             "entry_price": 13.96,
             "entry_time": "2026-10-06T17:30:00",
             "ticker": "LINK-USD",
-            "unrealized_gross_return_pct": 0.1576
+            "unrealized_gross_return_pct": 0.5444
           }
         },
         "today": {
@@ -3551,24 +3551,24 @@
             "AVAX": {
               "asset": "AVAX",
               "btc_confirmed_short": true,
-              "current_price": 11.547,
+              "current_price": 11.58,
               "entry_price": 11.46,
               "entry_time": "2026-10-06T19:30:00",
               "eth_confirmed_short": true,
               "filter": "BTC+ETH confirmed short + mid-cap enter_short",
               "ticker": "AVAX-USD",
-              "unrealized_gross_return_pct": -0.7592
+              "unrealized_gross_return_pct": -1.0471
             },
             "LINK": {
               "asset": "LINK",
               "btc_confirmed_short": true,
-              "current_price": 13.938,
+              "current_price": 13.884,
               "entry_price": 13.96,
               "entry_time": "2026-10-06T17:30:00",
               "eth_confirmed_short": true,
               "filter": "BTC+ETH confirmed short + mid-cap enter_short",
               "ticker": "LINK-USD",
-              "unrealized_gross_return_pct": 0.1576
+              "unrealized_gross_return_pct": 0.5444
             }
           },
           "today": {
@@ -3793,6 +3793,6 @@
     "errors": [],
     "scope": "Shadow-only fresh short signals for SOL/AVAX/LINK/SUI/XRP/ONDO that live trading blocks because mid-cap allow_short=False.",
     "tracking_started_at": "2026-09-10T22:03:23.796957+00:00",
-    "updated_at": "2026-10-06T22:08:24.858793+00:00"
+    "updated_at": "2026-10-06T22:33:16.940785+00:00"
   }
 }
