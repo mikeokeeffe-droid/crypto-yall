@@ -33,16 +33,47 @@ def load_state() -> dict:
     gist_id = os.environ.get("AGGRESSIVE_GIST_ID")
     if not token or not gist_id:
         raise RuntimeError("GIST_TOKEN or AGGRESSIVE_GIST_ID missing")
+
     resp = requests.get(
         f"https://api.github.com/gists/{gist_id}",
         headers={"Authorization": f"token {token}"},
         timeout=15,
     )
     resp.raise_for_status()
+
     files = resp.json().get("files", {})
     if STATE_FILENAME not in files:
         raise RuntimeError(f"{STATE_FILENAME} missing from Aggressive Gist")
-    state = json.loads(files[STATE_FILENAME]["content"])
+
+    state_file = files[STATE_FILENAME]
+    if state_file.get("truncated"):
+        raw_url = state_file.get("raw_url")
+        if not raw_url:
+            raise RuntimeError(
+                "Aggressive Gist state is truncated but has no raw_url"
+            )
+        raw_resp = requests.get(
+            raw_url,
+            headers={
+                "Authorization": f"token {token}",
+                "Accept": "application/vnd.github.raw",
+            },
+            timeout=30,
+        )
+        raw_resp.raise_for_status()
+        state_text = raw_resp.text
+        print(
+            "Aggressive exit shadow suite: state exceeded the inline Gist limit; "
+            "loaded complete state from raw_url"
+        )
+    else:
+        state_text = state_file.get("content", "")
+
+    try:
+        state = json.loads(state_text)
+    except json.JSONDecodeError as e:
+        raise RuntimeError(f"Aggressive state is invalid JSON: {e}") from e
+
     if not isinstance(state, dict):
         raise RuntimeError("Aggressive state is not a JSON object")
     return state
