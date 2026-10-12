@@ -1,7 +1,7 @@
 {
   "bots": {
     "aggressive": {
-      "bot_state_drawdown_pct": -0.07141500000000023,
+      "bot_state_drawdown_pct": -0.10820166666666706,
       "by_asset": {
         "ETH": {
           "average_loss": null,
@@ -332,9 +332,9 @@
       "funding": -0.024767,
       "gross_closed_pnl": 0.526,
       "incomplete_accounting": [],
-      "last_protection_run": "2026-10-12T15:07:03.285932+00:00",
-      "last_run": "2026-10-12T14:51:28.271257+00:00",
-      "last_strategy_run": "2026-10-12T14:51:28.271257+00:00",
+      "last_protection_run": "2026-10-12T15:17:16.348016+00:00",
+      "last_run": "2026-10-12T15:18:15.752042+00:00",
+      "last_strategy_run": "2026-10-12T15:18:15.752042+00:00",
       "leverage_results": {
         "3x": {
           "average_loss": null,
@@ -751,7 +751,7 @@
       "funding": 0.011543,
       "gross_closed_pnl": 0.54854,
       "incomplete_accounting": [],
-      "last_protection_run": "2026-10-12T15:07:49.804076+00:00",
+      "last_protection_run": "2026-10-12T15:14:41.278850+00:00",
       "last_run": "2026-10-12T15:09:20.066965+00:00",
       "last_strategy_run": "2026-10-12T15:09:20.066965+00:00",
       "profit_giveback": 0.3565,
@@ -803,7 +803,7 @@
     }
   },
   "date_utc": "2026-10-12",
-  "generated_at": "2026-10-12T15:09:23.382184+00:00",
+  "generated_at": "2026-10-12T15:18:18.608003+00:00",
   "report_errors": [],
   "reporting_only": true,
   "schema_version": 2,
@@ -3460,6 +3460,6 @@
     "errors": [],
     "scope": "Shadow-only fresh short signals for SOL/AVAX/LINK/SUI/XRP/ONDO that live trading blocks because mid-cap allow_short=False.",
     "tracking_started_at": "2026-09-10T22:03:23.796957+00:00",
-    "updated_at": "2026-10-12T15:09:23.382184+00:00"
+    "updated_at": "2026-10-12T15:18:18.608003+00:00"
   }
 }
