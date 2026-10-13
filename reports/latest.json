@@ -689,9 +689,9 @@
       "funding": -0.001505,
       "gross_closed_pnl": -0.43383,
       "incomplete_accounting": [],
-      "last_protection_run": "2026-10-13T16:28:38.809855+00:00",
-      "last_run": "2026-10-13T16:33:05.013182+00:00",
-      "last_strategy_run": "2026-10-13T16:33:05.013182+00:00",
+      "last_protection_run": "2026-10-13T16:58:54.918009+00:00",
+      "last_run": "2026-10-13T17:03:06.249382+00:00",
+      "last_strategy_run": "2026-10-13T17:03:06.249382+00:00",
       "leverage_results": {
         "3x": {
           "average_loss": -0.092997,
@@ -1196,7 +1196,7 @@
       "funding": 0,
       "gross_closed_pnl": 0,
       "incomplete_accounting": [],
-      "last_protection_run": "2026-10-13T16:29:12.039216+00:00",
+      "last_protection_run": "2026-10-13T16:59:55.974798+00:00",
       "last_run": "2026-10-13T16:08:29.025172+00:00",
       "last_strategy_run": "2026-10-13T16:08:29.025172+00:00",
       "profit_giveback": 0,
@@ -1219,7 +1219,7 @@
     }
   },
   "date_utc": "2026-10-13",
-  "generated_at": "2026-10-13T16:33:08.322144+00:00",
+  "generated_at": "2026-10-13T17:03:09.233524+00:00",
   "report_errors": [],
   "reporting_only": true,
   "schema_version": 2,
@@ -2718,38 +2718,38 @@
           "AVAX": {
             "asset": "AVAX",
             "blocked_live_reason": "mid-cap allow_short=False",
-            "current_price": 10.291,
+            "current_price": 10.274,
             "entry_price": 10.268,
             "entry_time": "2026-10-13T11:00:00",
             "ticker": "AVAX-USD",
-            "unrealized_gross_return_pct": -0.224
+            "unrealized_gross_return_pct": -0.0584
           },
           "LINK": {
             "asset": "LINK",
             "blocked_live_reason": "mid-cap allow_short=False",
-            "current_price": 12.91,
+            "current_price": 12.925,
             "entry_price": 12.88,
             "entry_time": "2026-10-13T12:00:00",
             "ticker": "LINK-USD",
-            "unrealized_gross_return_pct": -0.2329
+            "unrealized_gross_return_pct": -0.3494
           },
           "ONDO": {
             "asset": "ONDO",
             "blocked_live_reason": "mid-cap allow_short=False",
-            "current_price": 0.4681,
+            "current_price": 0.46845,
             "entry_price": 0.4685,
             "entry_time": "2026-10-13T10:00:00",
             "ticker": "ONDO-USD",
-            "unrealized_gross_return_pct": 0.0854
+            "unrealized_gross_return_pct": 0.0107
           },
           "SUI": {
             "asset": "SUI",
             "blocked_live_reason": "mid-cap allow_short=False",
-            "current_price": 1.0452,
+            "current_price": 1.0471,
             "entry_price": 1.0456,
             "entry_time": "2026-10-13T12:30:00",
             "ticker": "SUI20947-USD",
-            "unrealized_gross_return_pct": 0.0383
+            "unrealized_gross_return_pct": -0.1435
           }
         },
         "today": {
@@ -3414,20 +3414,20 @@
           "AVAX": {
             "asset": "AVAX",
             "blocked_live_reason": "mid-cap allow_short=False",
-            "current_price": 10.232,
+            "current_price": 10.274,
             "entry_price": 10.885,
             "entry_time": "2026-10-12T13:00:00",
             "ticker": "AVAX-USD",
-            "unrealized_gross_return_pct": 5.9991
+            "unrealized_gross_return_pct": 5.6132
           },
           "SUI": {
             "asset": "SUI",
             "blocked_live_reason": "mid-cap allow_short=False",
-            "current_price": 1.0387,
+            "current_price": 1.0471,
             "entry_price": 1.0977,
             "entry_time": "2026-10-08T12:00:00",
             "ticker": "SUI20947-USD",
-            "unrealized_gross_return_pct": 5.3749
+            "unrealized_gross_return_pct": 4.6096
           }
         },
         "today": {
@@ -3934,6 +3934,6 @@
     "errors": [],
     "scope": "Shadow-only fresh short signals for SOL/AVAX/LINK/SUI/XRP/ONDO that live trading blocks because mid-cap allow_short=False.",
     "tracking_started_at": "2026-09-10T22:03:23.796957+00:00",
-    "updated_at": "2026-10-13T16:33:08.322144+00:00"
+    "updated_at": "2026-10-13T17:03:09.233524+00:00"
   }
 }
