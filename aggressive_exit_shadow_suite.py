@@ -292,6 +292,45 @@ def main() -> None:
             "are not estimated here."
         )
         loss_tests = loss_rec.setdefault("tests", {})
+
+        # Dollar-denominated shadow trials requested for the weekend comparison.
+        # These are deliberately observation-only: they record the first sampled
+        # P&L at which each hypothetical rule would have exited, but send no order.
+        dollar_trials = {
+            "loss_cap_15c": -0.15,
+            "loss_cap_20c": -0.20,
+            "loss_cap_25c": -0.25,
+            "loss_cap_30c": -0.30,
+        }
+        for test_name, threshold_usd in dollar_trials.items():
+            item = loss_tests.setdefault(
+                test_name,
+                {"triggered": False, "threshold_usd": threshold_usd},
+            )
+            if upnl <= threshold_usd and not item.get("triggered"):
+                item.update({
+                    "triggered": True,
+                    "triggered_at": dt.datetime.now(dt.UTC).isoformat(),
+                    "sampled_exit_pnl": upnl,
+                    "sampled_exit_return_pct": ret,
+                })
+
+        profit_floor = loss_tests.setdefault(
+            "profit_floor_10c",
+            {"armed": False, "triggered": False, "arm_threshold_usd": 0.10, "floor_usd": 0.10},
+        )
+        if upnl >= 0.10:
+            profit_floor["armed"] = True
+            profit_floor.setdefault("armed_at", dt.datetime.now(dt.UTC).isoformat())
+        if profit_floor.get("armed") and upnl <= 0.10 and not profit_floor.get("triggered"):
+            profit_floor.update({
+                "triggered": True,
+                "triggered_at": dt.datetime.now(dt.UTC).isoformat(),
+                "sampled_exit_pnl": upnl,
+                "sampled_exit_return_pct": ret,
+            })
+
+        # Keep the existing percentage trials for comparison.
         for test_name, threshold in {
             "loss_cap_0_75pct": -0.75,
             "loss_cap_1_00pct": -1.00,
@@ -303,6 +342,7 @@ def main() -> None:
                     "triggered": True,
                     "triggered_at": dt.datetime.now(dt.UTC).isoformat(),
                     "sampled_exit_return_pct": ret,
+                    "sampled_exit_pnl": upnl,
                 })
         loss_shadow[coin] = loss_rec
 
