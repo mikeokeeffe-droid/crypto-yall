@@ -720,6 +720,61 @@ def main() -> None:
 
     update_flat_research(state, snapshots, set(managed), now)
 
+    # Observation-only cent-cap and 10c profit-floor trials.
+    # Records sampled trigger points only; never places or modifies an order.
+    risk_shadow = state.setdefault("shadow_cent_risk_active", {})
+    for snapshot in snapshots:
+        coin = str(snapshot["coin"])
+        side = str(snapshot["side"])
+        entry_px = float(snapshot["entry_px"])
+        upnl = float(snapshot["unrealized_pnl"])
+        rec = risk_shadow.get(coin, {}) if isinstance(risk_shadow.get(coin), dict) else {}
+        same_position = (
+            rec.get("side") == side
+            and abs(float(rec.get("entry_px", 0.0) or 0.0) - entry_px)
+            <= max(1e-12, entry_px * 1e-8)
+        )
+        if not same_position:
+            rec = {
+                "side": side,
+                "entry_px": entry_px,
+                "started_at": now.isoformat(),
+                "tests": {},
+                "observation_only": True,
+            }
+        rec["current_unrealized_pnl"] = upnl
+        rec["updated_at"] = now.isoformat()
+        tests = rec.setdefault("tests", {})
+        for name, threshold in {
+            "loss_cap_15c": -0.15,
+            "loss_cap_20c": -0.20,
+            "loss_cap_25c": -0.25,
+            "loss_cap_30c": -0.30,
+        }.items():
+            item = tests.setdefault(name, {"triggered": False, "threshold_usd": threshold})
+            if upnl <= threshold and not item.get("triggered"):
+                item.update({
+                    "triggered": True,
+                    "triggered_at": now.isoformat(),
+                    "sampled_exit_pnl": upnl,
+                })
+
+        floor = tests.setdefault(
+            "profit_floor_10c",
+            {"armed": False, "triggered": False, "arm_threshold_usd": 0.10, "floor_usd": 0.10},
+        )
+        if upnl >= 0.10 and not floor.get("armed"):
+            floor["armed"] = True
+            floor["armed_at"] = now.isoformat()
+        if floor.get("armed") and upnl <= 0.10 and not floor.get("triggered"):
+            floor.update({
+                "triggered": True,
+                "triggered_at": now.isoformat(),
+                "sampled_exit_pnl": upnl,
+            })
+        risk_shadow[coin] = rec
+    state["shadow_cent_risk_active"] = risk_shadow
+
     # Remove alert signatures for positions no longer owned.
     for coin in list(new_signatures):
         if coin not in managed:
