@@ -1,7 +1,7 @@
 {
   "bots": {
     "aggressive": {
-      "bot_state_drawdown_pct": -0.3679400000000003,
+      "bot_state_drawdown_pct": -0.37569666666666685,
       "by_asset": {
         "AVAX": {
           "average_loss": -0.270778,
@@ -1041,9 +1041,9 @@
       "funding": -0.001427,
       "gross_closed_pnl": -0.15089,
       "incomplete_accounting": [],
-      "last_protection_run": "2026-10-15T17:29:13.271277+00:00",
-      "last_run": "2026-10-15T17:33:03.723814+00:00",
-      "last_strategy_run": "2026-10-15T17:33:03.723814+00:00",
+      "last_protection_run": "2026-10-15T17:58:47.671623+00:00",
+      "last_run": "2026-10-15T18:03:28.406008+00:00",
+      "last_strategy_run": "2026-10-15T18:03:28.406008+00:00",
       "leverage_results": {
         "3x": {
           "average_loss": -0.196041,
@@ -1804,7 +1804,7 @@
       "funding": 0.000681,
       "gross_closed_pnl": 0.023868,
       "incomplete_accounting": [],
-      "last_protection_run": "2026-10-15T17:29:10.635466+00:00",
+      "last_protection_run": "2026-10-15T17:59:52.833371+00:00",
       "last_run": "2026-10-15T17:08:27.147548+00:00",
       "last_strategy_run": "2026-10-15T17:08:27.147548+00:00",
       "profit_giveback": 0.185493,
@@ -1856,7 +1856,7 @@
     }
   },
   "date_utc": "2026-10-15",
-  "generated_at": "2026-10-15T17:33:07.241625+00:00",
+  "generated_at": "2026-10-15T18:03:32.290325+00:00",
   "report_errors": [],
   "reporting_only": true,
   "schema_version": 2,
@@ -3557,12 +3557,12 @@
       "intraday": {
         "all_time": {
           "average_loss_pct": -2.6938,
-          "average_win_pct": 3.5251,
-          "closed_trades": 55,
-          "cumulative_gross_return_pct": -11.3424,
+          "average_win_pct": 3.4701,
+          "closed_trades": 56,
+          "cumulative_gross_return_pct": -9.0831,
           "losses": 33,
-          "win_rate_pct": 40.0,
-          "wins": 22
+          "win_rate_pct": 41.07,
+          "wins": 23
         },
         "closed_trades": [
           {
@@ -4224,36 +4224,39 @@
             "gross_return_pct": 1.3644,
             "outcome": "win",
             "ticker": "SOL-USD"
+          },
+          {
+            "asset": "XRP",
+            "blocked_live_reason": "mid-cap allow_short=False",
+            "entry_price": 1.3721,
+            "entry_time": "2026-10-14T00:00:00",
+            "exit_action": "cover_short",
+            "exit_price": 1.3411,
+            "exit_time": "2026-10-15T17:00:00",
+            "gross_return_pct": 2.2593,
+            "outcome": "win",
+            "ticker": "XRP-USD"
           }
         ],
         "open_positions": {
           "AVAX": {
             "asset": "AVAX",
             "blocked_live_reason": "mid-cap allow_short=False",
-            "current_price": 9.9316,
+            "current_price": 9.9738,
             "entry_price": 10.885,
             "entry_time": "2026-10-12T13:00:00",
             "ticker": "AVAX-USD",
-            "unrealized_gross_return_pct": 8.7588
-          },
-          "XRP": {
-            "asset": "XRP",
-            "blocked_live_reason": "mid-cap allow_short=False",
-            "current_price": 1.336,
-            "entry_price": 1.3721,
-            "entry_time": "2026-10-14T00:00:00",
-            "ticker": "XRP-USD",
-            "unrealized_gross_return_pct": 2.631
+            "unrealized_gross_return_pct": 8.3712
           }
         },
         "today": {
           "average_loss_pct": null,
-          "average_win_pct": 1.3644,
-          "closed_trades": 1,
-          "cumulative_gross_return_pct": 1.3644,
+          "average_win_pct": 1.8119,
+          "closed_trades": 2,
+          "cumulative_gross_return_pct": 3.6237,
           "losses": 0,
           "win_rate_pct": 100.0,
-          "wins": 1
+          "wins": 2
         }
       }
     },
@@ -4750,6 +4753,6 @@
     "errors": [],
     "scope": "Shadow-only fresh short signals for SOL/AVAX/LINK/SUI/XRP/ONDO that live trading blocks because mid-cap allow_short=False.",
     "tracking_started_at": "2026-09-10T22:03:23.796957+00:00",
-    "updated_at": "2026-10-15T17:33:07.241625+00:00"
+    "updated_at": "2026-10-15T18:03:32.290325+00:00"
   }
 }
