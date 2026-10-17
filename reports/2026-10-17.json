@@ -1,7 +1,7 @@
 {
   "bots": {
     "aggressive": {
-      "bot_state_drawdown_pct": -0.1469683333333327,
+      "bot_state_drawdown_pct": -0.16855166666666607,
       "by_asset": {
         "BTC": {
           "average_loss": -0.08535,
@@ -471,9 +471,9 @@
       "funding": 0.00115,
       "gross_closed_pnl": -0.2273,
       "incomplete_accounting": [],
-      "last_protection_run": "2026-10-17T09:08:19.305166+00:00",
-      "last_run": "2026-10-17T09:03:02.581214+00:00",
-      "last_strategy_run": "2026-10-17T09:03:02.581214+00:00",
+      "last_protection_run": "2026-10-17T09:28:46.834730+00:00",
+      "last_run": "2026-10-17T09:33:02.020527+00:00",
+      "last_strategy_run": "2026-10-17T09:33:02.020527+00:00",
       "leverage_results": {
         "3x": {
           "average_loss": -0.073853,
@@ -714,12 +714,12 @@
         },
         "SUI": {
           "accounting_note": "Sampled hypothetical return only; no order is sent and fees/funding are not estimated here.",
-          "current_return_pct": 1.3310016516078886,
-          "entry_px": 1.0293,
+          "current_return_pct": -0.09455558873295511,
+          "entry_px": 1.0047,
           "observation_only": true,
-          "peak_return_pct": 1.3310016516078886,
+          "peak_return_pct": -0.09455558873295511,
           "side": "long",
-          "started_at": "2026-10-16T04:32:57.102068+00:00",
+          "started_at": "2026-10-17T09:32:51.296020+00:00",
           "tests": {
             "giveback_0_30pp": {
               "triggered": false
@@ -731,11 +731,11 @@
               "triggered": false
             }
           },
-          "updated_at": "2026-10-16T05:03:01.167013+00:00"
+          "updated_at": "2026-10-17T09:32:51.296039+00:00"
         },
         "XRP": {
           "accounting_note": "Sampled hypothetical return only; no order is sent and fees/funding are not estimated here.",
-          "current_return_pct": -0.1529051987767584,
+          "current_return_pct": -0.22935779816513763,
           "entry_px": 1.308,
           "observation_only": true,
           "peak_return_pct": 0.2217125382262997,
@@ -752,7 +752,7 @@
               "triggered": false
             }
           },
-          "updated_at": "2026-10-17T09:02:46.398521+00:00"
+          "updated_at": "2026-10-17T09:32:51.298333+00:00"
         }
       },
       "realized_net_pnl": -0.305402,
@@ -810,7 +810,7 @@
       "funding": 0,
       "gross_closed_pnl": 0,
       "incomplete_accounting": [],
-      "last_protection_run": "2026-10-17T09:04:42.317226+00:00",
+      "last_protection_run": "2026-10-17T09:29:02.289506+00:00",
       "last_run": "2026-10-17T09:08:22.703076+00:00",
       "last_strategy_run": "2026-10-17T09:08:22.703076+00:00",
       "profit_giveback": 0,
@@ -833,7 +833,7 @@
     }
   },
   "date_utc": "2026-10-17",
-  "generated_at": "2026-10-17T09:08:25.652486+00:00",
+  "generated_at": "2026-10-17T09:33:05.024215+00:00",
   "report_errors": [],
   "reporting_only": true,
   "schema_version": 2,
@@ -2656,11 +2656,20 @@
           "SUI": {
             "asset": "SUI",
             "blocked_live_reason": "mid-cap allow_short=False",
-            "current_price": 1.0064,
+            "current_price": 1.0044,
             "entry_price": 1.0199,
             "entry_time": "2026-10-16T15:30:00",
             "ticker": "SUI20947-USD",
-            "unrealized_gross_return_pct": 1.3237
+            "unrealized_gross_return_pct": 1.5198
+          },
+          "XRP": {
+            "asset": "XRP",
+            "blocked_live_reason": "mid-cap allow_short=False",
+            "current_price": 1.3051,
+            "entry_price": 1.3051,
+            "entry_time": "2026-10-17T09:00:00",
+            "ticker": "XRP-USD",
+            "unrealized_gross_return_pct": 0.0
           }
         },
         "today": {
@@ -3965,6 +3974,6 @@
     "errors": [],
     "scope": "Shadow-only fresh short signals for SOL/AVAX/LINK/SUI/XRP/ONDO that live trading blocks because mid-cap allow_short=False.",
     "tracking_started_at": "2026-09-10T22:03:23.796957+00:00",
-    "updated_at": "2026-10-17T09:08:25.652486+00:00"
+    "updated_at": "2026-10-17T09:33:05.024215+00:00"
   }
 }
