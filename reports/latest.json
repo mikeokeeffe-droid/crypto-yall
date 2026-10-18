@@ -1,7 +1,7 @@
 {
   "bots": {
     "aggressive": {
-      "bot_state_drawdown_pct": 0.0,
+      "bot_state_drawdown_pct": 0.021999999999999797,
       "by_asset": {},
       "closed_trade_max_drawdown": 0.0,
       "closed_trades": [],
@@ -121,9 +121,9 @@
       "funding": 0,
       "gross_closed_pnl": 0,
       "incomplete_accounting": [],
-      "last_protection_run": "2026-10-18T00:13:24.443208+00:00",
-      "last_run": "2026-10-18T00:02:59.236462+00:00",
-      "last_strategy_run": "2026-10-18T00:02:59.236462+00:00",
+      "last_protection_run": "2026-10-18T00:28:41.681049+00:00",
+      "last_run": "2026-10-18T00:33:11.246861+00:00",
+      "last_strategy_run": "2026-10-18T00:33:11.246861+00:00",
       "leverage_results": {},
       "profit_giveback": 0,
       "profit_protection_exits": [],
@@ -193,12 +193,12 @@
         },
         "LINK": {
           "accounting_note": "Sampled hypothetical return only; no order is sent and fees/funding are not estimated here.",
-          "current_return_pct": 0.2602199278099555,
-          "entry_px": 11.913,
+          "current_return_pct": 0.15050167224080266,
+          "entry_px": 11.96,
           "observation_only": true,
-          "peak_return_pct": 0.2602199278099555,
+          "peak_return_pct": 0.15050167224080266,
           "side": "long",
-          "started_at": "2026-10-17T22:02:54.402046+00:00",
+          "started_at": "2026-10-18T00:33:00.244399+00:00",
           "tests": {
             "giveback_0_30pp": {
               "triggered": false
@@ -210,7 +210,7 @@
               "triggered": false
             }
           },
-          "updated_at": "2026-10-17T23:02:59.165319+00:00"
+          "updated_at": "2026-10-18T00:33:00.244417+00:00"
         },
         "ONDO": {
           "accounting_note": "Sampled hypothetical return only; no order is sent and fees/funding are not estimated here.",
@@ -352,7 +352,7 @@
       "funding": 0,
       "gross_closed_pnl": 0,
       "incomplete_accounting": [],
-      "last_protection_run": "2026-10-18T00:13:50.488452+00:00",
+      "last_protection_run": "2026-10-18T00:29:13.461642+00:00",
       "last_run": "2026-10-18T00:08:30.224116+00:00",
       "last_strategy_run": "2026-10-18T00:08:30.224116+00:00",
       "profit_giveback": 0,
@@ -375,7 +375,7 @@
     }
   },
   "date_utc": "2026-10-18",
-  "generated_at": "2026-10-18T00:16:49.252798+00:00",
+  "generated_at": "2026-10-18T00:33:13.674493+00:00",
   "report_errors": [],
   "reporting_only": true,
   "schema_version": 2,
@@ -2198,29 +2198,29 @@
           "SOL": {
             "asset": "SOL",
             "blocked_live_reason": "mid-cap allow_short=False",
-            "current_price": 103.41,
+            "current_price": 103.28,
             "entry_price": 104.79,
             "entry_time": "2026-10-17T09:30:00",
             "ticker": "SOL-USD",
-            "unrealized_gross_return_pct": 1.3169
+            "unrealized_gross_return_pct": 1.441
           },
           "SUI": {
             "asset": "SUI",
             "blocked_live_reason": "mid-cap allow_short=False",
-            "current_price": 0.97561,
+            "current_price": 0.97348,
             "entry_price": 1.0199,
             "entry_time": "2026-10-16T15:30:00",
             "ticker": "SUI20947-USD",
-            "unrealized_gross_return_pct": 4.3426
+            "unrealized_gross_return_pct": 4.5514
           },
           "XRP": {
             "asset": "XRP",
             "blocked_live_reason": "mid-cap allow_short=False",
-            "current_price": 1.2933,
+            "current_price": 1.2943,
             "entry_price": 1.3051,
             "entry_time": "2026-10-17T09:00:00",
             "ticker": "XRP-USD",
-            "unrealized_gross_return_pct": 0.9041
+            "unrealized_gross_return_pct": 0.8275
           }
         },
         "today": {
@@ -3540,6 +3540,6 @@
     "errors": [],
     "scope": "Shadow-only fresh short signals for SOL/AVAX/LINK/SUI/XRP/ONDO that live trading blocks because mid-cap allow_short=False.",
     "tracking_started_at": "2026-09-10T22:03:23.796957+00:00",
-    "updated_at": "2026-10-18T00:16:49.252798+00:00"
+    "updated_at": "2026-10-18T00:33:13.674493+00:00"
   }
 }
