@@ -762,9 +762,9 @@
       "funding": -0.004185,
       "gross_closed_pnl": -0.032643,
       "incomplete_accounting": [],
-      "last_protection_run": "2026-10-19T22:08:20.529824+00:00",
-      "last_run": "2026-10-19T22:03:01.705550+00:00",
-      "last_strategy_run": "2026-10-19T22:03:01.705550+00:00",
+      "last_protection_run": "2026-10-19T22:28:45.300430+00:00",
+      "last_run": "2026-10-19T22:33:12.750061+00:00",
+      "last_strategy_run": "2026-10-19T22:33:12.750061+00:00",
       "leverage_results": {
         "3x": {
           "average_loss": -0.11812,
@@ -1550,7 +1550,7 @@
       "funding": -0.006636,
       "gross_closed_pnl": -0.517068,
       "incomplete_accounting": [],
-      "last_protection_run": "2026-10-19T22:05:02.383218+00:00",
+      "last_protection_run": "2026-10-19T22:29:18.156547+00:00",
       "last_run": "2026-10-19T22:08:35.557242+00:00",
       "last_strategy_run": "2026-10-19T22:08:35.557242+00:00",
       "profit_giveback": 0.58857,
@@ -1630,7 +1630,7 @@
     }
   },
   "date_utc": "2026-10-19",
-  "generated_at": "2026-10-19T22:08:39.432341+00:00",
+  "generated_at": "2026-10-19T22:33:16.292300+00:00",
   "report_errors": [],
   "reporting_only": true,
   "schema_version": 2,
@@ -3573,11 +3573,11 @@
           "SOL": {
             "asset": "SOL",
             "blocked_live_reason": "mid-cap allow_short=False",
-            "current_price": 104.68,
+            "current_price": 105.2,
             "entry_price": 104.68,
             "entry_time": "2026-10-19T11:30:00",
             "ticker": "SOL-USD",
-            "unrealized_gross_return_pct": 0.0
+            "unrealized_gross_return_pct": -0.4968
           }
         },
         "today": {
@@ -4959,6 +4959,6 @@
     "errors": [],
     "scope": "Shadow-only fresh short signals for SOL/AVAX/LINK/SUI/XRP/ONDO that live trading blocks because mid-cap allow_short=False.",
     "tracking_started_at": "2026-09-10T22:03:23.796957+00:00",
-    "updated_at": "2026-10-19T22:08:39.432341+00:00"
+    "updated_at": "2026-10-19T22:33:16.292300+00:00"
   }
 }
