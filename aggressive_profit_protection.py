@@ -15,6 +15,7 @@ resets or flips, or after a 15-minute cooldown.
 import os
 
 import aggressive_executor as aggressive
+from usd_loss_cap import loss_cap_breached
 from intraday_data_loader import HL_SYMBOL_MAP
 from reentry_lock import block_locked_entries, mark_pending_lock, refresh_locks
 
@@ -32,6 +33,7 @@ HIGH_LEV_GIVEBACK_PCT = _env_float("AGGRESSIVE_HIGH_LEV_GIVEBACK", 1.0)
 HIGH_LEV_THRESHOLD = _env_float("AGGRESSIVE_HIGH_LEV_THRESHOLD", 3.0)
 SMALL_PROFIT_PEAK_PCT = float(os.environ.get("AGGRESSIVE_SMALL_PROFIT_PEAK_PCT", "1.0"))
 SMALL_PROFIT_FLOOR_PCT = float(os.environ.get("AGGRESSIVE_SMALL_PROFIT_FLOOR_PCT", "0.25"))
+LOSS_CAP_USD = _env_float("AGGRESSIVE_LIVE_LOSS_CAP_USD", 0.0)  # opt-in, disabled by default
 ENABLED = os.environ.get("AGGRESSIVE_PROFIT_PROTECTION", "ON").upper() == "ON"
 PROTECTION_ONLY = os.environ.get("AGGRESSIVE_PROTECTION_ONLY", "OFF").upper() == "ON"
 REENTRY_COOLDOWN_MINUTES = 15
@@ -101,6 +103,8 @@ def decide_trades(signals, open_positions, max_positions, pyramid_state):
         protection_band = "HIGH LEVERAGE" if is_high_leverage else "LOW LEVERAGE"
 
         giveback = peak_pct - current_pct
+        current_pnl = float(position.get("unrealized_pnl", 0.0) or 0.0)
+        loss_cap_trigger = loss_cap_breached(current_pnl, LOSS_CAP_USD)
         small_profit_trigger = (
             peak_pct >= SMALL_PROFIT_PEAK_PCT
             and current_pct <= SMALL_PROFIT_FLOOR_PCT
@@ -110,7 +114,7 @@ def decide_trades(signals, open_positions, max_positions, pyramid_state):
             and giveback >= active_giveback_pct
         )
 
-        if not small_profit_trigger and not trailing_trigger:
+        if not loss_cap_trigger and not small_profit_trigger and not trailing_trigger:
             continue
 
         ticker = ticker_by_coin.get(coin)
@@ -118,7 +122,12 @@ def decide_trades(signals, open_positions, max_positions, pyramid_state):
             continue
         side = "long" if float(position.get("size", 0.0)) > 0 else "short"
 
-        if small_profit_trigger:
+        if loss_cap_trigger:
+            protection_mode = "USD LOSS CAP"
+            reason = (f"loss cap: sampled unrealized P&L ${current_pnl:+.4f} "
+                      f"reached -${LOSS_CAP_USD:.2f}; "
+                      "actual realized loss may be larger after fees/slippage")
+        elif small_profit_trigger:
             protection_mode = "SMALL PROFIT FLOOR"
             reason = (
                 f"small-profit protection: peak {peak_pct:.2f}% -> current {current_pct:.2f}% "
@@ -137,7 +146,7 @@ def decide_trades(signals, open_positions, max_positions, pyramid_state):
         trades.append({
             "ticker": ticker, "hl_coin": coin, "action": "close", "side": side,
             "close_size": abs(float(position.get("size", 0.0) or 0.0)),
-            "exit_type": "PROFIT PROTECTION",
+            "exit_type": "LOSS PROTECTION" if loss_cap_trigger else "PROFIT PROTECTION",
             "protection_mode": protection_mode,
             "protection_arm_pct": active_arm_pct,
             "protection_max_giveback_pct": active_giveback_pct,
@@ -161,7 +170,8 @@ def send_telegram(results, status_summary):
         item = dict(result)
         if item.get("action") == "close":
             reason = str(item.get("reason", ""))
-            is_protection = reason.startswith("profit protection:") or reason.startswith("small-profit protection:")
+            is_loss_cap = reason.startswith("loss cap:")
+            is_protection = is_loss_cap or reason.startswith("profit protection:") or reason.startswith("small-profit protection:")
             item.setdefault("exit_type", "PROFIT PROTECTION" if is_protection else "SIGNAL EXIT")
             diagnostics = [f"Exit type: {item['exit_type']}"]
             if "peak_return_pct" in item:
@@ -171,6 +181,8 @@ def send_telegram(results, status_summary):
             if is_protection:
                 if item.get("protection_mode"):
                     diagnostics.append(f"Protection mode: {item['protection_mode']}")
+                if is_loss_cap:
+                    diagnostics.append(f"Loss threshold: -${LOSS_CAP_USD:.2f} sampled unrealized P&L")
                 diagnostics.append(
                     f"Small-profit floor: peak +{SMALL_PROFIT_PEAK_PCT:.2f}% / floor +{SMALL_PROFIT_FLOOR_PCT:.2f}%"
                 )
@@ -197,6 +209,7 @@ if __name__ == "__main__":
     print(
         f"Aggressive live profit protection: {'ON' if ENABLED else 'OFF'} | "
         f"mode {'PROTECTION-ONLY' if PROTECTION_ONLY else 'FULL EXECUTOR'} | "
+        f"USD loss cap ${LOSS_CAP_USD:.2f} (0=OFF; sampled) | "
         f"small-profit peak +{SMALL_PROFIT_PEAK_PCT:.2f}% -> floor +{SMALL_PROFIT_FLOOR_PCT:.2f}% | "
         f"low-lev arm +{LOW_LEV_ARM_PCT:.2f}% / {LOW_LEV_GIVEBACK_PCT:.2f}pp | "
         f"high-lev ({HIGH_LEV_THRESHOLD:.0f}x+) arm +{HIGH_LEV_ARM_PCT:.2f}% / "
