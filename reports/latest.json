@@ -1,7 +1,7 @@
 {
   "bots": {
     "aggressive": {
-      "bot_state_drawdown_pct": 0.05868583333333325,
+      "bot_state_drawdown_pct": 0.11683749999999993,
       "by_asset": {
         "LINK": {
           "average_loss": -0.010613,
@@ -411,9 +411,9 @@
       "funding": -0.001504,
       "gross_closed_pnl": 0.298288,
       "incomplete_accounting": [],
-      "last_protection_run": "2026-10-19T06:28:37.649257+00:00",
-      "last_run": "2026-10-19T06:33:09.442464+00:00",
-      "last_strategy_run": "2026-10-19T06:33:09.442464+00:00",
+      "last_protection_run": "2026-10-19T06:58:54.221486+00:00",
+      "last_run": "2026-10-19T07:03:13.363022+00:00",
+      "last_strategy_run": "2026-10-19T07:03:13.363022+00:00",
       "leverage_results": {
         "3x": {
           "average_loss": -0.018234,
@@ -692,7 +692,7 @@
         },
         "LINK": {
           "accounting_note": "Sampled hypothetical return only; no order is sent and fees/funding are not estimated here.",
-          "current_return_pct": -0.24596212183323768,
+          "current_return_pct": 0.09838484873329507,
           "entry_px": 12.197,
           "observation_only": true,
           "peak_return_pct": 0.1147823235221776,
@@ -709,7 +709,7 @@
               "triggered": false
             }
           },
-          "updated_at": "2026-10-19T06:32:57.936443+00:00"
+          "updated_at": "2026-10-19T07:03:02.617068+00:00"
         },
         "ONDO": {
           "accounting_note": "Sampled hypothetical return only; no order is sent and fees/funding are not estimated here.",
@@ -776,10 +776,10 @@
         },
         "XRP": {
           "accounting_note": "Sampled hypothetical return only; no order is sent and fees/funding are not estimated here.",
-          "current_return_pct": 0.09150526155253927,
+          "current_return_pct": 0.22563672411163643,
           "entry_px": 1.3114,
           "observation_only": true,
-          "peak_return_pct": 0.1661583041024859,
+          "peak_return_pct": 0.22563672411163643,
           "side": "long",
           "started_at": "2026-10-19T03:33:03.349932+00:00",
           "tests": {
@@ -793,7 +793,7 @@
               "triggered": false
             }
           },
-          "updated_at": "2026-10-19T06:32:57.939728+00:00"
+          "updated_at": "2026-10-19T07:03:02.621682+00:00"
         }
       },
       "realized_net_pnl": 0.203841,
@@ -851,7 +851,7 @@
       "funding": 0,
       "gross_closed_pnl": 0,
       "incomplete_accounting": [],
-      "last_protection_run": "2026-10-19T06:29:07.464895+00:00",
+      "last_protection_run": "2026-10-19T06:59:53.006870+00:00",
       "last_run": "2026-10-19T06:08:28.638906+00:00",
       "last_strategy_run": "2026-10-19T06:08:28.638906+00:00",
       "profit_giveback": 0,
@@ -874,7 +874,7 @@
     }
   },
   "date_utc": "2026-10-19",
-  "generated_at": "2026-10-19T06:33:11.899396+00:00",
+  "generated_at": "2026-10-19T07:03:15.761476+00:00",
   "report_errors": [],
   "reporting_only": true,
   "schema_version": 2,
@@ -4181,6 +4181,6 @@
     "errors": [],
     "scope": "Shadow-only fresh short signals for SOL/AVAX/LINK/SUI/XRP/ONDO that live trading blocks because mid-cap allow_short=False.",
     "tracking_started_at": "2026-09-10T22:03:23.796957+00:00",
-    "updated_at": "2026-10-19T06:33:11.899396+00:00"
+    "updated_at": "2026-10-19T07:03:15.761476+00:00"
   }
 }
