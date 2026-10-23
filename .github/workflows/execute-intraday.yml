@@ -162,7 +162,7 @@ jobs:
         shell: bash
         run: |
           had_failure=0
-              for cycle in {1..55}; do
+          for cycle in {1..55}; do
             echo "Waiting 1 minute before Intraday protection check ${cycle}/55"
             sleep 60
             ok=0
