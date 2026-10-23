@@ -131,8 +131,8 @@ jobs:
         if: always()
         shell: bash
         run: |
-            had_failure=0
-            for cycle in {1..25}; do
+          had_failure=0
+          for cycle in {1..25}; do
             echo "Waiting 1 minute before Aggressive protection check ${cycle}/25"
             sleep 60
             ok=0
