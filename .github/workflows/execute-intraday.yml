@@ -162,12 +162,12 @@ jobs:
         shell: bash
         run: |
           had_failure=0
-          for cycle in 1 2 3 4 5 6 7 8 9 10 11; do
-            echo "Waiting 5 minutes before Intraday protection check ${cycle}/11"
-            sleep 300
+              for cycle in {1..55}; do
+            echo "Waiting 1 minute before Intraday protection check ${cycle}/55"
+            sleep 60
             ok=0
             for attempt in 1 2; do
-              echo "Intraday protection check ${cycle}/11, attempt ${attempt}/2"
+              echo "Intraday protection check ${cycle}/55, attempt ${attempt}/2"
               if python intraday_profit_protection.py; then
                 ok=1
                 break
