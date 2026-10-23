@@ -22,6 +22,7 @@ import json
 import os
 import sys
 import datetime as dt
+import time
 
 import requests
 
@@ -140,18 +141,45 @@ def save_state(state: dict):
             "Cannot save aggressive state: GIST_TOKEN or AGGRESSIVE_GIST_ID is missing"
         )
 
-    resp = requests.patch(
-        f"https://api.github.com/gists/{gist_id}",
-        headers={"Authorization": f"token {gist_token}"},
-        json={"files": {STATE_FILENAME: {"content": json.dumps(state, indent=2)}}},
-        timeout=15,
-    )
+    url = f"https://api.github.com/gists/{gist_id}"
+    payload = {"files": {STATE_FILENAME: {"content": json.dumps(state, indent=2)}}}
+    headers = {"Authorization": f"token {gist_token}"}
 
-    if not resp.ok:
-        raise RuntimeError(
-            f"Failed to save aggressive state to Gist: "
-            f"HTTP {resp.status_code} {resp.text}"
+    # A rate-limited write must never be treated as a successful state save.
+    # Retry only explicit rate-limit responses, with bounded waiting; other
+    # failures retain the original fail-closed behaviour.
+    for attempt in range(3):
+        try:
+            resp = requests.patch(url, headers=headers, json=payload, timeout=15)
+        except requests.RequestException as exc:
+            raise RuntimeError("Failed to save aggressive state to Gist: " + str(exc)) from exc
+
+        if resp.ok:
+            break
+
+        remaining = resp.headers.get("X-RateLimit-Remaining")
+        is_rate_limit = resp.status_code in (403, 429) and (
+            remaining == "0"
+            or "rate limit" in resp.text.lower()
+            or resp.status_code == 429
         )
+        if not is_rate_limit or attempt == 2:
+            raise RuntimeError(
+                f"Failed to save aggressive state to Gist: "
+                f"HTTP {resp.status_code} {resp.text}"
+            )
+
+        retry_after = resp.headers.get("Retry-After")
+        try:
+            wait_seconds = max(1, min(60, int(retry_after))) if retry_after else 15 * (attempt + 1)
+        except (ValueError, TypeError):
+            wait_seconds = 15 * (attempt + 1)
+        print(
+            f"GitHub Gist rate limited aggressive state save "
+            f"(HTTP {resp.status_code}); retry {attempt + 2}/3 "
+            f"in {wait_seconds}s"
+        )
+        time.sleep(wait_seconds)
 
     print("Aggressive state saved successfully")
 
