@@ -864,7 +864,7 @@
           "pnl_source": "price_fallback+userFunding"
         }
       ],
-      "last_protection_run": "2026-10-23T21:40:13.453474+00:00",
+      "last_protection_run": "2026-10-23T21:58:07.378753+00:00",
       "last_run": "2026-10-23T21:33:15.015858+00:00",
       "last_strategy_run": "2026-10-23T21:33:15.015858+00:00",
       "leverage_results": {
@@ -1511,7 +1511,7 @@
       "funding": 0,
       "gross_closed_pnl": 0,
       "incomplete_accounting": [],
-      "last_protection_run": "2026-10-23T21:39:02.128668+00:00",
+      "last_protection_run": "2026-10-23T21:59:02.764304+00:00",
       "last_run": "2026-10-23T21:40:32.720802+00:00",
       "last_strategy_run": "2026-10-23T21:40:32.720802+00:00",
       "profit_giveback": 0,
@@ -1534,7 +1534,7 @@
     }
   },
   "date_utc": "2026-10-23",
-  "generated_at": "2026-10-23T21:40:37.439791+00:00",
+  "generated_at": "2026-10-23T22:03:21.118616+00:00",
   "report_errors": [],
   "reporting_only": true,
   "schema_version": 2,
@@ -4448,20 +4448,20 @@
           "ONDO": {
             "asset": "ONDO",
             "blocked_live_reason": "mid-cap allow_short=False",
-            "current_price": 0.42677,
+            "current_price": 0.42576,
             "entry_price": 0.43283,
             "entry_time": "2026-10-23T12:00:00",
             "ticker": "ONDO-USD",
-            "unrealized_gross_return_pct": 1.4001
+            "unrealized_gross_return_pct": 1.6334
           },
           "SOL": {
             "asset": "SOL",
             "blocked_live_reason": "mid-cap allow_short=False",
-            "current_price": 103.88,
+            "current_price": 103.61,
             "entry_price": 103.51,
             "entry_time": "2026-10-23T19:00:00",
             "ticker": "SOL-USD",
-            "unrealized_gross_return_pct": -0.3575
+            "unrealized_gross_return_pct": -0.0966
           }
         },
         "today": {
@@ -5124,6 +5124,6 @@
     "errors": [],
     "scope": "Shadow-only fresh short signals for SOL/AVAX/LINK/SUI/XRP/ONDO that live trading blocks because mid-cap allow_short=False.",
     "tracking_started_at": "2026-09-10T22:03:23.796957+00:00",
-    "updated_at": "2026-10-23T21:40:37.439791+00:00"
+    "updated_at": "2026-10-23T22:03:21.118616+00:00"
   }
 }
