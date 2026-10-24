@@ -31,3 +31,27 @@ BEGIN
   RAISE EXCEPTION 'invalid state modified revision';
  END IF;
 END $$;
+
+-- Rehearse recovery from a backup in disposable PostgreSQL, never production.
+DO $$
+DECLARE original jsonb; recovered_revision bigint;
+BEGIN
+ SELECT state INTO STRICT original FROM public.bot_state_backups
+ WHERE bot='aggressive' AND revision=1;
+ IF original <> '{"x":1}'::jsonb THEN
+  RAISE EXCEPTION 'recovery source mismatch';
+ END IF;
+ recovered_revision := public.cas_bot_state('aggressive',2,original);
+ IF recovered_revision <> 3 OR
+    (SELECT state FROM public.bot_state WHERE bot='aggressive') <> original THEN
+  RAISE EXCEPTION 'recovery mismatch';
+ END IF;
+ IF (SELECT count(*) FROM public.bot_state_backups
+     WHERE bot='aggressive' AND revision=2 AND state='{"x":10}'::jsonb) <> 1 THEN
+  RAISE EXCEPTION 'pre-recovery backup missing';
+ END IF;
+ IF (SELECT revision FROM public.bot_state WHERE bot='intraday') <> 1 OR
+    (SELECT revision FROM public.bot_state WHERE bot='daily') <> 1 THEN
+  RAISE EXCEPTION 'recovery affected another bot';
+ END IF;
+END $$;
