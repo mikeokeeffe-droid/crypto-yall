@@ -92,6 +92,10 @@ begin
   if v_count<>1 then
     raise exception 'intent release conflict; transaction rolled back';
   end if;
+  -- Remove the same owner's short-lived reservation as part of the
+  -- verified release transaction, otherwise a new bot stays blocked.
+  delete from public.bot_entry_reservations
+   where coin=p_coin and bot=p_bot and token=p_token;
   return true;
 end;
 $$;
