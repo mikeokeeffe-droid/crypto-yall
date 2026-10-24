@@ -1,0 +1,46 @@
+name: Test Snapshot Initializer PostgreSQL Rollback
+
+on:
+  pull_request:
+    paths:
+      - 'db/initialize_bot_states_from_snapshots.sql'
+      - 'db/schema.sql'
+      - 'tests/ci_snapshot_initializer_rollback.sql'
+      - '.github/workflows/test-snapshot-initializer-postgres.yml'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  isolated-postgres:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: test-only-password
+          POSTGRES_DB: isolated_snapshot_tests
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      PGHOST: localhost
+      PGPORT: '5432'
+      PGUSER: postgres
+      PGPASSWORD: test-only-password
+      PGDATABASE: isolated_snapshot_tests
+    steps:
+      - uses: actions/checkout@v4
+      - name: Create local-only service role
+        run: psql -v ON_ERROR_STOP=1 -c "CREATE ROLE service_role NOLOGIN;"
+      - name: Create empty schema
+        run: psql -v ON_ERROR_STOP=1 -f db/schema.sql
+      - name: Install staged initializer in disposable database
+        run: psql -v ON_ERROR_STOP=1 -f db/initialize_bot_states_from_snapshots.sql
+      - name: Test rollback, unverified rejection, success and overwrite protection
+        run: psql -v ON_ERROR_STOP=1 -f tests/ci_snapshot_initializer_rollback.sql
