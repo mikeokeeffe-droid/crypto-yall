@@ -66,7 +66,7 @@ class EntryReservationPostgresTests(unittest.TestCase):
                     ("ETH", "aggressive", token, 120),
                 ).fetchone()[0]
                 self.assertTrue(ok)
-                transaction.force_rollback()
+                transaction.force_rollback = True
         self.assertTrue(reserve("ETH", "intraday", uuid.uuid4()))
 
     def test_unresolved_order_survives_reservation_expiry(self):
