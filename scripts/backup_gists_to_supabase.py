@@ -4,6 +4,7 @@ Never changes Gists, live bot_state, orders or strategy. Requires coordinated
 snapshot window with bot writers paused and exchange-side protection verified.
 """
 import hashlib
+import datetime as dt
 import json
 import os
 import sys
@@ -100,10 +101,9 @@ def main():
             base + "/rest/v1/bot_state_snapshots",
             headers={**headers, "Prefer": "return=representation"},
             params={"snapshot_id": "eq." + snapshot_id, "verified": "eq.false"},
-            json={"verified": True, "verified_at": "now()"},
+            json={"verified": True, "verified_at": dt.datetime.now(dt.timezone.utc).isoformat()},
             timeout=30,
         )
-        # PostgREST JSON timestamps do not evaluate SQL expressions: use UTC ISO.
         update.raise_for_status()
         result = update.json()
         if not isinstance(result, list) or len(result) != 1:
