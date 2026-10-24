@@ -19,7 +19,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Install requests
-        run: python -m pip install requests
+      - name: Install dependencies
+        run: python -m pip install -r requirements.txt
       - name: Run offline tests
-        run: python -m unittest discover -s tests -p test_supabase_state_store.py -v
+        run: |
+          python -m unittest discover -s tests -p test_supabase_state_store.py -v
+          python -m unittest test_intraday_protection_only_offline -v
