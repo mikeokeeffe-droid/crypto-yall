@@ -15,6 +15,7 @@ on:
       - 'ownership_handoff_staging.py'
       - 'executor_integration_contract_staging.py'
       - 'hyperliquid_reconciliation_staging.py'
+      - 'hyperliquid_fill_verification_staging.py'
       - '.github/workflows/test-atomic-entry-reservations.yml'
   workflow_dispatch:
 permissions:
@@ -85,5 +86,7 @@ jobs:
         run: python -m unittest discover -s tests -p 'test_executor_integration_contract_staging.py' -v
       - name: Test mocked Hyperliquid reconciliation evidence
         run: python -m unittest discover -s tests -p 'test_hyperliquid_reconciliation_staging.py' -v
+      - name: Test mocked Hyperliquid user fill records
+        run: python -m unittest discover -s tests -p 'test_hyperliquid_fill_verification_staging.py' -v
       - name: Test competing transactions and failure cases
         run: python -m unittest discover -s tests -p 'test_entry_reservation_postgres.py' -v
