@@ -10,6 +10,7 @@ on:
       - 'supabase_entry_store_staging.py'
       - 'entry_lifecycle_staging.py'
       - 'executor_entry_dry_run_staging.py'
+      - 'shared_entry_gate_staging.py'
       - '.github/workflows/test-atomic-entry-reservations.yml'
   workflow_dispatch:
 permissions:
@@ -67,5 +68,7 @@ jobs:
         run: python -m unittest discover -s tests -p 'test_executor_entry_dry_run_staging.py' -v
       - name: Verify three real executor order paths (static)
         run: python -m unittest discover -s tests -p 'test_executor_paths_staging.py' -v
+      - name: Test shared three-bot entry inspection wrapper
+        run: python -m unittest discover -s tests -p 'test_shared_entry_gate_staging.py' -v
       - name: Test competing transactions and failure cases
         run: python -m unittest discover -s tests -p 'test_entry_reservation_postgres.py' -v
