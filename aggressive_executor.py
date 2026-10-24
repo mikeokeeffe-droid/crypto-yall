@@ -23,6 +23,7 @@ import os
 import sys
 import datetime as dt
 import time
+import copy
 
 import requests
 
@@ -637,6 +638,7 @@ def main():
         sys.exit(1)
 
     state = load_state()
+    original_state = copy.deepcopy(state)
     equity = get_account_equity(info, address)
     capital = float(os.environ.get("AGGRESSIVE_CAPITAL", "3000"))
     threshold = float(os.environ.get("AGGRESSIVE_DD_PCT", "3"))
@@ -1125,7 +1127,25 @@ def main():
             }
             for ticker, signal_info in signals.items()
         }
-    save_state(state)
+    # Skip only a redundant idle protection heartbeat. Compare the complete
+    # state (excluding heartbeat-only telemetry) so ownership, pending claims,
+    # peaks, exits, and all other safety-relevant changes still persist.
+    idle_protection = (
+        protection_only
+        and not owned_coins
+        and not state.get("pending_entry_claims")
+        and not original_state.get("pending_entry_claims")
+    )
+    before = copy.deepcopy(original_state)
+    after = copy.deepcopy(state)
+    if idle_protection:
+        for snapshot in (before, after):
+            snapshot.pop("last_protection_run", None)
+            snapshot.pop("last_equity", None)
+    if idle_protection and before == after:
+        print("Idle protection heartbeat: unchanged state; skipping redundant Gist write")
+    else:
+        save_state(state)
 
     filled_count = sum(1 for r in results if r.get("status") == "filled")
     error_count = sum(1 for r in results if r.get("status") == "error")
