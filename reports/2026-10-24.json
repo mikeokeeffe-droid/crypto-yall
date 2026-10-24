@@ -282,7 +282,7 @@
       "funding": -0.000521,
       "gross_closed_pnl": -0.12171,
       "incomplete_accounting": [],
-      "last_protection_run": "2026-10-24T08:00:29.486293+00:00",
+      "last_protection_run": "2026-10-24T08:31:04.241196+00:00",
       "last_run": "2026-10-24T07:33:27.785296+00:00",
       "last_strategy_run": "2026-10-24T07:33:27.785296+00:00",
       "leverage_results": {
@@ -528,7 +528,7 @@
       "trading_fees": 0
     },
     "intraday": {
-      "bot_state_drawdown_pct": -0.0864875000000002,
+      "bot_state_drawdown_pct": 0.0,
       "by_asset": {},
       "closed_trade_max_drawdown": 0.0,
       "closed_trades": [],
@@ -536,9 +536,9 @@
       "funding": 0,
       "gross_closed_pnl": 0,
       "incomplete_accounting": [],
-      "last_protection_run": "2026-10-24T08:00:10.808526+00:00",
-      "last_run": "2026-10-24T07:26:16.310787+00:00",
-      "last_strategy_run": "2026-10-24T07:26:16.310787+00:00",
+      "last_protection_run": "2026-10-24T08:30:15.602697+00:00",
+      "last_run": "2026-10-24T08:31:48.260752+00:00",
+      "last_strategy_run": "2026-10-24T08:31:48.260752+00:00",
       "profit_giveback": 0,
       "profit_protection_exits": [],
       "realized_net_pnl": 0,
@@ -559,7 +559,7 @@
     }
   },
   "date_utc": "2026-10-24",
-  "generated_at": "2026-10-24T08:03:00.624435+00:00",
+  "generated_at": "2026-10-24T08:31:53.356304+00:00",
   "report_errors": [],
   "reporting_only": true,
   "schema_version": 2,
@@ -2658,11 +2658,11 @@
           "AVAX": {
             "asset": "AVAX",
             "blocked_live_reason": "mid-cap allow_short=False",
-            "current_price": 8.9453,
+            "current_price": 8.9286,
             "entry_price": 9.0535,
             "entry_time": "2026-10-23T23:30:00",
             "ticker": "AVAX-USD",
-            "unrealized_gross_return_pct": 1.1951
+            "unrealized_gross_return_pct": 1.3796
           }
         },
         "today": {
@@ -4159,6 +4159,6 @@
     "errors": [],
     "scope": "Shadow-only fresh short signals for SOL/AVAX/LINK/SUI/XRP/ONDO that live trading blocks because mid-cap allow_short=False.",
     "tracking_started_at": "2026-09-10T22:03:23.796957+00:00",
-    "updated_at": "2026-10-24T08:03:00.624435+00:00"
+    "updated_at": "2026-10-24T08:31:53.356304+00:00"
   }
 }
