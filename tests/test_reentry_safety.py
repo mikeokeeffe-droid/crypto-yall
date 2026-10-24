@@ -20,7 +20,7 @@ class ReentrySafetyTests(unittest.TestCase):
             state, {"BTC": {"action": "hold_long"}}, SYMBOLS, {}
         )
         self.assertFalse(locks["BTC"]["pending"])
-        self.assertIn("confirmed_at", locks)
+        self.assertIn("confirmed_at", locks["BTC"])
         self.assertEqual(
             block_locked_entries(
                 [{"action": "open_long", "hl_coin": "BTC"}], locks
