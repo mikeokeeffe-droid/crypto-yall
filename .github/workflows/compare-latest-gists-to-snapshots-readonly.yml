@@ -16,9 +16,9 @@ jobs:
       - name: Compare latest Gist versions and hashes with verified snapshots
         env:
           GIST_TOKEN: ${{ secrets.GIST_TOKEN }}
-          AGGRESSIVE_GIST_ID: ${{ vars.AGGRESSIVE_GIST_ID }}
-          INTRADAY_GIST_ID: ${{ vars.INTRADAY_GIST_ID }}
-          GIST_ID: ${{ vars.GIST_ID }}
+          AGGRESSIVE_GIST_ID: ${{ secrets.AGGRESSIVE_GIST_ID }}
+          INTRADAY_GIST_ID: ${{ secrets.INTRADAY_GIST_ID }}
+          GIST_ID: ${{ secrets.GIST_ID }}
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: python scripts/compare_latest_gists_to_snapshots_readonly.py
