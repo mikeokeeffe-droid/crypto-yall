@@ -69,6 +69,31 @@ class EntryReservationPostgresTests(unittest.TestCase):
                 transaction.force_rollback()
         self.assertTrue(reserve("ETH", "intraday", uuid.uuid4()))
 
+    def test_unresolved_order_survives_reservation_expiry(self):
+        first, second = uuid.uuid4(), uuid.uuid4()
+        self.assertTrue(reserve("AVAX", "aggressive", first))
+        with connect() as conn:
+            self.assertTrue(conn.execute(
+                "select public.claim_bot_entry_intent(%s,%s,%s)",
+                ("AVAX", "aggressive", first),
+            ).fetchone()[0])
+            conn.execute(
+                "update public.bot_entry_reservations "
+                "set expires_at=now()-interval '1 second' where coin='AVAX'"
+            )
+        self.assertFalse(reserve("AVAX", "intraday", second))
+        self.assertFalse(reserve("AVAX", "daily", uuid.uuid4()))
+        with connect() as conn:
+            self.assertFalse(conn.execute(
+                "select public.resolve_bot_entry_intent(%s,%s,%s)",
+                ("AVAX", "intraday", second),
+            ).fetchone()[0])
+            self.assertTrue(conn.execute(
+                "select public.resolve_bot_entry_intent(%s,%s,%s)",
+                ("AVAX", "aggressive", first),
+            ).fetchone()[0])
+        self.assertTrue(reserve("AVAX", "intraday", second))
+
     def test_invalid_arguments_fail_closed(self):
         for coin, bot, ttl in [
             ("BTC", "unknown", 120),
