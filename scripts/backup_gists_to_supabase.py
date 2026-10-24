@@ -97,17 +97,27 @@ def main():
         if latest_version != version or digest(latest) != expected_digest:
             raise RuntimeError(bot + ": source changed; snapshot remains unverified")
         # Only verified after independent readback AND source version comparison.
-        update = session.patch(
-            base + "/rest/v1/bot_state_snapshots",
-            headers={**headers, "Prefer": "return=representation"},
-            params={"snapshot_id": "eq." + snapshot_id, "verified": "eq.false"},
-            json={"verified": True, "verified_at": dt.datetime.now(dt.timezone.utc).isoformat()},
-            timeout=30,
-        )
-        update.raise_for_status()
-        result = update.json()
-        if not isinstance(result, list) or len(result) != 1:
-            raise RuntimeError(bot + ": verification status not confirmed")
+        try:
+            update = session.patch(
+                base + "/rest/v1/bot_state_snapshots",
+                headers={**headers, "Prefer": "return=representation"},
+                params={"snapshot_id": "eq." + snapshot_id, "verified": "eq.false"},
+                json={"verified": True, "verified_at": dt.datetime.now(dt.timezone.utc).isoformat()},
+                timeout=30,
+            )
+            update.raise_for_status()
+            result = update.json()
+            if not isinstance(result, list) or len(result) != 1:
+                raise RuntimeError(bot + ": verification status not confirmed")
+        except (requests.RequestException, ValueError):
+            # Ambiguous PATCH outcome: read back, never repeat the mutation.
+            confirmed = read_snapshot(session, base, headers, snapshot_id)
+            if confirmed.get("verified") is not True or digest(confirmed["state"]) != expected_digest:
+                raise RuntimeError(bot + ": verification could not be confirmed")
+        # Independently verify final persisted state, even after a 2xx response.
+        confirmed = read_snapshot(session, base, headers, snapshot_id)
+        if confirmed.get("verified") is not True or digest(confirmed["state"]) != expected_digest:
+            raise RuntimeError(bot + ": final snapshot verification failed")
         print(bot + ": snapshot readback and source version verified")
     print("Three snapshots verified. Live bot state untouched.")
 
