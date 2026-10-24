@@ -495,7 +495,7 @@ def execute_trade(
         from intraday_entry_observer_staging import observe_intraday_entry
         observation = observe_intraday_entry(
             trade=trade,
-            position_snapshot=get_open_positions(info, os.environ.get("HL_ACCOUNT_ADDRESS", "")),
+            position_snapshot=None,  # No independent exchange snapshot yet; deny.
         )
         print(f"Intraday safety trial: {observation}")
         return {
