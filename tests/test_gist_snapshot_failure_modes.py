@@ -57,9 +57,8 @@ class FailureModeTests(unittest.TestCase):
                 backup.main()
         session.patch.assert_not_called()
 
-    @unittest.expectedFailure
     def test_patch_timeout_reconciles_verified_row(self):
-        """Known blocker: PATCH timeout currently raises without readback."""
+        """Timeout must reconcile by readback without retrying PATCH."""
         session = Mock()
         session.patch.side_effect = requests.Timeout()
         with patch.object(backup.requests, "Session", return_value=session), \
