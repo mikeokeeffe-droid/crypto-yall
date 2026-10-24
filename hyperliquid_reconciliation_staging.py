@@ -56,3 +56,21 @@ def classify_order_evidence(*, order_response: dict | None,
         if position_size == 0:
             return ReconcileEvidence(ReconcileState.REJECTED_FINAL_FLAT, "final rejection and flat position")
     return ReconcileEvidence(ReconcileState.UNKNOWN, "ambiguous exchange outcome")
+
+
+def normalize_executor_order_response(raw_response: dict | None) -> dict:
+    """Normalize the actual shared _parse_response output used by all bots.
+
+    The executor's 'error' status does NOT prove a final rejection, so it
+    stays unknown. A 'filled' status is only provisional until a fresh,
+    matching fill and position snapshot is independently checked.
+    """
+    if not isinstance(raw_response, dict):
+        return {"status": "unknown"}
+    if raw_response.get("status") == "filled":
+        return {
+            "status": "filled",
+            "oid": raw_response.get("oid"),
+            "filled_size": raw_response.get("fill_size"),
+        }
+    return {"status": "unknown"}
