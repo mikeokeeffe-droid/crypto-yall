@@ -6,6 +6,7 @@ on:
       - 'tests/**'
       - 'entry_gate_staging.py'
       - 'order_reconciliation_staging.py'
+      - 'supabase_entry_store_staging.py'
       - '.github/workflows/test-atomic-entry-reservations.yml'
   workflow_dispatch:
 permissions:
@@ -52,5 +53,7 @@ jobs:
         run: python -m unittest discover -s tests -p 'test_entry_gate_staging.py' -v
       - name: Test simulated order outcome reconciliation
         run: python -m unittest discover -s tests -p 'test_order_reconciliation_staging.py' -v
+      - name: Test staging Supabase RPC adapter (mock only)
+        run: python -m unittest discover -s tests -p 'test_supabase_entry_store_staging.py' -v
       - name: Test competing transactions and failure cases
         run: python -m unittest discover -s tests -p 'test_entry_reservation_postgres.py' -v
