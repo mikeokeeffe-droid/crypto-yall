@@ -53,10 +53,11 @@ class FailureAndConflictTests(unittest.TestCase):
     def test_reservation_outage_never_submits_order(self):
         store = SharedFakeStore()
         store.fail = True
-        with self.assertRaises(ConnectionError):
-            check(store, "aggressive")
-        # Error propagates from the offline adapter: live integration must
-        # convert it to a fail-closed skipped entry, never a fallback order.
+        result = check(store, "aggressive")
+        # The existing entry adapter already catches reservation failures
+        # and fails closed without attempting any exchange order.
+        self.assertFalse(result.simulated_allowed)
+        self.assertFalse(result.live_order_submitted)
         self.assertEqual(store.calls, 1)
 
     def test_unknown_exchange_result_remains_fenced(self):
