@@ -485,6 +485,17 @@ def execute_trade(
         )
         return _parse_response(trade, resp, info, coin)
 
+    # Opt-in staging trial at the REAL entry dispatch point. Fail closed:
+    # the current shared gate is an inspection adapter, not yet a trusted
+    # production reservation + exchange reconciliation service.
+    # Close/exit actions above remain unaffected.
+    if os.environ.get("INTRADAY_ENTRY_SAFETY_TRIAL", "OFF").upper() == "ON":
+        return {
+            **trade,
+            "status": "skipped",
+            "reason": "Intraday safety trial: entry submission disabled",
+        }
+
     mid = get_mid_price(info, coin)
     calculated_notional = capital * POSITION_SIZE_PCT * leverage
     test_notional = float(os.environ.get("INTRADAY_TEST_NOTIONAL", "0") or 0)
