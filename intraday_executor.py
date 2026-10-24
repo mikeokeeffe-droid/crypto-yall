@@ -490,6 +490,14 @@ def execute_trade(
     # production reservation + exchange reconciliation service.
     # Close/exit actions above remain unaffected.
     if os.environ.get("INTRADAY_ENTRY_SAFETY_TRIAL", "OFF").upper() == "ON":
+        # Real entry path, dry-run only. The inspection result is logged,
+        # never used as permission to place an exchange order.
+        from intraday_entry_observer_staging import observe_intraday_entry
+        observation = observe_intraday_entry(
+            trade=trade,
+            position_snapshot=get_open_positions(info, os.environ.get("HL_ACCOUNT_ADDRESS", "")),
+        )
+        print(f"Intraday safety trial: {observation}")
         return {
             **trade,
             "status": "skipped",
