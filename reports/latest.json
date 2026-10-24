@@ -711,7 +711,7 @@
     }
   },
   "date_utc": "2026-10-24",
-  "generated_at": "2026-10-24T22:03:31.040581+00:00",
+  "generated_at": "2026-10-24T23:01:04.565182+00:00",
   "report_errors": [],
   "reporting_only": true,
   "schema_version": 2,
@@ -3649,20 +3649,20 @@
           "ONDO": {
             "asset": "ONDO",
             "blocked_live_reason": "mid-cap allow_short=False",
-            "current_price": 0.40384,
+            "current_price": 0.40631,
             "entry_price": 0.43283,
             "entry_time": "2026-10-23T12:00:00",
             "ticker": "ONDO-USD",
-            "unrealized_gross_return_pct": 6.6978
+            "unrealized_gross_return_pct": 6.1271
           },
           "SOL": {
             "asset": "SOL",
             "blocked_live_reason": "mid-cap allow_short=False",
-            "current_price": 101.32,
+            "current_price": 101.58,
             "entry_price": 103.51,
             "entry_time": "2026-10-23T19:00:00",
             "ticker": "SOL-USD",
-            "unrealized_gross_return_pct": 2.1157
+            "unrealized_gross_return_pct": 1.8646
           }
         },
         "today": {
@@ -4101,7 +4101,7 @@
             }
           ],
           "dual_short_confirmed_now": false,
-          "eth_confirmed_short_now": true,
+          "eth_confirmed_short_now": false,
           "open_positions": {},
           "today": {
             "average_loss_pct": null,
@@ -4325,6 +4325,6 @@
     "errors": [],
     "scope": "Shadow-only fresh short signals for SOL/AVAX/LINK/SUI/XRP/ONDO that live trading blocks because mid-cap allow_short=False.",
     "tracking_started_at": "2026-09-10T22:03:23.796957+00:00",
-    "updated_at": "2026-10-24T22:03:31.040581+00:00"
+    "updated_at": "2026-10-24T23:01:04.565182+00:00"
   }
 }
