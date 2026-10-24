@@ -60,6 +60,9 @@ jobs:
 
           exit 1
         env:
+          SUPABASE_STATE_ENABLED: 'OFF'
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           HL_PRIVATE_KEY: ${{ secrets.HL_PRIVATE_KEY }}
           HL_ACCOUNT_ADDRESS: ${{ secrets.HL_ACCOUNT_ADDRESS }}
           HL_TESTNET: ${{ vars.HL_TESTNET }}
@@ -152,6 +155,9 @@ jobs:
             exit 1
           fi
         env:
+          SUPABASE_STATE_ENABLED: 'OFF'
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           HL_PRIVATE_KEY: ${{ secrets.HL_PRIVATE_KEY }}
           HL_ACCOUNT_ADDRESS: ${{ secrets.HL_ACCOUNT_ADDRESS }}
           HL_TESTNET: ${{ vars.HL_TESTNET }}
