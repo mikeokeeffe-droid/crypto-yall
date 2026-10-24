@@ -1,8 +1,11 @@
 name: Test Atomic Entry Reservations (Isolated PostgreSQL)
 on:
-  push:
-    branches:
-      - safety/atomic-entry-reservations-20261024
+  pull_request:
+    paths:
+      - 'db/entry_reservations_staging.sql'
+      - 'tests/**'
+      - 'entry_gate_staging.py'
+      - '.github/workflows/test-atomic-entry-reservations.yml'
   workflow_dispatch:
 permissions:
   contents: read
