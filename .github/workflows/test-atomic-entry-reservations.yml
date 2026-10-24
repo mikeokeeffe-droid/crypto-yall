@@ -19,6 +19,7 @@ on:
       - 'hyperliquid_position_snapshot_staging.py'
       - 'hyperliquid_testnet_probe_staging.py'
       - 'intraday_single_bot_trial_staging.py'
+      - 'intraday_executor.py'
       - '.github/workflows/test-atomic-entry-reservations.yml'
   workflow_dispatch:
 permissions:
@@ -97,5 +98,7 @@ jobs:
         run: python -m unittest discover -s tests -p 'test_hyperliquid_testnet_probe_staging.py' -v
       - name: Test Intraday-only order-free trial
         run: python -m unittest discover -s tests -p 'test_intraday_single_bot_trial_staging.py' -v
+      - name: Verify Intraday real order-dispatch trial guard
+        run: python -m unittest discover -s tests -p 'test_intraday_trial_dispatch_staging.py' -v
       - name: Test competing transactions and failure cases
         run: python -m unittest discover -s tests -p 'test_entry_reservation_postgres.py' -v
