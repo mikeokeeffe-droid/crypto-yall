@@ -38,7 +38,7 @@ def release(coin, bot, token):
 class EntryReservationPostgresTests(unittest.TestCase):
     def setUp(self):
         with connect() as conn:
-            conn.execute("truncate table public.bot_entry_reservations")
+            conn.execute("truncate table public.bot_entry_intents, public.bot_entry_reservations")
 
     def test_concurrent_competing_bots_only_one_wins(self):
         gate = threading.Barrier(3)
