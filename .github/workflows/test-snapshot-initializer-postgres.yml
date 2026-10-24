@@ -37,7 +37,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Create local-only service role
-        run: psql -v ON_ERROR_STOP=1 -c "CREATE ROLE service_role NOLOGIN;"
+        run: psql -v ON_ERROR_STOP=1 -c "CREATE ROLE service_role NOLOGIN; CREATE ROLE anon NOLOGIN; CREATE ROLE authenticated NOLOGIN;"
       - name: Create empty schema
         run: psql -v ON_ERROR_STOP=1 -f db/schema.sql
       - name: Install staged initializer in disposable database
