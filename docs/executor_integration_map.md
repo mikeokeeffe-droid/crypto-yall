@@ -6,7 +6,7 @@ No live executor files have been edited by this pull request.
 
 - Aggressive: `aggressive_executor.py` function `execute_trade`, `exchange.market_open` near line 544; trade dispatch near line 802.
 - Intraday: `intraday_executor.py` function `execute_trade`, `exchange.market_open` near line 547; trade dispatch near line 832.
-- Daily: `daily_executor.py` was not found at repository root. Locate the actual Daily executor before implementing shared locking.
+- Daily: **located** in `hyperliquid_executor.py`, function `execute_trade`, `exchange.market_open` near line 490; ownership and cross-bot checks in `main` near lines 1202–1251.
 
 ## Integration contract (not yet implemented)
 
@@ -23,5 +23,5 @@ No live executor files have been edited by this pull request.
 
 - The existing `executor_entry_dry_run_staging.py` is a standalone simulation, **not wired into live executors**.
 - Real order/position reconciliation and durable owner handoff are not implemented.
-- Daily's real entry module still needs to be located.
+- Daily's real entry module is identified; no executor has been modified.
 - Staging Supabase project RPC deployment and privileges remain unverified.
