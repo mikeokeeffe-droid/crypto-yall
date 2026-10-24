@@ -22,6 +22,8 @@ import json
 import os
 import sys
 import datetime as dt
+import time
+import copy
 
 import requests
 
@@ -140,18 +142,45 @@ def save_state(state: dict):
             "Cannot save aggressive state: GIST_TOKEN or AGGRESSIVE_GIST_ID is missing"
         )
 
-    resp = requests.patch(
-        f"https://api.github.com/gists/{gist_id}",
-        headers={"Authorization": f"token {gist_token}"},
-        json={"files": {STATE_FILENAME: {"content": json.dumps(state, indent=2)}}},
-        timeout=15,
-    )
+    url = f"https://api.github.com/gists/{gist_id}"
+    payload = {"files": {STATE_FILENAME: {"content": json.dumps(state, indent=2)}}}
+    headers = {"Authorization": f"token {gist_token}"}
 
-    if not resp.ok:
-        raise RuntimeError(
-            f"Failed to save aggressive state to Gist: "
-            f"HTTP {resp.status_code} {resp.text}"
+    # A rate-limited write must never be treated as a successful state save.
+    # Retry only explicit rate-limit responses, with bounded waiting; other
+    # failures retain the original fail-closed behaviour.
+    for attempt in range(3):
+        try:
+            resp = requests.patch(url, headers=headers, json=payload, timeout=15)
+        except requests.RequestException as exc:
+            raise RuntimeError("Failed to save aggressive state to Gist: " + str(exc)) from exc
+
+        if resp.ok:
+            break
+
+        remaining = resp.headers.get("X-RateLimit-Remaining")
+        is_rate_limit = resp.status_code in (403, 429) and (
+            remaining == "0"
+            or "rate limit" in resp.text.lower()
+            or resp.status_code == 429
         )
+        if not is_rate_limit or attempt == 2:
+            raise RuntimeError(
+                f"Failed to save aggressive state to Gist: "
+                f"HTTP {resp.status_code} {resp.text}"
+            )
+
+        retry_after = resp.headers.get("Retry-After")
+        try:
+            wait_seconds = max(1, min(60, int(retry_after))) if retry_after else 15 * (attempt + 1)
+        except (ValueError, TypeError):
+            wait_seconds = 15 * (attempt + 1)
+        print(
+            f"GitHub Gist rate limited aggressive state save "
+            f"(HTTP {resp.status_code}); retry {attempt + 2}/3 "
+            f"in {wait_seconds}s"
+        )
+        time.sleep(wait_seconds)
 
     print("Aggressive state saved successfully")
 
@@ -609,6 +638,7 @@ def main():
         sys.exit(1)
 
     state = load_state()
+    original_state = copy.deepcopy(state)
     equity = get_account_equity(info, address)
     capital = float(os.environ.get("AGGRESSIVE_CAPITAL", "3000"))
     threshold = float(os.environ.get("AGGRESSIVE_DD_PCT", "3"))
@@ -1097,7 +1127,25 @@ def main():
             }
             for ticker, signal_info in signals.items()
         }
-    save_state(state)
+    # Skip only a redundant idle protection heartbeat. Compare the complete
+    # state (excluding heartbeat-only telemetry) so ownership, pending claims,
+    # peaks, exits, and all other safety-relevant changes still persist.
+    idle_protection = (
+        protection_only
+        and not owned_coins
+        and not state.get("pending_entry_claims")
+        and not original_state.get("pending_entry_claims")
+    )
+    before = copy.deepcopy(original_state)
+    after = copy.deepcopy(state)
+    if idle_protection:
+        for snapshot in (before, after):
+            snapshot.pop("last_protection_run", None)
+            snapshot.pop("last_equity", None)
+    if idle_protection and before == after:
+        print("Idle protection heartbeat: unchanged state; skipping redundant Gist write")
+    else:
+        save_state(state)
 
     filled_count = sum(1 for r in results if r.get("status") == "filled")
     error_count = sum(1 for r in results if r.get("status") == "error")
