@@ -60,6 +60,9 @@ INTRADAY_MAX_LEVERAGE = float(os.getenv("INTRADAY_MAX_LEVERAGE", "2"))
 # ── State persistence (separate Gist from daily bot) ────────────────────────
 
 def load_state() -> dict:
+    from supabase_state_store import enabled, load
+    if enabled():
+        return load("intraday")
     gist_token = os.environ.get("GIST_TOKEN")
     gist_id = os.environ.get("INTRADAY_GIST_ID")
 
@@ -145,6 +148,9 @@ def load_state() -> dict:
     return state
 
 def save_state(state: dict):
+    from supabase_state_store import enabled, save
+    if enabled():
+        return save("intraday", state)
     gist_token = os.environ.get("GIST_TOKEN")
     gist_id = os.environ.get("INTRADAY_GIST_ID")
 
