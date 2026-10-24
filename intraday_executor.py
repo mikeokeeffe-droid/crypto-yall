@@ -656,9 +656,17 @@ def main():
     if protection_only:
         print("Intraday PROTECTION-ONLY mode: no entries, normal signal exits, or signal recomputation")
 
-    if kill_switch_off():
+    # Opt-in protection-only continuation while new entries remain disabled.
+    # Default OFF preserves the existing emergency halt behaviour.
+    allow_protection_while_halted = (
+        protection_only
+        and os.environ.get("INTRADAY_PROTECT_WHILE_HALTED", "OFF").upper() == "ON"
+    )
+    if kill_switch_off() and not allow_protection_while_halted:
         print("Intraday KILL_SWITCH is OFF — halting")
         sys.exit(0)
+    if allow_protection_while_halted and kill_switch_off():
+        print("Intraday entry halt remains ON; protection-only close checks permitted")
 
     try:
         info, exchange, address = get_client()
@@ -812,6 +820,11 @@ def main():
         managed_positions,
         max_positions,
     )
+
+    # Defence in depth: a protection-only heartbeat must never open a trade,
+    # even if a future strategy change accidentally proposes an entry.
+    if protection_only:
+        trades = [t for t in trades if t.get("action") == "close"]
 
     # Cross-bot position lock:
     # The three bots share one Hyperliquid account but keep separate state.
