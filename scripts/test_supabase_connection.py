@@ -10,7 +10,11 @@ def main():
         raise ValueError("Invalid Supabase URL")
     if not key.startswith(("sb_secret_", "eyJ")):
         raise ValueError("Unexpected Supabase secret key format")
-    headers = {"apikey": key, "Authorization": f"Bearer {key}"}
+    headers = {"apikey": key}
+    # Modern sb_secret_* keys authenticate via apikey; legacy JWT keys also
+    # require a Bearer token for PostgREST.
+    if key.startswith("eyJ"):
+        headers["Authorization"] = f"Bearer {key}"
     # Request no rows, only verify the table exists and privileged credentials work.
     response = requests.get(
         f"{url}/rest/v1/bot_state",
