@@ -1,7 +1,12 @@
 name: Backup Three Gists to Supabase
 
 on:
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      snapshot_window_confirmed:
+        description: 'Type YES only after confirming bot writers paused and exchange-side protective orders remain active'
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -19,6 +24,7 @@ jobs:
       - name: Save and independently verify private snapshots
         run: python scripts/backup_gists_to_supabase.py
         env:
+          SNAPSHOT_WINDOW_CONFIRMED: ${{ inputs.snapshot_window_confirmed }}
           GIST_TOKEN: ${{ secrets.GIST_TOKEN }}
           AGGRESSIVE_GIST_ID: ${{ secrets.AGGRESSIVE_GIST_ID }}
           INTRADAY_GIST_ID: ${{ secrets.INTRADAY_GIST_ID }}
