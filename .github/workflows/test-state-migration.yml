@@ -1,0 +1,23 @@
+name: Supabase State Migration Safety Tests
+
+on:
+  workflow_dispatch: {}
+  pull_request:
+    paths:
+      - 'tests/test_supabase_state_migration.py'
+      - '.github/workflows/test-state-migration.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  offline-state-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validate JSON state round-trip and critical fields
+        run: python -m unittest discover -s tests -p 'test_supabase_state_migration.py' -v
