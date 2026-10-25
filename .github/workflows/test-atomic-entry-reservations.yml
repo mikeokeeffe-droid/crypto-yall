@@ -22,6 +22,10 @@ on:
       - 'intraday_executor.py'
       - 'intraday_entry_observer_staging.py'
       - 'trusted_reconciliation_staging.py'
+      - 'hyperliquid_readonly_evidence_staging.py'
+      - 'hyperliquid_reconciliation_pipeline_staging.py'
+      - 'hyperliquid_fill_pagination_staging.py'
+      - 'intraday_restart_recovery_staging.py'
       - '.github/workflows/test-atomic-entry-reservations.yml'
   workflow_dispatch:
 permissions:
