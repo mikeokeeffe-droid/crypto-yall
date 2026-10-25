@@ -24,7 +24,8 @@ def fetch_exchange_snapshot(info, account_address: str, *, clock=time.time):
     fills = info.user_fills(account_address)
     if not isinstance(user_state, dict) or not isinstance(open_orders, list) or not isinstance(fills, list):
         raise ValueError("incomplete exchange snapshot")
-    # Timestamp from the START of acquisition: slow sequential calls cannot\n    # masquerade as fresh evidence.\n    return ExchangeSnapshot(user_state, open_orders, fills, started_at)
+    # Timestamp at request start, not after slow sequential requests.
+    return ExchangeSnapshot(user_state, open_orders, fills, started_at)
 
 def is_fresh(snapshot: ExchangeSnapshot, *, now=None, max_age_seconds=15):
     if now is None:
