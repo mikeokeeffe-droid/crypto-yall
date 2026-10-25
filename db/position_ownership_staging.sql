@@ -112,5 +112,5 @@ revoke all on function public.release_closed_bot_position(text,text,uuid,boolean
 -- EXECUTE from PUBLIC on all new functions above (already done) and
 -- explicitly validate routine service_role has no close/release permission.
 grant select,insert,update,delete on public.bot_position_owners to service_role;
-grant execute on function public.record_bot_position_owner(text,text,uuid,text,boolean)
- to service_role;
+revoke execute on function public.record_bot_position_owner(text,text,uuid,text,boolean)
+ from service_role;
