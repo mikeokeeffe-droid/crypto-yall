@@ -7,17 +7,23 @@ using these decisions for durable ownership transitions.
 from dataclasses import dataclass
 from hyperliquid_readonly_evidence_staging import fetch_exchange_snapshot, is_fresh
 from trusted_reconciliation_staging import verify_handoff, verify_release
+from hyperliquid_fill_pagination_staging import fetch_fills_window
 
 @dataclass(frozen=True)
 class EvidenceResult:
     allowed: bool
     reason: str
 
-def evaluate_handoff(info, account_address, *, coin, order_id, clock):
+def evaluate_handoff(info, account_address, *, coin, order_id, clock, order_start_ms=None):
     try:
         snapshot = fetch_exchange_snapshot(info, account_address, clock=clock)
+        if order_start_ms is None:
+            return EvidenceResult(False, 'order start time required for complete fill evidence')
+        window = fetch_fills_window(info, account_address, order_start_ms, int(clock() * 1000))
+        if not window.complete:
+            return EvidenceResult(False, 'fill history incomplete: ' + window.reason)
         decision = verify_handoff(
-            coin=coin, order_id=order_id, fills=snapshot.fills,
+            coin=coin, order_id=order_id, fills=window.fills,
             open_orders=snapshot.open_orders, user_state=snapshot.user_state,
             fresh=is_fresh(snapshot, now=clock()),
         )
