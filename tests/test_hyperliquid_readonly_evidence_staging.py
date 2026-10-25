@@ -26,6 +26,15 @@ class ReadOnlyEvidenceTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             fetch_exchange_snapshot(FakeInfo(), "invalid")
 
+    def test_malformed_hex_address_rejected(self):
+        with self.assertRaises(ValueError):
+            fetch_exchange_snapshot(FakeInfo(), "0x" + "z" * 40)
+
+    def test_slow_acquisition_is_stale(self):
+        ticks = iter([100.0, 120.0])
+        snap = fetch_exchange_snapshot(FakeInfo(), ADDRESS, clock=lambda: next(ticks))
+        self.assertFalse(is_fresh(snap, now=120.0))
+
     def test_malformed_exchange_data_rejected(self):
         class BadInfo(FakeInfo):
             def open_orders(self, address):
