@@ -44,13 +44,13 @@ def fetch_fills_window(info, address, start_ms, end_ms, *, max_pages=20, page_li
             all_fills.append(fill)
         if len(page) < page_limit:
             return FillWindow(all_fills, True, "window fetched")
-        # A full page ending with multiple fills at one millisecond cannot
-        # be safely advanced without an exchange-provided cursor.
+        # A full page cannot prove that every fill at its final millisecond
+        # was returned. Even one visible fill may have unseen siblings.
+        # Never advance by timestamp alone without an exchange cursor.
         if last_time is None:
             return FillWindow([], False, "missing page cursor")
-        if sum(f.get("time") == last_time for f in page) > 1:
-            return FillWindow([], False, "ambiguous timestamp page boundary")
-        cursor = last_time + 1
+        return FillWindow([], False, "full page without lossless cursor")
+
         if cursor > end_ms:
             return FillWindow(all_fills, True, "window fetched")
     return FillWindow([], False, "page budget exhausted")
