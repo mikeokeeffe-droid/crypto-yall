@@ -35,6 +35,13 @@ class ReadOnlyEvidenceTests(unittest.TestCase):
         snap = fetch_exchange_snapshot(FakeInfo(), ADDRESS, clock=lambda: next(ticks))
         self.assertFalse(is_fresh(snap, now=120.0))
 
+    def test_full_fill_page_rejected_as_potentially_truncated(self):
+        class FullPageInfo(FakeInfo):
+            def user_fills(self, address):
+                return [{}] * 2000
+        with self.assertRaisesRegex(ValueError, "truncated"):
+            fetch_exchange_snapshot(FullPageInfo(), ADDRESS)
+
     def test_malformed_exchange_data_rejected(self):
         class BadInfo(FakeInfo):
             def open_orders(self, address):
