@@ -71,6 +71,7 @@ jobs:
           psql -v ON_ERROR_STOP=1 -f db/position_ownership_staging.sql
           psql -v ON_ERROR_STOP=1 -f db/trusted_reconciler_role_staging.sql
           psql -v ON_ERROR_STOP=1 -f tests/position_ownership_permissions.sql
+          psql -v ON_ERROR_STOP=1 -f tests/trusted_reconciler_permissions.sql
           psql -v ON_ERROR_STOP=1 -f tests/position_ownership_staging.sql
           psql -v ON_ERROR_STOP=1 -f tests/entry_reservation_permissions.sql
           psql -v ON_ERROR_STOP=1 -f tests/entry_reservations_staging.sql
