@@ -375,7 +375,7 @@
     }
   },
   "date_utc": "2026-10-25",
-  "generated_at": "2026-10-25T07:41:52.827607+00:00",
+  "generated_at": "2026-10-25T08:40:13.952055+00:00",
   "report_errors": [],
   "reporting_only": true,
   "schema_version": 2,
@@ -3358,7 +3358,7 @@
             "win_rate_pct": 23.53,
             "wins": 8
           },
-          "btc_confirmed_short_now": false,
+          "btc_confirmed_short_now": true,
           "closed_trades": [
             {
               "asset": "AVAX",
@@ -3769,8 +3769,8 @@
               "ticker": "LINK-USD"
             }
           ],
-          "dual_short_confirmed_now": false,
-          "eth_confirmed_short_now": false,
+          "dual_short_confirmed_now": true,
+          "eth_confirmed_short_now": true,
           "open_positions": {},
           "today": {
             "average_loss_pct": null,
@@ -3994,6 +3994,6 @@
     "errors": [],
     "scope": "Shadow-only fresh short signals for SOL/AVAX/LINK/SUI/XRP/ONDO that live trading blocks because mid-cap allow_short=False.",
     "tracking_started_at": "2026-09-10T22:03:23.796957+00:00",
-    "updated_at": "2026-10-25T07:41:52.827607+00:00"
+    "updated_at": "2026-10-25T08:40:13.952055+00:00"
   }
 }
