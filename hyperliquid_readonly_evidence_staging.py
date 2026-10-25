@@ -24,6 +24,10 @@ def fetch_exchange_snapshot(info, account_address: str, *, clock=time.time):
     fills = info.user_fills(account_address)
     if not isinstance(user_state, dict) or not isinstance(open_orders, list) or not isinstance(fills, list):
         raise ValueError("incomplete exchange snapshot")
+    # user_fills may be truncated by the exchange. Never treat a full
+    # response page as complete evidence of historical fills.
+    if len(fills) >= 2000:
+        raise ValueError("fill history may be truncated; pagination required")
     # Timestamp at request start, not after slow sequential requests.
     return ExchangeSnapshot(user_state, open_orders, fills, started_at)
 
