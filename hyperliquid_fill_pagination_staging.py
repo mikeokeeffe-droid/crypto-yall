@@ -38,7 +38,7 @@ def fetch_fills_window(info, address, start_ms, end_ms, *, max_pages=20, page_li
                 return FillWindow([], False, "nonmonotonic fill timestamps")
             last_time = timestamp
             identity = fill.get("tid")
-            if identity in seen or identity[0] is None:
+            if identity in seen or identity is None:
                 return FillWindow([], False, "duplicate or missing trade identity")
             seen.add(identity)
             all_fills.append(fill)
