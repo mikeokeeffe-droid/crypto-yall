@@ -22,6 +22,8 @@ def evaluate_handoff(info, account_address, *, coin, order_id, clock, order_star
         window = fetch_fills_window(info, account_address, order_start_ms, int(clock() * 1000))
         if not window.complete:
             return EvidenceResult(False, 'fill history incomplete: ' + window.reason)
+        if not is_fresh(snapshot, now=clock()):
+            return EvidenceResult(False, 'exchange snapshot stale after fill pagination')
         decision = verify_handoff(
             coin=coin, order_id=order_id, fills=window.fills,
             open_orders=snapshot.open_orders, user_state=snapshot.user_state,
