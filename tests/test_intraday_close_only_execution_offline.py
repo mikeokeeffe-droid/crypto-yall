@@ -1,11 +1,22 @@
-"""Offline regression tests for Intraday close-only execution.
+"""Offline regression tests for Intraday close-only dispatch.
 
-All exchange calls use a fake object. Never submit real orders.
+Extract only the executor function from source so no pandas, credentials,
+Hyperliquid client, network, or other runtime dependency is imported.
 """
+import ast
+from pathlib import Path
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock
 
-import intraday_executor as executor
+
+def load_execute_trade():
+    source = Path(__file__).resolve().parents[1] / "intraday_executor.py"
+    tree = ast.parse(source.read_text(encoding="utf-8"), filename=str(source))
+    fn = next(n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == "execute_trade")
+    module = ast.fix_missing_locations(ast.Module(body=[fn], type_ignores=[]))
+    namespace = {"_parse_response": Mock(return_value={"status": "filled"})}
+    exec(compile(module, str(source), "exec"), namespace)
+    return namespace["execute_trade"]
 
 
 class FakeExchange:
@@ -19,18 +30,18 @@ class FakeExchange:
 
     def market_open(self, coin, is_buy, size):
         self.opens.append((coin, is_buy, size))
-        raise AssertionError("A new entry must never be submitted")
+        raise AssertionError("New entry must never be submitted")
 
 
 class IntradayCloseOnlyExecutionTests(unittest.TestCase):
     def setUp(self):
         self.exchange = FakeExchange()
+        self.execute_trade = load_execute_trade()
 
     def test_existing_long_close_uses_requested_size(self):
         trade = {"ticker": "SOL-USD", "hl_coin": "SOL", "action": "close",
                  "side": "long", "close_size": 0.4}
-        with patch.object(executor, "_parse_response", return_value={"status": "filled"}):
-            result = executor.execute_trade(None, self.exchange, trade, 100, 2)
+        result = self.execute_trade(None, self.exchange, trade, 100, 2)
         self.assertEqual(result["status"], "filled")
         self.assertEqual(self.exchange.closes, [("SOL", 0.4)])
         self.assertEqual(self.exchange.opens, [])
@@ -38,8 +49,7 @@ class IntradayCloseOnlyExecutionTests(unittest.TestCase):
     def test_existing_short_close_uses_requested_size(self):
         trade = {"ticker": "SOL-USD", "hl_coin": "SOL", "action": "close",
                  "side": "short", "close_size": 0.2}
-        with patch.object(executor, "_parse_response", return_value={"status": "filled"}):
-            executor.execute_trade(None, self.exchange, trade, 100, 2)
+        self.execute_trade(None, self.exchange, trade, 100, 2)
         self.assertEqual(self.exchange.closes, [("SOL", 0.2)])
         self.assertEqual(self.exchange.opens, [])
 
@@ -47,16 +57,16 @@ class IntradayCloseOnlyExecutionTests(unittest.TestCase):
         for action in ("open_long", "open_short"):
             with self.subTest(action=action):
                 trade = {"ticker": "SOL-USD", "hl_coin": "SOL", "action": action}
-                result = executor.execute_trade(None, self.exchange, trade, 100, 2)
+                result = self.execute_trade(None, self.exchange, trade, 100, 2)
                 self.assertEqual(result["status"], "skipped")
         self.assertEqual(self.exchange.opens, [])
 
-    def test_exchange_close_failure_is_not_reported_as_fill(self):
+    def test_exchange_close_failure_propagates(self):
         trade = {"ticker": "SOL-USD", "hl_coin": "SOL", "action": "close",
                  "close_size": 0.3}
-        with patch.object(self.exchange, "market_close", side_effect=RuntimeError("offline exchange")):
-            with self.assertRaises(RuntimeError):
-                executor.execute_trade(None, self.exchange, trade, 100, 2)
+        self.exchange.market_close = Mock(side_effect=RuntimeError("offline exchange"))
+        with self.assertRaises(RuntimeError):
+            self.execute_trade(None, self.exchange, trade, 100, 2)
         self.assertEqual(self.exchange.opens, [])
 
 
