@@ -488,7 +488,7 @@ def execute_trade(
     # Draft-branch fail-closed gate: no new live entry until a separately
     # reviewed production reconciliation service has been deployed.
     # This does not block existing position close orders.
-    if os.environ.get("INTRADAY_TRUSTED_ENTRY_READY", "OFF").upper() != "ON":
+    if True:  # No environment override can certify an unverified service.
         return {
             **trade,
             "status": "skipped",
