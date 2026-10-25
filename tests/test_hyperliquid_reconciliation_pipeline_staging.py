@@ -14,11 +14,13 @@ class Info:
         return [{"coin": "SOL"}] if self.open_order else []
     def user_fills(self, address):
         return [{"coin": "SOL", "oid": 17, "sz": "1"}]
+    def user_fills_by_time(self, address, start, end):
+        return [{"coin": "SOL", "oid": 17, "sz": "1", "time": start, "tid": 99}]
 
 class PipelineTests(unittest.TestCase):
     def test_verified_handoff(self):
         self.assertTrue(evaluate_handoff(Info(active=True), ADDRESS,
-                        coin="SOL", order_id="17", clock=lambda: 100).allowed)
+                        coin="SOL", order_id="17", clock=lambda: 100, order_start_ms=99000).allowed)
     def test_flat_handoff_rejected(self):
         self.assertFalse(evaluate_handoff(Info(), ADDRESS,
                          coin="SOL", order_id="17", clock=lambda: 100).allowed)
