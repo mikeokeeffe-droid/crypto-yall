@@ -111,6 +111,7 @@ revoke all on function public.release_closed_bot_position(text,text,uuid,boolean
 -- IMPORTANT: the staging migration runs as the database owner; revoke
 -- EXECUTE from PUBLIC on all new functions above (already done) and
 -- explicitly validate routine service_role has no close/release permission.
-grant select,insert,update,delete on public.bot_position_owners to service_role;
+revoke insert,update,delete on public.bot_position_owners from service_role;
+grant select on public.bot_position_owners to service_role;
 revoke execute on function public.record_bot_position_owner(text,text,uuid,text,boolean)
  from service_role;
