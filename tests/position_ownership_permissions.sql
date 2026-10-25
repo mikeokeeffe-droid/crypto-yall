@@ -9,9 +9,9 @@ begin
     'public.release_closed_bot_position(text,text,uuid,boolean,boolean)', 'EXECUTE') then
     raise exception 'service_role must not release closed positions';
   end if;
-  if not has_function_privilege('service_role',
+  if has_function_privilege('service_role',
     'public.record_bot_position_owner(text,text,uuid,text,boolean)', 'EXECUTE') then
-    raise exception 'service_role must be able to record verified owner';
+    raise exception 'routine executor must not self-certify fills';
   end if;
   if has_function_privilege('anon',
     'public.record_bot_position_owner(text,text,uuid,text,boolean)', 'EXECUTE') then
