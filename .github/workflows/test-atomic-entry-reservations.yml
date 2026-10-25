@@ -23,6 +23,7 @@ on:
       - 'intraday_executor.py'
       - 'intraday_entry_observer_staging.py'
       - 'trusted_reconciliation_staging.py'
+      - 'trusted_reconciler_worker_staging.py'
       - 'hyperliquid_readonly_evidence_staging.py'
       - 'hyperliquid_reconciliation_pipeline_staging.py'
       - 'hyperliquid_fill_pagination_staging.py'
@@ -119,6 +120,8 @@ jobs:
         run: python -m unittest discover -s tests -p 'test_hyperliquid_readonly_evidence_staging.py' -v
       - name: Test Hyperliquid fill pagination
         run: python -m unittest discover -s tests -p 'test_hyperliquid_fill_pagination_staging.py' -v
+      - name: Test independent reconciler worker
+        run: python -m unittest discover -s tests -p 'test_trusted_reconciler_worker_staging.py' -v
       - name: Test Intraday restart recovery
         run: python -m unittest discover -s tests -p 'test_intraday_restart_recovery_staging.py' -v
       - name: Test read-only reconciliation pipeline
