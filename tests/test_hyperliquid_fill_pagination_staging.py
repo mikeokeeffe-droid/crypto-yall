@@ -10,11 +10,12 @@ class FillPaginationTests(unittest.TestCase):
     def test_short_page_is_complete(self):
         r = fetch_fills_window(Info([[{"time": 100, "tid": 1, "oid": 2}]]), ADDR, 100, 200)
         self.assertTrue(r.complete)
-    def test_full_page_then_next_page(self):
+    def test_full_page_without_lossless_cursor_holds(self):
         pages = [[{"time": 100, "tid": 1, "oid": 2}, {"time": 101, "tid": 2, "oid": 2}], [{"time": 102, "tid": 3, "oid": 3}]]
         r = fetch_fills_window(Info(pages), ADDR, 100, 200, page_limit=2)
-        self.assertTrue(r.complete)
-        self.assertEqual(len(r.fills), 3)
+        self.assertFalse(r.complete)
+        self.assertEqual(r.fills, [])
+        self.assertIn("lossless cursor", r.reason)
     def test_ambiguous_boundary_holds(self):
         page = [{"time": 100, "tid": 1}, {"time": 100, "tid": 2}]
         self.assertFalse(fetch_fills_window(Info([page]), ADDR, 100, 200, page_limit=2).complete)
