@@ -31,7 +31,7 @@ def dispatch_staging_reconciliation(request, *, info, address, reconciler_rpc,
                     "issuer", "audience", "now", "authorized"}:
         raise PermissionError("caller cannot inject trusted dependencies")
     token = request["token"]
-    # Verify before selecting an operation or touching trusted dependencies.
+    # Verify before invoking any trusted dependencies.
     verify_staging_jwt(token, signing_key, issuer=issuer, audience=audience, now=now)
     return _OPERATIONS[operation](
         info, address, reconciler_rpc, auth_token=token, signing_key=signing_key,
