@@ -14,7 +14,7 @@
 - Do not merge this draft into main or deploy staging grants to production.
 - Do not switch on Aggressive, Intraday or Daily bots, modify secrets, production database, or kill switches.
 - Never treat passing isolated PostgreSQL tests as proof that Supabase service_role is restricted in production.
-- Existing staging grant SQL still includes direct DML for service_role; isolated restricted-grant trial does not remove that production blocker.
+- Staging grant SQL now revokes service_role direct DML and routine reservation RPCs; this is **not deployed** and does not provision a replacement executor identity. Actual production grants remain unverified.
 
 ## Acceptance gate
 
@@ -25,3 +25,7 @@ Only consider cutover after CI is green at the **final commit**, identity-to-DB-
 - Signed staging identity tests now explicitly reject Aggressive and Daily reconciliation requests before reading exchange evidence or invoking database RPCs.
 - This is a **safety fence**, not three-bot integration. Aggressive and Daily must remain unsupported by the authenticated staging reconciler until separate end-to-end authorization and exchange-evidence tests exist.
 - An independent reviewer must inspect the authentication gateway implementation, actual deployed grants, and migration sequence; no such review is represented as complete here.
+
+## Staging grant hardening (commit 9293816)
+
+The staging grant proposal now explicitly revokes direct table DML and routine reservation RPC access from service_role. This is intentionally fail-closed: no production or staging rollout is possible until a dedicated authenticated executor principal is configured. Existing PostgreSQL grants, inherited roles and function ownership still require inspection; revoking grants from service_role alone is not proof of effective isolation.
