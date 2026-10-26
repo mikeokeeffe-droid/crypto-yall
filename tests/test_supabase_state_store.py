@@ -61,5 +61,36 @@ class StateAdapterTests(unittest.TestCase):
             store.load("daily")
 
 
+    @patch("supabase_state_store.requests.get")
+    @patch("supabase_state_store.requests.post")
+    def test_timeout_does_not_advance_revision_or_retry(self, post, get):
+        import requests
+        get.return_value = Mock(json=lambda: [{"state": {}, "revision": 7}])
+        store.load("daily")
+        post.side_effect = requests.Timeout("uncertain write outcome")
+        with self.assertRaises(requests.Timeout):
+            store.save("daily", {"x": 1})
+        self.assertEqual(store._REVISIONS["daily"], 7)
+        self.assertEqual(post.call_count, 1)
+
+    @patch("supabase_state_store.requests.get")
+    @patch("supabase_state_store.requests.post")
+    def test_restart_requires_fresh_load_before_save(self, post, get):
+        get.return_value = Mock(json=lambda: [{"state": {}, "revision": 4}])
+        store.load("intraday")
+        store._REVISIONS.clear()  # Simulate a fresh process.
+        with self.assertRaises(RuntimeError):
+            store.save("intraday", {"x": 1})
+        post.assert_not_called()
+
+    @patch("supabase_state_store.requests.get")
+    def test_read_timeout_fails_closed(self, get):
+        import requests
+        get.side_effect = requests.Timeout("read timeout")
+        with self.assertRaises(requests.Timeout):
+            store.load("aggressive")
+        self.assertNotIn("aggressive", store._REVISIONS)
+
+
 if __name__ == "__main__":
     unittest.main()
