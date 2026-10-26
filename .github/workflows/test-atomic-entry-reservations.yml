@@ -196,5 +196,7 @@ jobs:
         run: python -m unittest discover -s tests -p 'test_hyperliquid_reconciliation_pipeline_staging.py' -v
       - name: Test independent reconciliation decisions
         run: python -m unittest discover -s tests -p 'test_trusted_reconciliation_staging.py' -v
+      - name: Verify three-bot PostgreSQL collision and restart acceptance
+        run: python -m unittest discover -s tests -p 'test_three_bot_postgres_acceptance.py' -v
       - name: Test competing transactions and failure cases
         run: python -m unittest discover -s tests -p 'test_entry_reservation_postgres.py' -v
