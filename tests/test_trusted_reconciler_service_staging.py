@@ -26,6 +26,35 @@ class ServiceTests(unittest.TestCase):
         self.assertFalse(result.confirmed)
         release.assert_called_once()
 
+    def test_denied_authorization_never_invokes_rpc(self):
+        calls = []
+        for value in (False, None, "true", 1, {}, []):
+            with self.subTest(value=value):
+                with self.assertRaises(PermissionError):
+                    authorized_reconcile_flat_owner(None, None,
+                        lambda *a: calls.append(a), authorized=value,
+                        coin="SOL", bot="intraday", token="durable-token",
+                        clock=lambda: 100)
+        self.assertEqual(calls, [])
+
+    def test_authorized_entry_transport_failure_keeps_fence(self):
+        with patch("trusted_reconciler_service_staging.reconcile_entry",
+                   return_value=SimpleNamespace(action="handoff_candidate")):
+            def broken_rpc(*args):
+                raise ConnectionError("offline")
+            result = authorized_reconcile_submitted_entry(None, None,
+                broken_rpc, authorized=True, **ARGS)
+        self.assertFalse(result.confirmed)
+
+    def test_authorized_entry_rpc_must_confirm_true(self):
+        with patch("trusted_reconciler_service_staging.reconcile_entry",
+                   return_value=SimpleNamespace(action="handoff_candidate")):
+            for response in (False, None, "true", 1):
+                with self.subTest(response=response):
+                    result = authorized_reconcile_submitted_entry(None, None,
+                        lambda *args: response, authorized=True, **ARGS)
+                    self.assertFalse(result.confirmed)
+
     def test_unauthorized_entry_does_not_read_exchange_or_mutate(self):
         with patch("trusted_reconciler_service_staging.reconcile_entry") as exchange:
             with self.assertRaises(PermissionError):
