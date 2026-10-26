@@ -14,7 +14,8 @@ class ReconciliationResult:
     reason: str
 
 def reconcile_entry(info, address, *, coin, order_id, order_start_ms, clock):
-    if (type(order_id) not in (str, int) or not str(order_id).strip()\n            or (type(order_id) is int and order_id < 0)):
+    if (type(order_id) not in (str, int) or not str(order_id).strip()
+            or (type(order_id) is int and order_id < 0)):
         return ReconciliationResult("hold", "missing exchange order identity")
     if type(order_start_ms) is not int or order_start_ms < 0:
         return ReconciliationResult("hold", "missing durable submission timestamp")
