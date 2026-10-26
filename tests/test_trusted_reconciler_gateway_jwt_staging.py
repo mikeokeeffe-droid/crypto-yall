@@ -33,6 +33,19 @@ class JwtTests(unittest.TestCase):
         with self.assertRaises(PermissionError):
             self.verify(token(CLAIMS, key=b"wrong-key-not-used-by-the-gateway-000"))
 
+    def test_duplicate_claim_fields_rejected(self):
+        def enc(value):
+            return base64.urlsafe_b64encode(value.encode()).rstrip(b"=").decode()
+        header = enc('{"alg":"HS256","typ":"JWT"}')
+        body = enc('{"sub":"worker","iss":"trusted-staging","aud":"staging-reconciler",'
+                   '"scope":"reconciler:position-write","iat":90,"nbf":90,'
+                   '"exp":200,"exp":999999}')
+        signing = header + "." + body
+        sig = base64.urlsafe_b64encode(
+            hmac.new(KEY, signing.encode(), hashlib.sha256).digest()).rstrip(b"=").decode()
+        with self.assertRaises(PermissionError):
+            self.verify(signing + "." + sig)
+
     def test_algorithm_restriction(self):
         with self.assertRaises(PermissionError):
             self.verify(token(CLAIMS, algorithm="none"))
