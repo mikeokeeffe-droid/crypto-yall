@@ -30,6 +30,30 @@ class ServiceTests(unittest.TestCase):
                    **{**ARGS, "bot": "aggressive"})
         self.assertFalse(result.confirmed)
 
+    def test_entry_rejects_other_bots_without_exchange_or_rpc(self):
+        for bot in ("aggressive", "daily", "", None):
+            with self.subTest(bot=bot):
+                with patch("trusted_reconciler_service_staging.reconcile_entry") as evidence:
+                    rpc_calls = []
+                    result = reconcile_submitted_entry(None, None,
+                        lambda *a: rpc_calls.append(a) or True,
+                        **{**ARGS, "bot": bot})
+                self.assertFalse(result.confirmed)
+                evidence.assert_not_called()
+                self.assertEqual(rpc_calls, [])
+
+    def test_release_rejects_other_bots_without_exchange_or_rpc(self):
+        for bot in ("aggressive", "daily", "", None):
+            with self.subTest(bot=bot):
+                with patch("trusted_reconciler_service_staging.release_verified") as release:
+                    rpc_calls = []
+                    result = reconcile_flat_owner(None, None,
+                        lambda *a: rpc_calls.append(a) or True,
+                        coin="SOL", bot=bot, token="durable-token", clock=lambda: 100)
+                self.assertFalse(result.confirmed)
+                release.assert_not_called()
+                self.assertEqual(rpc_calls, [])
+
     def test_release_holds_when_evidence_denied(self):
         with patch("trusted_reconciler_service_staging.release_verified", return_value=False):
             result = reconcile_flat_owner(None, None, lambda *a: True,
