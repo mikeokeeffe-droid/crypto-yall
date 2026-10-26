@@ -4,6 +4,7 @@ The caller supplies a dedicated reconciler credential and HTTPS endpoint.
 Do not use SUPABASE_SERVICE_ROLE_KEY or executor credentials. No deployment.
 """
 import json
+import ipaddress
 from urllib.parse import urlparse
 from urllib.request import Request, urlopen
 
@@ -13,6 +14,12 @@ _ALLOWED = frozenset({"record_bot_position_owner",
 class TrustedRpcTransport:
     def __init__(self, endpoint, reconciler_token, *, opener=urlopen):
         parsed = urlparse(endpoint)
+        try:
+            ip = ipaddress.ip_address(parsed.hostname or "")
+        except ValueError:
+            ip = None
+        if (ip is not None and not ip.is_global):
+            raise ValueError("public HTTPS RPC endpoint required")
         if (parsed.scheme != "https" or not parsed.hostname or parsed.username or parsed.password
                 or parsed.query or parsed.fragment or parsed.port == 0
                 or parsed.path not in ("", "/") or parsed.hostname in ("localhost", "127.0.0.1", "::1")
