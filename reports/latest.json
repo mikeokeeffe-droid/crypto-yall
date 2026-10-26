@@ -375,7 +375,7 @@
     }
   },
   "date_utc": "2026-10-26",
-  "generated_at": "2026-10-26T22:08:22.279647+00:00",
+  "generated_at": "2026-10-26T23:08:22.120925+00:00",
   "report_errors": [],
   "reporting_only": true,
   "schema_version": 2,
@@ -2522,11 +2522,11 @@
           "SUI": {
             "asset": "SUI",
             "blocked_live_reason": "mid-cap allow_short=False",
-            "current_price": 0.91082,
+            "current_price": 0.91041,
             "entry_price": 0.9098,
             "entry_time": "2026-10-26T19:30:00",
             "ticker": "SUI20947-USD",
-            "unrealized_gross_return_pct": -0.1121
+            "unrealized_gross_return_pct": -0.067
           }
         },
         "today": {
@@ -3383,20 +3383,20 @@
           "SOL": {
             "asset": "SOL",
             "blocked_live_reason": "mid-cap allow_short=False",
-            "current_price": 100.5,
+            "current_price": 100.35,
             "entry_price": 100.99,
             "entry_time": "2026-10-25T12:00:00",
             "ticker": "SOL-USD",
-            "unrealized_gross_return_pct": 0.4852
+            "unrealized_gross_return_pct": 0.6337
           },
           "SUI": {
             "asset": "SUI",
             "blocked_live_reason": "mid-cap allow_short=False",
-            "current_price": 0.91082,
+            "current_price": 0.91041,
             "entry_price": 0.91605,
             "entry_time": "2026-10-26T08:00:00",
             "ticker": "SUI20947-USD",
-            "unrealized_gross_return_pct": 0.5709
+            "unrealized_gross_return_pct": 0.6157
           }
         },
         "today": {
@@ -3864,13 +3864,13 @@
             "SUI": {
               "asset": "SUI",
               "btc_confirmed_short": true,
-              "current_price": 0.91082,
+              "current_price": 0.91041,
               "entry_price": 0.9098,
               "entry_time": "2026-10-26T19:30:00",
               "eth_confirmed_short": true,
               "filter": "BTC+ETH confirmed short + mid-cap enter_short",
               "ticker": "SUI20947-USD",
-              "unrealized_gross_return_pct": -0.1121
+              "unrealized_gross_return_pct": -0.067
             }
           },
           "today": {
@@ -4095,6 +4095,6 @@
     "errors": [],
     "scope": "Shadow-only fresh short signals for SOL/AVAX/LINK/SUI/XRP/ONDO that live trading blocks because mid-cap allow_short=False.",
     "tracking_started_at": "2026-09-10T22:03:23.796957+00:00",
-    "updated_at": "2026-10-26T22:08:22.279647+00:00"
+    "updated_at": "2026-10-26T23:08:22.120925+00:00"
   }
 }
