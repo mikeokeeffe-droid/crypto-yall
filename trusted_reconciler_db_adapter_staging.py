@@ -14,7 +14,7 @@ class CommitResult:
 def commit_candidate(rpc, decision, *, coin, bot, token, order_id=None):
     if decision is None or getattr(decision, "action", None) not in {"handoff_candidate", "release_candidate"}:
         return CommitResult(False, "exchange verification did not authorize transition")
-    if not coin or bot not in {"intraday", "aggressive", "daily"} or not token:
+    if not coin or bot != "intraday" or not token:
         return CommitResult(False, "invalid durable owner identity")
     if decision.action == "handoff_candidate":
         if order_id is None or not str(order_id).strip():
