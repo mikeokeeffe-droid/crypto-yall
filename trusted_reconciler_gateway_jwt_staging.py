@@ -60,7 +60,9 @@ def verify_staging_jwt(token, secret, *, issuer, audience, now=None):
     not_before = payload.get("nbf")
     if (not isinstance(issued, int) or isinstance(issued, bool)
             or not isinstance(not_before, int) or isinstance(not_before, bool)
-            or issued > clock or not_before > clock\n            or type(payload.get("exp")) is not int\n            or payload["exp"] <= max(issued, not_before)):
+            or issued > clock or not_before > clock
+            or type(payload.get("exp")) is not int
+            or payload["exp"] <= max(issued, not_before)):
         raise PermissionError("invalid token timing")
     scopes = payload.get("scope")
     if not isinstance(scopes, str):
