@@ -35,4 +35,6 @@ def verify_order_fills(*, fills, coin: str, order_id: str,
         if not (0 < size < float("inf")):
             return FillEvidence(False, reason="invalid fill size")
         total += size
+    if not (0 < total < float("inf")):
+        return FillEvidence(False, reason="invalid aggregate fill size")
     return FillEvidence(True, filled_size=total, reason="matching exchange fills")
