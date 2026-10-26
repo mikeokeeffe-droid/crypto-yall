@@ -29,6 +29,11 @@ class FillVerificationTests(unittest.TestCase):
         self.assertFalse(verify(fills, fresh=False).verified)
         self.assertFalse(verify(fills, orders=[{"coin": "SOL"}]).verified)
 
+    def test_aggregate_fill_overflow_denied(self):
+        fills = [{"coin": "SOL", "oid": 123, "sz": "1e308"},
+                 {"coin": "SOL", "oid": 123, "sz": "1e308"}]
+        self.assertFalse(verify(fills).verified)
+
     def test_invalid_size_denied(self):
         self.assertFalse(verify([{"coin": "SOL", "oid": 123, "sz": "nan"}]).verified)
         self.assertFalse(verify([{"coin": "SOL", "oid": 123, "sz": "-1"}]).verified)
