@@ -90,5 +90,30 @@ class GatewayDatabaseBoundaryTests(unittest.TestCase):
         self.assertEqual(calls, ["record_bot_position_owner"])
 
 
+    def test_reconciler_direct_write_is_denied_by_database(self):
+        with connect() as conn:
+            with self.assertRaises(psycopg.errors.InsufficientPrivilege):
+                with conn.transaction():
+                    conn.execute("set local role bot_reconciler")
+                    conn.execute(
+                        "update public.bot_position_owners set bot=bot where false"
+                    )
+
+    def test_connection_failure_retains_intent_and_never_confirms_handoff(self):
+        calls = []
+        def unavailable_rpc(function, params):
+            calls.append(function)
+            raise psycopg.OperationalError("simulated isolated DB outage")
+
+        with patch("trusted_reconciler_service_staging.reconcile_entry",
+                   return_value=ReconciliationResult(
+                       "handoff_candidate", "mock verified evidence")):
+            result = reconcile_entry_with_token(
+                None, None, unavailable_rpc,
+                auth_token=signed_token(), **AUTH, **ENTRY)
+        self.assertFalse(result.confirmed)
+        self.assertIn("retain intent", result.reason)
+        self.assertEqual(calls, ["record_bot_position_owner"])
+
 if __name__ == "__main__":
     unittest.main()
