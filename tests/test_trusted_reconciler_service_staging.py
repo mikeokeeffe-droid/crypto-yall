@@ -26,6 +26,32 @@ class ServiceTests(unittest.TestCase):
         self.assertFalse(result.confirmed)
         release.assert_called_once()
 
+    def test_release_never_skips_first_exchange_verification(self):
+        calls = []
+        with patch("trusted_reconciler_release_staging.reconcile_closed",
+                   return_value=SimpleNamespace(action="hold")) as exchange:
+            result = authorized_reconcile_flat_owner(None, None,
+                lambda *args: calls.append(args) or True,
+                authorized=True, coin="SOL", bot="intraday",
+                token="durable-token", clock=lambda: 100)
+        self.assertFalse(result.confirmed)
+        exchange.assert_called_once()
+        self.assertEqual(calls, [])
+
+    def test_release_requires_explicit_database_confirmation(self):
+        for response in (False, None, "true", 1):
+            with self.subTest(response=response):
+                calls = []
+                with patch("trusted_reconciler_release_staging.reconcile_closed",
+                           return_value=SimpleNamespace(action="release_candidate")) as exchange:
+                    result = authorized_reconcile_flat_owner(None, None,
+                        lambda name, params: calls.append(name) or response,
+                        authorized=True, coin="SOL", bot="intraday",
+                        token="durable-token", clock=lambda: 100)
+                self.assertFalse(result.confirmed)
+                self.assertEqual(calls, ["mark_bot_position_closed"])
+                exchange.assert_called_once()
+
     def test_authorized_release_transport_failure_keeps_fence(self):
         with patch("trusted_reconciler_release_staging.reconcile_closed",
                    return_value=SimpleNamespace(action="release_candidate")):
