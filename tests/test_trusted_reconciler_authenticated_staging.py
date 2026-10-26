@@ -38,7 +38,7 @@ class AuthenticatedStagingTests(unittest.TestCase):
                     calls = []
                     with self.assertRaises(PermissionError):
                         reconcile_entry_with_token(None, None,
-                            lambda *a: calls.append(a), token=candidate,
+                            lambda *a: calls.append(a), auth_token=candidate,
                             **AUTH, **ENTRY)
                     evidence.assert_not_called()
                     self.assertEqual(calls, [])
@@ -49,7 +49,7 @@ class AuthenticatedStagingTests(unittest.TestCase):
                    return_value=SimpleNamespace(action="handoff_candidate")):
             result = reconcile_entry_with_token(None, None,
                 lambda name, data: calls.append(name) or True,
-                token=signed_token(), **AUTH, **ENTRY)
+                auth_token=signed_token(), **AUTH, **ENTRY)
         self.assertTrue(result.confirmed)
         self.assertEqual(calls, ["record_bot_position_owner"])
 
@@ -57,7 +57,7 @@ class AuthenticatedStagingTests(unittest.TestCase):
         with patch("trusted_reconciler_service_staging.release_verified") as evidence:
             with self.assertRaises(PermissionError):
                 reconcile_release_with_token(None, None, lambda *a: True,
-                    token=signed_token(scope="executor:reserve"), **AUTH, **OWNER)
+                    auth_token=signed_token(scope="executor:reserve"), **AUTH, **OWNER)
             evidence.assert_not_called()
 
     def test_signed_release_still_holds_if_exchange_disagrees(self):
