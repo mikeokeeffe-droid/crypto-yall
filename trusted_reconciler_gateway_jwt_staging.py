@@ -31,11 +31,18 @@ def verify_staging_jwt(token, secret, *, issuer, audience, now=None):
     parts = token.split(".")
     if len(parts) != 3:
         raise PermissionError("invalid token structure")
+    def reject_duplicate_claims(pairs):
+        result = {}
+        for key, value in pairs:
+            if key in result:
+                raise ValueError("duplicate token field")
+            result[key] = value
+        return result
     try:
-        header = json.loads(_decode(parts[0]))
-        payload = json.loads(_decode(parts[1]))
+        header = json.loads(_decode(parts[0]), object_pairs_hook=reject_duplicate_claims)
+        payload = json.loads(_decode(parts[1]), object_pairs_hook=reject_duplicate_claims)
         signature = _decode(parts[2])
-    except (ValueError, TypeError):
+    except (ValueError, TypeError, UnicodeDecodeError):
         raise PermissionError("invalid token JSON") from None
     if not isinstance(header, dict) or header.get("alg") != "HS256" or header.get("typ") != "JWT":
         raise PermissionError("unexpected signing algorithm")
