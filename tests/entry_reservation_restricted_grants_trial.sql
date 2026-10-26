@@ -48,3 +48,21 @@ begin
   end if;
 end $$;
 rollback;
+
+-- Assert the trusted reconciler's effective role cannot write protected tables
+-- directly and cannot borrow the routine executor's entry RPC privileges.
+begin;
+set local role bot_reconciler;
+do $$
+begin
+  if has_table_privilege(current_user, 'public.bot_position_owners', 'UPDATE')
+     or has_table_privilege(current_user, 'public.bot_entry_intents', 'DELETE')
+     or has_table_privilege(current_user, 'public.bot_entry_reservations', 'INSERT')
+     or has_function_privilege(current_user,
+       'public.try_reserve_bot_entry(text,text,uuid,integer)', 'EXECUTE')
+     or not has_function_privilege(current_user,
+       'public.mark_bot_position_closed(text,text,uuid,boolean,boolean)', 'EXECUTE') then
+    raise exception 'reconciler role has unexpected effective privileges';
+  end if;
+end $$;
+rollback;
