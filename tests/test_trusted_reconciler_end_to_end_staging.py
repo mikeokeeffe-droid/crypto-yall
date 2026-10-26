@@ -37,6 +37,37 @@ class IntegrationTests(unittest.TestCase):
                                 "release_closed_bot_position"])
         self.assertGreaterEqual(exchange.calls, 3)
 
+    def test_outstanding_order_blocks_handoff_and_release(self):
+        exchange = Exchange()
+        exchange.orders = [{"coin": "SOL", "oid": 19}]
+        calls = []
+        rpc = lambda *args: calls.append(args) or True
+        entry = reconcile_submitted_entry(exchange, ADDR, rpc, coin="SOL",
+                    bot="intraday", token="durable-token", order_id=17,
+                    order_start_ms=99000, clock=lambda: 100)
+        self.assertFalse(entry.confirmed)
+        exchange.active = False
+        release = reconcile_flat_owner(exchange, ADDR, rpc, coin="SOL",
+                    bot="intraday", token="durable-token", clock=lambda: 100)
+        self.assertFalse(release.confirmed)
+        self.assertEqual(calls, [])
+
+    def test_other_bots_cannot_reconcile_or_mutate(self):
+        for bot in ("aggressive", "daily"):
+            with self.subTest(bot=bot):
+                exchange = Exchange()
+                calls = []
+                rpc = lambda *args: calls.append(args) or True
+                result = reconcile_submitted_entry(exchange, ADDR, rpc, coin="SOL",
+                         bot=bot, token="durable-token", order_id=17,
+                         order_start_ms=99000, clock=lambda: 100)
+                self.assertFalse(result.confirmed)
+                self.assertEqual(exchange.calls, 0)
+                self.assertFalse(reconcile_flat_owner(exchange, ADDR, rpc,
+                         coin="SOL", bot=bot, token="durable-token",
+                         clock=lambda: 100).confirmed)
+                self.assertEqual(calls, [])
+
     def test_incomplete_evidence_never_calls_rpc(self):
         exchange = Exchange()
         exchange.fills = []
