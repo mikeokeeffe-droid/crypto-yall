@@ -31,10 +31,10 @@ class GatewayDispatchTests(unittest.TestCase):
 
 
     def test_verified_token_routes_only_to_server_owned_adapter(self):
-        from unittest.mock import sentinel
+        from unittest.mock import Mock
+        run = Mock(return_value="reconciled")
         with patch("trusted_reconciler_dispatch_staging.verify_staging_jwt") as verify, \
-             patch("trusted_reconciler_dispatch_staging.reconcile_entry_with_token",
-                   return_value="reconciled") as run:
+             patch.dict("trusted_reconciler_dispatch_staging._OPERATIONS", {"reconcile_entry": run}):
             result = dispatch_staging_reconciliation(
                 {"token": "signed", "operation": "reconcile_entry",
                  "args": {"coin": "SOL", "bot": "intraday", "token": "owner", "order_id": "1", "order_start_ms": 1, "clock": 1}},
