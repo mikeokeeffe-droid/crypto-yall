@@ -13,6 +13,15 @@ class ServiceResult:
     confirmed: bool
     reason: str
 
+def authenticated_rpc(rpc, *, authorized):
+    """Fail-closed staging adapter. Caller must validate identity out of band.
+
+    This does not authenticate a remote user or provision credentials.
+    """
+    if authorized is not True or not callable(rpc):
+        raise PermissionError("trusted reconciler authorization required")
+    return rpc
+
 def reconcile_submitted_entry(info, address, rpc, *, coin, bot, token,
                               order_id, order_start_ms, clock):
     if bot != "intraday":
