@@ -12,6 +12,9 @@ class RestartTests(unittest.TestCase):
         self.assertEqual(classify_restart("released", False, True, False, True).action, "hold")
     def test_existing_owner_is_managed(self):
         self.assertEqual(classify_restart("filled", True, False, True, True).action, "manage_existing")
+    def test_owned_position_with_open_orders_holds(self):
+        self.assertEqual(classify_restart("filled", True, False, False, True).action, "hold")
+
     def test_conflicting_owner_holds(self):
         self.assertEqual(classify_restart("filled", True, True, True, True).action, "hold")
     def test_unknown_intent_holds(self):
