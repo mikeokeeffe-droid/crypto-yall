@@ -18,3 +18,33 @@ begin
     raise exception 'trial executor lost scoped reservation RPC';
   end if;
 end $$;
+
+-- Verify effective permissions under the actual database role, not only via
+-- role-name introspection. Run only against disposable PostgreSQL.
+begin;
+set local role service_role;
+do $$
+begin
+  if has_table_privilege(current_user, 'public.bot_entry_reservations', 'INSERT')
+     or has_table_privilege(current_user, 'public.bot_entry_intents', 'UPDATE')
+     or has_function_privilege(current_user,
+       'public.try_reserve_bot_entry(text,text,uuid,integer)', 'EXECUTE') then
+    raise exception 'service_role still has effective entry mutation access';
+  end if;
+end $$;
+rollback;
+
+begin;
+set local role bot_entry_executor_trial;
+do $$
+begin
+  if has_table_privilege(current_user, 'public.bot_entry_reservations', 'INSERT')
+     or has_table_privilege(current_user, 'public.bot_entry_intents', 'DELETE')
+     or not has_function_privilege(current_user,
+       'public.try_reserve_bot_entry(text,text,uuid,integer)', 'EXECUTE')
+     or has_function_privilege(current_user,
+       'public.resolve_bot_entry_intent(text,text,uuid)', 'EXECUTE') then
+    raise exception 'trial executor role privileges exceed scoped RPC access';
+  end if;
+end $$;
+rollback;
