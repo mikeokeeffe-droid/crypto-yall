@@ -21,7 +21,7 @@ def simulate_executor_entry(
 ) -> DryRunResult:
     # Caller MUST supply fake/staging store. This function is deliberately
     # incapable of submitting a live order even if given an order_sender.
-    permit = acquire_entry_permit(store, coin, bot)
+    # Reject unsafe exchange state before creating any durable reservation.\n    if (type(exchange_position_flat) is not bool or\n            type(exchange_orders_clear) is not bool or\n            not exchange_position_flat or not exchange_orders_clear):\n        return DryRunResult(False)\n    permit = acquire_entry_permit(store, coin, bot)
     if permit is None:
         return DryRunResult(False)
     lifecycle = EntryLifecycle()
