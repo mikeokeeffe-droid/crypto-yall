@@ -29,5 +29,35 @@ class GatewayDispatchTests(unittest.TestCase):
                     **self.options)
             run.assert_not_called()
 
+
+    def test_verified_token_routes_only_to_server_owned_adapter(self):
+        from unittest.mock import sentinel
+        with patch("trusted_reconciler_dispatch_staging.verify_staging_jwt") as verify, \
+             patch("trusted_reconciler_dispatch_staging.reconcile_entry_with_token",
+                   return_value="reconciled") as run:
+            result = dispatch_staging_reconciliation(
+                {"token": "signed", "operation": "reconcile_entry",
+                 "args": {"bot": "Intraday"}},
+                **self.options)
+            self.assertEqual(result, "reconciled")
+            verify.assert_called_once()
+            run.assert_called_once()
+            self.assertIs(run.call_args.args[2], self.options["reconciler_rpc"])
+            self.assertEqual(run.call_args.kwargs["auth_token"], "signed")
+
+    def test_rejects_release_with_invalid_token(self):
+        with patch("trusted_reconciler_dispatch_staging.reconcile_release_with_token") as run:
+            with self.assertRaises(PermissionError):
+                dispatch_staging_reconciliation(
+                    {"token": "invalid", "operation": "reconcile_release",
+                     "args": {"bot": "Intraday"}}, **self.options)
+            run.assert_not_called()
+
+    def test_rejects_unexpected_request_fields(self):
+        with self.assertRaises(PermissionError):
+            dispatch_staging_reconciliation(
+                {"token": "invalid", "operation": "reconcile_entry",
+                 "args": {"bot": "Intraday"}, "rpc": object()}, **self.options)
+
 if __name__ == "__main__":
     unittest.main()
