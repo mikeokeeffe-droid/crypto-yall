@@ -41,6 +41,19 @@ class DryRunTests(unittest.TestCase):
         )
         self.assertFalse(result.simulated_allowed)
 
+    def test_unsafe_evidence_never_touches_reservation_store(self):
+        class NeverReserve:
+            def reserve(self, *args):
+                raise AssertionError("unsafe evidence must not reserve")
+            def claim_intent(self, *args):
+                raise AssertionError("unsafe evidence must not claim")
+        for flat, clear in ((False, True), (True, False), (None, True), (True, 1)):
+            with self.subTest(flat=flat, clear=clear):
+                result = simulate_executor_entry(
+                    NeverReserve(), coin="SOL", bot="intraday",
+                    exchange_position_flat=flat, exchange_orders_clear=clear)
+                self.assertFalse(result.simulated_allowed)
+
     def test_pending_order_denies(self):
         result = simulate_executor_entry(
             FakeStore(), coin="SUI", bot="aggressive",
