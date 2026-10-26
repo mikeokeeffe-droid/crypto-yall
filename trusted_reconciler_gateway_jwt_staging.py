@@ -24,7 +24,8 @@ def _decode(segment):
 
 def verify_staging_jwt(token, secret, *, issuer, audience, now=None):
     """Verify signature and essential claims; never accept caller-supplied claims."""
-    if not isinstance(token, str) or len(token) > 16384 or any(ch.isspace() for ch in token):
+    if (not isinstance(token, str) or len(token) > 16384
+            or not token.isascii() or any(ch.isspace() for ch in token)):
         raise PermissionError("invalid token")
     if not isinstance(secret, bytes) or len(secret) < 32:
         raise ValueError("staging signing key must contain at least 32 bytes")
