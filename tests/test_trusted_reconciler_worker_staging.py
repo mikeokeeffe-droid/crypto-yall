@@ -24,6 +24,17 @@ class WorkerTests(unittest.TestCase):
     def test_missing_submission_timestamp_holds(self):
         self.assertEqual(reconcile_entry(Info(), ADDRESS, coin="SOL", order_id=17,
                          order_start_ms=None, clock=lambda: 100).action, "hold")
+    def test_malformed_order_identity_and_timestamp_hold_without_exchange_reads(self):
+        class NoReads:
+            def __getattr__(self, name):
+                raise AssertionError("invalid input must not read exchange")
+        for order_id, start in ((True, 99000), (-1, 99000), (17, True), (17, -1)):
+            with self.subTest(order_id=order_id, start=start):
+                result = reconcile_entry(NoReads(), ADDRESS, coin="SOL",
+                                         order_id=order_id,
+                                         order_start_ms=start, clock=lambda: 100)
+                self.assertEqual(result.action, "hold")
+
     def test_flat_entry_holds(self):
         self.assertEqual(reconcile_entry(Info(active=False), ADDRESS, coin="SOL", order_id=17,
                          order_start_ms=99000, clock=lambda: 100).action, "hold")
