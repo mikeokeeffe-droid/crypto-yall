@@ -60,6 +60,9 @@ INTRADAY_MAX_LEVERAGE = float(os.getenv("INTRADAY_MAX_LEVERAGE", "2"))
 # ── State persistence (separate Gist from daily bot) ────────────────────────
 
 def load_state() -> dict:
+    from supabase_state_store import enabled, load
+    if enabled():
+        return load("intraday")
     gist_token = os.environ.get("GIST_TOKEN")
     gist_id = os.environ.get("INTRADAY_GIST_ID")
 
@@ -145,6 +148,9 @@ def load_state() -> dict:
     return state
 
 def save_state(state: dict):
+    from supabase_state_store import enabled, save
+    if enabled():
+        return save("intraday", state)
     gist_token = os.environ.get("GIST_TOKEN")
     gist_id = os.environ.get("INTRADAY_GIST_ID")
 
@@ -485,25 +491,6 @@ def execute_trade(
         )
         return _parse_response(trade, resp, info, coin)
 
-    # Opt-in staging trial at the REAL entry dispatch point. Fail closed:
-    # the current shared gate is an inspection adapter, not yet a trusted
-    # production reservation + exchange reconciliation service.
-    # Close/exit actions above remain unaffected.
-    if os.environ.get("INTRADAY_ENTRY_SAFETY_TRIAL", "OFF").upper() == "ON":
-        # Real entry path, dry-run only. The inspection result is logged,
-        # never used as permission to place an exchange order.
-        from intraday_entry_observer_staging import observe_intraday_entry
-        observation = observe_intraday_entry(
-            trade=trade,
-            position_snapshot=None,  # No independent exchange snapshot yet; deny.
-        )
-        print(f"Intraday safety trial: {observation}")
-        return {
-            **trade,
-            "status": "skipped",
-            "reason": "Intraday safety trial: entry submission disabled",
-        }
-
     mid = get_mid_price(info, coin)
     calculated_notional = capital * POSITION_SIZE_PCT * leverage
     test_notional = float(os.environ.get("INTRADAY_TEST_NOTIONAL", "0") or 0)
@@ -656,17 +643,9 @@ def main():
     if protection_only:
         print("Intraday PROTECTION-ONLY mode: no entries, normal signal exits, or signal recomputation")
 
-    # Opt-in protection-only continuation while new entries remain disabled.
-    # Default OFF preserves the existing emergency halt behaviour.
-    allow_protection_while_halted = (
-        protection_only
-        and os.environ.get("INTRADAY_PROTECT_WHILE_HALTED", "OFF").upper() == "ON"
-    )
-    if kill_switch_off() and not allow_protection_while_halted:
+    if kill_switch_off():
         print("Intraday KILL_SWITCH is OFF — halting")
         sys.exit(0)
-    if allow_protection_while_halted and kill_switch_off():
-        print("Intraday entry halt remains ON; protection-only close checks permitted")
 
     try:
         info, exchange, address = get_client()
@@ -820,11 +799,6 @@ def main():
         managed_positions,
         max_positions,
     )
-
-    # Defence in depth: a protection-only heartbeat must never open a trade,
-    # even if a future strategy change accidentally proposes an entry.
-    if protection_only:
-        trades = [t for t in trades if t.get("action") == "close"]
 
     # Cross-bot position lock:
     # The three bots share one Hyperliquid account but keep separate state.
