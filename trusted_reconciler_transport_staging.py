@@ -13,9 +13,11 @@ _ALLOWED = frozenset({"record_bot_position_owner",
 class TrustedRpcTransport:
     def __init__(self, endpoint, reconciler_token, *, opener=urlopen):
         parsed = urlparse(endpoint)
-        if parsed.scheme != "https" or not parsed.netloc or parsed.username or parsed.password:
+        if (parsed.scheme != "https" or not parsed.hostname or parsed.username or parsed.password
+                or parsed.query or parsed.fragment or parsed.port == 0):
             raise ValueError("HTTPS RPC endpoint required")
-        if not reconciler_token or not isinstance(reconciler_token, str):
+        if (not isinstance(reconciler_token, str) or not reconciler_token.strip()
+                or any(ch.isspace() for ch in reconciler_token)):
             raise ValueError("dedicated reconciler token required")
         self.endpoint = endpoint.rstrip("/")
         self.token = reconciler_token
