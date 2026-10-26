@@ -5,6 +5,7 @@ on:
       - 'db/entry_reservations_staging.sql'
       - 'db/entry_reservations_staging_grants.sql'
       - 'db/entry_reservations_restricted_grants_trial.sql'
+      - 'db/entry_reservation_identity_preflight_staging.sql'
       - 'db/position_ownership_staging.sql'
       - 'db/trusted_reconciler_role_staging.sql'
       - 'tests/**'
@@ -94,6 +95,7 @@ jobs:
           psql -v ON_ERROR_STOP=1 -f db/entry_reservations_restricted_grants_trial.sql
           psql -v ON_ERROR_STOP=1 -f tests/entry_reservation_restricted_grants_trial.sql
           psql -v ON_ERROR_STOP=1 -f tests/entry_reservation_cross_role_isolation.sql
+          psql -v ON_ERROR_STOP=1 -f db/entry_reservation_identity_preflight_staging.sql
       - name: Test offline re-entry lock safeguards
         run: python -m unittest discover -s tests -p 'test_reentry_safety.py' -v
       - name: Test fail-closed entry adapter
