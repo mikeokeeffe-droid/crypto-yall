@@ -19,3 +19,9 @@
 ## Acceptance gate
 
 Only consider cutover after CI is green at the **final commit**, identity-to-DB-role end-to-end proof is captured, every production caller is migrated, independent review signs off, and the user explicitly approves deployment.
+
+## Latest isolated acceptance additions
+
+- Signed staging identity tests now explicitly reject Aggressive and Daily reconciliation requests before reading exchange evidence or invoking database RPCs.
+- This is a **safety fence**, not three-bot integration. Aggressive and Daily must remain unsupported by the authenticated staging reconciler until separate end-to-end authorization and exchange-evidence tests exist.
+- An independent reviewer must inspect the authentication gateway implementation, actual deployed grants, and migration sequence; no such review is represented as complete here.
