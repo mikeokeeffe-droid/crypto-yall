@@ -32,6 +32,13 @@ class GatewayAuthorizationTests(unittest.TestCase):
                         principal, expected_issuer="trusted-idp",
                         expected_audience="staging-reconciler", now=clock)
 
+    def test_identity_claims_must_be_strings(self):
+        for changes in ({"subject": 42}, {"subject": "   "},
+                        {"issuer": 123}, {"audience": ["staging-reconciler"]}):
+            with self.subTest(changes=changes):
+                with self.assertRaises(PermissionError):
+                    self.check(**changes)
+
     def test_invalid_claims_fail_closed(self):
         for changes in ({"subject": ""}, {"issuer": "untrusted"},
                         {"audience": "trading-bot"}, {"scopes": frozenset()},
