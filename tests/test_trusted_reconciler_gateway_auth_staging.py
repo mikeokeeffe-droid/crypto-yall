@@ -23,6 +23,15 @@ class GatewayAuthorizationTests(unittest.TestCase):
             authorize_verified_principal(self.claims, expected_issuer="trusted-idp",
                                          expected_audience="staging-reconciler", now=100)
 
+    def test_invalid_clock_rejected(self):
+        principal = VerifiedGatewayPrincipal(**self.claims)
+        for clock in (None, True, "100", 100.0):
+            with self.subTest(clock=clock):
+                with self.assertRaises(PermissionError):
+                    authorize_verified_principal(
+                        principal, expected_issuer="trusted-idp",
+                        expected_audience="staging-reconciler", now=clock)
+
     def test_invalid_claims_fail_closed(self):
         for changes in ({"subject": ""}, {"issuer": "untrusted"},
                         {"audience": "trading-bot"}, {"scopes": frozenset()},
