@@ -1,12 +1,25 @@
 import unittest
 from unittest.mock import patch
 from types import SimpleNamespace
-from trusted_reconciler_service_staging import reconcile_submitted_entry, reconcile_flat_owner, authenticated_rpc
+from trusted_reconciler_service_staging import reconcile_submitted_entry, reconcile_flat_owner, authenticated_rpc, authorized_reconcile_submitted_entry, authorized_reconcile_flat_owner
 
 ARGS = dict(coin="SOL", bot="intraday", token="durable-token", order_id=17,
             order_start_ms=99000, clock=lambda: 100)
 
 class ServiceTests(unittest.TestCase):
+    def test_unauthorized_entry_does_not_read_exchange_or_mutate(self):
+        with patch("trusted_reconciler_service_staging.reconcile_entry") as exchange:
+            with self.assertRaises(PermissionError):
+                authorized_reconcile_submitted_entry(None, None, lambda *a: True, **ARGS)
+            exchange.assert_not_called()
+
+    def test_unauthorized_release_does_not_read_exchange_or_mutate(self):
+        with patch("trusted_reconciler_service_staging.release_verified") as exchange:
+            with self.assertRaises(PermissionError):
+                authorized_reconcile_flat_owner(None, None, lambda *a: True,
+                    coin="SOL", bot="intraday", token="durable-token", clock=lambda: 100)
+            exchange.assert_not_called()
+
     def test_rpc_adapter_denies_missing_authorization(self):
         for authorized in (False, None, "true", 1):
             with self.subTest(authorized=authorized):
