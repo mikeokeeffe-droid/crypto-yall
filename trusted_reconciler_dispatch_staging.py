@@ -9,6 +9,11 @@ from trusted_reconciler_authenticated_staging import (
 )
 from trusted_reconciler_gateway_jwt_staging import verify_staging_jwt
 
+_ARGUMENTS = {
+    "reconcile_entry": frozenset({"coin", "bot", "token", "order_id", "order_start_ms", "clock"}),
+    "reconcile_release": frozenset({"coin", "bot", "token", "clock"}),
+}
+
 _OPERATIONS = {
     "reconcile_entry": reconcile_entry_with_token,
     "reconcile_release": reconcile_release_with_token,
@@ -30,6 +35,10 @@ def dispatch_staging_reconciliation(request, *, info, address, reconciler_rpc,
     if set(args) & {"info", "address", "rpc", "auth_token", "signing_key",
                     "issuer", "audience", "now", "authorized"}:
         raise PermissionError("caller cannot inject trusted dependencies")
+    if set(args) != _ARGUMENTS[operation]:
+        raise PermissionError("unexpected or missing reconciliation arguments")
+    if args["bot"] != "intraday":
+        raise PermissionError("only intraday staging reconciliation is permitted")
     token = request["token"]
     # Verify before invoking any trusted dependencies.
     verify_staging_jwt(token, signing_key, issuer=issuer, audience=audience, now=now)
