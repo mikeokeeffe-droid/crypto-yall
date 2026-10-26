@@ -12,6 +12,16 @@ class AdapterTests(unittest.TestCase):
                              coin="SOL", bot="intraday", token="token", order_id=17)
         self.assertTrue(r.committed)
         self.assertEqual(calls[0][0], "record_bot_position_owner")
+    def test_non_intraday_bots_denied_at_rpc_boundary(self):
+        for bot in ("aggressive", "daily"):
+            with self.subTest(bot=bot):
+                calls = []
+                result = commit_candidate(lambda *args: calls.append(args) or True,
+                    SimpleNamespace(action="handoff_candidate"),
+                    coin="SOL", bot=bot, token="token", order_id=17)
+                self.assertFalse(result.committed)
+                self.assertEqual(calls, [])
+
     def test_unverified_never_calls_rpc(self):
         calls = []
         r = commit_candidate(lambda *args: calls.append(args), SimpleNamespace(action="hold"),
