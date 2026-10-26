@@ -40,3 +40,14 @@ def reconcile_flat_owner(info, address, rpc, *, coin, bot, token, clock):
     released = release_verified(info, address, rpc, coin=coin, bot=bot,
                                 token=token, clock=clock)
     return ServiceResult(released, "release confirmed" if released else "release held; owner fence retained")
+
+def authorized_reconcile_submitted_entry(info, address, rpc, *, authorized=False, **kwargs):
+    """Opt-in staging entry point; authorization must precede any evidence read."""
+    guarded_rpc = authenticated_rpc(rpc, authorized=authorized)
+    return reconcile_submitted_entry(info, address, guarded_rpc, **kwargs)
+
+
+def authorized_reconcile_flat_owner(info, address, rpc, *, authorized=False, **kwargs):
+    """Opt-in staging release entry point; authorization must precede evidence read."""
+    guarded_rpc = authenticated_rpc(rpc, authorized=authorized)
+    return reconcile_flat_owner(info, address, guarded_rpc, **kwargs)
