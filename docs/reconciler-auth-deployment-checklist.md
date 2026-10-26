@@ -19,3 +19,7 @@
 - Explicit approval for credentials, migrations, rollout and rollback; keep all bots OFF until approved.
 
 **Known blocker:** The repository's staging `authenticated_rpc(..., authorized=True)` is only a caller assertion; the HTTPS transport injects a token but does not verify the receiving service. Neither constitutes completed authentication.
+
+## Database identity preflight
+
+The repository now includes `db/entry_reservation_identity_preflight_staging.sql`, a read-only assertion script that checks effective privileges and the presence of distinct roles in a disposable CI database. It does not create credentials or prove a production identity mapping. The `bot_entry_executor_trial` role is NOLOGIN and is **not** a deployable production executor principal. A database administrator must inspect actual staging grants, role inheritance, credential mapping, and caller migration before proposing any production change.
