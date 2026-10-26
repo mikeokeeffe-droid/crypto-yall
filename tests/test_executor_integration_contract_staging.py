@@ -58,6 +58,17 @@ class ExecutorIntegrationContractTests(unittest.TestCase):
             position_flat=True, no_open_orders=True)
         self.assertEqual(result.decision, "deny")
 
+    def test_ambiguous_exchange_evidence_never_reserves(self):
+        for flat, clear in ((None, True), (True, None), (1, True), (True, "yes")):
+            with self.subTest(flat=flat, clear=clear):
+                store = FakeStore()
+                result = evaluate_executor_trade(
+                    store, bot="intraday",
+                    trade={"hl_coin": "SOL", "action": "open_long"},
+                    position_flat=flat, no_open_orders=clear)
+                self.assertEqual(result.decision, "deny")
+                self.assertEqual(store.calls, 0)
+
     def test_exchange_pending_order_blocks(self):
         result = evaluate_executor_trade(
             FakeStore(), bot="aggressive",
