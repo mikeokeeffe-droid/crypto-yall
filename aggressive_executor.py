@@ -60,6 +60,9 @@ AGGRESSIVE_MAX_LEVERAGE = float(os.getenv("AGGRESSIVE_MAX_LEVERAGE", "4"))
 # ── State persistence (separate Gist) ───────────────────────────────────────
 
 def load_state() -> dict:
+    from supabase_state_store import enabled, load
+    if enabled():
+        return load("aggressive")
     gist_token = os.environ.get("GIST_TOKEN")
     gist_id = os.environ.get("AGGRESSIVE_GIST_ID")
 
@@ -135,6 +138,9 @@ def load_state() -> dict:
     return state
 
 def save_state(state: dict):
+    from supabase_state_store import enabled, save
+    if enabled():
+        return save("aggressive", state)
     gist_token = os.environ.get("GIST_TOKEN")
     gist_id = os.environ.get("AGGRESSIVE_GIST_ID")
     if not gist_token or not gist_id:

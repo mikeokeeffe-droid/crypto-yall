@@ -78,6 +78,9 @@ MIN_ORDER_NOTIONAL = 12.0  # buffer above Hyperliquid $10 minimum
 # ── State Persistence (GitHub Gist) ─────────────────────────────────────────
 
 def load_trading_state() -> dict:
+    from supabase_state_store import enabled, load
+    if enabled():
+        return load("daily")
     gist_token = os.environ.get("GIST_TOKEN")
     gist_id = os.environ.get("GIST_ID")
 
@@ -153,6 +156,9 @@ def load_trading_state() -> dict:
     return state
 
 def save_trading_state(state: dict):
+    from supabase_state_store import enabled, save
+    if enabled():
+        return save("daily", state)
     gist_token = os.environ.get("GIST_TOKEN")
     gist_id = os.environ.get("GIST_ID")
     if not gist_token or not gist_id:
