@@ -114,25 +114,19 @@ jobs:
         run: |
           python -m unittest discover -s tests -p 'test_shared_entry_gate_staging.py' -v
           python -m unittest discover -s tests -p 'test_three_bot_collision_offline.py' -v
-        run: |
           python -m unittest discover -s tests -p 'test_real_executor_order_boundaries_offline.py' -v
           python -m unittest discover -s tests -p 'test_three_bot_entry_denials_offline.py' -v
-        run: |
           python -m unittest discover -s tests -p 'test_three_bot_db_outages_offline.py' -v
           python -m unittest discover -s tests -p 'test_real_executor_fence_offline.py' -v
-        run: |
           python -m unittest discover -s tests -p 'test_entry_restart_recovery_offline.py' -v
           python -m unittest discover -s tests -p 'test_partial_fill_recovery_offline.py' -v
-        run: |
           python -m unittest discover -s tests -p 'test_partial_fill_accounting_staging.py' -v
           python -m unittest discover -s tests -p 'test_hyperliquid_fill_adapter_staging.py' -v
-        run: |
           python -m unittest discover -s tests -p 'test_hyperliquid_fill_readonly_staging.py' -v
           python -m unittest discover -s tests -p 'test_hyperliquid_order_status_staging.py' -v
-        run: |
           python -m unittest discover -s tests -p 'test_entry_recovery_decision_staging.py' -v
           python -m unittest discover -s tests -p 'test_hyperliquid_position_readonly_staging.py' -v
-        run: python -m unittest discover -s tests -p 'test_hyperliquid_readonly_recovery_staging.py' -v
+          python -m unittest discover -s tests -p 'test_hyperliquid_readonly_recovery_staging.py' -v
       - name: Test simulated entry failures and cross-bot conflicts
         run: python -m unittest discover -s tests -p 'test_shared_entry_failure_staging.py' -v
       - name: Test offline ownership handoff and release safeguards
