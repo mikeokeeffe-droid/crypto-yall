@@ -22,10 +22,10 @@ class GatewayDispatchTests(unittest.TestCase):
                 **self.options)
 
     def test_rejects_bad_token_without_calling_adapter(self):
-        with patch("trusted_reconciler_dispatch_staging.reconcile_entry_with_token") as run:
+        with patch("trusted_reconciler_dispatch_staging._OPERATIONS", {"reconcile_entry": run}):
             with self.assertRaises(PermissionError):
                 dispatch_staging_reconciliation(
-                    {"token": "invalid", "operation": "reconcile_entry", "args": {"bot": "intraday"}},
+                    {"token": "invalid", "operation": "reconcile_entry", "args": {"coin": "SOL", "bot": "intraday", "token": "owner", "order_id": "1", "order_start_ms": 1, "clock": 1}},
                     **self.options)
             run.assert_not_called()
 
@@ -46,11 +46,11 @@ class GatewayDispatchTests(unittest.TestCase):
             self.assertEqual(run.call_args.kwargs["auth_token"], "signed")
 
     def test_rejects_release_with_invalid_token(self):
-        with patch("trusted_reconciler_dispatch_staging.reconcile_release_with_token") as run:
+        with patch("trusted_reconciler_dispatch_staging._OPERATIONS", {"reconcile_release": run}):
             with self.assertRaises(PermissionError):
                 dispatch_staging_reconciliation(
                     {"token": "invalid", "operation": "reconcile_release",
-                     "args": {"bot": "Intraday"}}, **self.options)
+                     "args": {"coin": "SOL", "bot": "intraday", "token": "owner", "clock": 1}}, **self.options)
             run.assert_not_called()
 
     def test_rejects_unexpected_request_fields(self):
