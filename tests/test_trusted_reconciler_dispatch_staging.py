@@ -37,7 +37,7 @@ class GatewayDispatchTests(unittest.TestCase):
                    return_value="reconciled") as run:
             result = dispatch_staging_reconciliation(
                 {"token": "signed", "operation": "reconcile_entry",
-                 "args": {"bot": "Intraday"}},
+                 "args": {"coin": "SOL", "bot": "intraday", "token": "owner", "order_id": "1", "order_start_ms": 1, "clock": 1}},
                 **self.options)
             self.assertEqual(result, "reconciled")
             verify.assert_called_once()
