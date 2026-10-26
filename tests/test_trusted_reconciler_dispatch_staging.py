@@ -1,5 +1,5 @@
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 from trusted_reconciler_dispatch_staging import dispatch_staging_reconciliation
 
 class GatewayDispatchTests(unittest.TestCase):
@@ -22,6 +22,7 @@ class GatewayDispatchTests(unittest.TestCase):
                 **self.options)
 
     def test_rejects_bad_token_without_calling_adapter(self):
+        run = Mock()
         with patch("trusted_reconciler_dispatch_staging._OPERATIONS", {"reconcile_entry": run}):
             with self.assertRaises(PermissionError):
                 dispatch_staging_reconciliation(
@@ -46,6 +47,7 @@ class GatewayDispatchTests(unittest.TestCase):
             self.assertEqual(run.call_args.kwargs["auth_token"], "signed")
 
     def test_rejects_release_with_invalid_token(self):
+        run = Mock()
         with patch("trusted_reconciler_dispatch_staging._OPERATIONS", {"reconcile_release": run}):
             with self.assertRaises(PermissionError):
                 dispatch_staging_reconciliation(
