@@ -43,6 +43,16 @@ class AuthenticatedStagingTests(unittest.TestCase):
                     evidence.assert_not_called()
                     self.assertEqual(calls, [])
 
+    def test_signed_entry_with_unavailable_evidence_never_writes(self):
+        calls = []
+        with patch("trusted_reconciler_service_staging.reconcile_entry",
+                   side_effect=ConnectionError("exchange unavailable")):
+            with self.assertRaises(ConnectionError):
+                reconcile_entry_with_token(None, None,
+                    lambda *a: calls.append(a) or True,
+                    auth_token=signed_token(), **AUTH, **ENTRY)
+        self.assertEqual(calls, [])
+
     def test_signed_entry_reaches_existing_verified_handoff(self):
         calls = []
         with patch("trusted_reconciler_service_staging.reconcile_entry",
