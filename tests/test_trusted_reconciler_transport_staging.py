@@ -15,6 +15,27 @@ class TransportTests(unittest.TestCase):
     def test_reject_missing_token(self):
         with self.assertRaises(ValueError):
             TrustedRpcTransport("https://example.test", "")
+    def test_reject_endpoint_with_embedded_credentials(self):
+        for endpoint in ("https://user:pass@example.test", "https://example.test?key=secret",
+                         "https://example.test/#token", "https://"):
+            with self.subTest(endpoint=endpoint):
+                with self.assertRaises(ValueError):
+                    TrustedRpcTransport(endpoint, "dedicated")
+
+    def test_reject_whitespace_credentials(self):
+        for token in (" ", "bad token", "bad\\ntoken", "\\ttoken"):
+            with self.subTest(token=repr(token)):
+                with self.assertRaises(ValueError):
+                    TrustedRpcTransport("https://example.test", token)
+
+    def test_disallowed_rpc_does_not_open_network(self):
+        calls = []
+        client = TrustedRpcTransport("https://example.test", "dedicated",
+                                    opener=lambda *a, **k: calls.append(a))
+        with self.assertRaises(ValueError):
+            client("resolve_bot_entry_intent", {})
+        self.assertEqual(calls, [])
+
     def test_allowlisted_rpc(self):
         seen = []
         def opener(request, timeout):
