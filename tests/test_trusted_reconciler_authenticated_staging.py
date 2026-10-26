@@ -64,7 +64,7 @@ class AuthenticatedStagingTests(unittest.TestCase):
         with patch("trusted_reconciler_service_staging.release_verified",
                    return_value=False) as evidence:
             result = reconcile_release_with_token(None, None,
-                lambda *a: True, token=signed_token(), **AUTH, **OWNER)
+                lambda *a: True, auth_token=signed_token(), **AUTH, **OWNER)
         self.assertFalse(result.confirmed)
         evidence.assert_called_once()
 
