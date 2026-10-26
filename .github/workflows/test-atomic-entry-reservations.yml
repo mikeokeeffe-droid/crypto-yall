@@ -80,6 +80,10 @@ jobs:
           psql -v ON_ERROR_STOP=1 -f tests/position_ownership_staging.sql
           psql -v ON_ERROR_STOP=1 -f tests/entry_reservation_permissions.sql
           psql -v ON_ERROR_STOP=1 -f tests/entry_reservations_staging.sql
+      - name: Verify isolated least-privilege executor trial
+        run: |
+          psql -v ON_ERROR_STOP=1 -f db/entry_reservation_least_privilege_trial.sql
+          psql -v ON_ERROR_STOP=1 -f tests/entry_reservation_least_privilege_trial.sql
       - name: Test offline re-entry lock safeguards
         run: python -m unittest discover -s tests -p 'test_reentry_safety.py' -v
       - name: Test fail-closed entry adapter
