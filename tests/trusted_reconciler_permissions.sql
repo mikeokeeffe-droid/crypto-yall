@@ -35,3 +35,18 @@ begin
    'public.release_closed_bot_position(text,text,uuid,boolean,boolean)','EXECUTE')
  then raise exception 'routine service role can release verified ownership'; end if;
 end $$;
+
+-- The reconciler identity must not be inherited by ordinary client roles.
+do $$
+begin
+ if pg_has_role('anon','bot_reconciler','MEMBER')
+    or pg_has_role('authenticated','bot_reconciler','MEMBER') then
+   raise exception 'client role inherits reconciler privileges';
+ end if;
+ if has_function_privilege('anon',
+   'public.release_closed_bot_position(text,text,uuid,boolean,boolean)','EXECUTE')
+    or has_function_privilege('authenticated',
+   'public.mark_bot_position_closed(text,text,uuid,boolean,boolean)','EXECUTE') then
+   raise exception 'client role can invoke reconciler mutation RPC';
+ end if;
+end $$;
