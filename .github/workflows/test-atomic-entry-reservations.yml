@@ -99,6 +99,10 @@ jobs:
           psql -v ON_ERROR_STOP=1 -f db/entry_reservation_identity_preflight_staging.sql
       - name: Verify signed gateway to restricted PostgreSQL identity boundary
         run: python -m unittest discover -s tests -p 'test_gateway_database_boundary_postgres.py' -v
+      - name: Verify ephemeral restricted PostgreSQL LOGIN (isolated CI only)
+        env:
+          ISOLATED_POSTGRES_CI: '1'
+        run: python -m unittest discover -s tests -p 'test_reconciler_dedicated_login_postgres.py' -v
       - name: Test dedicated-login PostgreSQL transport safeguards
         run: python -m unittest discover -s tests -p 'test_trusted_reconciler_postgres_transport_staging.py' -v
       - name: Test offline re-entry lock safeguards
