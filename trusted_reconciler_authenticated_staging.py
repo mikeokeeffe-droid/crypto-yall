@@ -16,9 +16,9 @@ def reconcile_entry_with_token(info, address, rpc, *, auth_token, signing_key,
     return authorized_reconcile_submitted_entry(
         info, address, rpc, authorized=True, **entry)
 
-def reconcile_release_with_token(info, address, rpc, *, token, signing_key,
+def reconcile_release_with_token(info, address, rpc, *, auth_token, signing_key,
                                  issuer, audience, now, **owner):
-    verify_staging_jwt(token, signing_key, issuer=issuer, audience=audience,
+    verify_staging_jwt(auth_token, signing_key, issuer=issuer, audience=audience,
                        now=now)
     return authorized_reconcile_flat_owner(
         info, address, rpc, authorized=True, **owner)
