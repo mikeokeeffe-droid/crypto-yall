@@ -96,6 +96,8 @@ jobs:
           psql -v ON_ERROR_STOP=1 -f tests/entry_reservation_restricted_grants_trial.sql
           psql -v ON_ERROR_STOP=1 -f tests/entry_reservation_cross_role_isolation.sql
           psql -v ON_ERROR_STOP=1 -f db/entry_reservation_identity_preflight_staging.sql
+      - name: Verify signed gateway to restricted PostgreSQL identity boundary
+        run: python -m unittest discover -s tests -p 'test_gateway_database_boundary_postgres.py' -v
       - name: Test offline re-entry lock safeguards
         run: python -m unittest discover -s tests -p 'test_reentry_safety.py' -v
       - name: Test fail-closed entry adapter
