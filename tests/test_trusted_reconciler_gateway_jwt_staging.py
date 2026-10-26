@@ -44,6 +44,10 @@ class JwtTests(unittest.TestCase):
         with self.assertRaises(PermissionError):
             self.verify(signing + "." + sig)
 
+    def test_reject_non_ascii_token_before_signature_parsing(self):
+        with self.assertRaises(PermissionError):
+            self.verify(token(CLAIMS) + "é")
+
     def test_reject_whitespace_in_token(self):
         with self.assertRaises(PermissionError):
             self.verify(token(CLAIMS) + " ")
