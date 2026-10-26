@@ -60,6 +60,14 @@ class AuthenticatedStagingTests(unittest.TestCase):
                     auth_token=signed_token(scope="executor:reserve"), **AUTH, **OWNER)
             evidence.assert_not_called()
 
+    def test_signed_release_can_only_use_verified_release_path(self):
+        with patch("trusted_reconciler_service_staging.release_verified",
+                   return_value=True) as verified:
+            result = reconcile_release_with_token(None, None,
+                lambda *a: True, auth_token=signed_token(), **AUTH, **OWNER)
+        self.assertTrue(result.confirmed)
+        verified.assert_called_once()
+
     def test_signed_release_still_holds_if_exchange_disagrees(self):
         with patch("trusted_reconciler_service_staging.release_verified",
                    return_value=False) as evidence:
