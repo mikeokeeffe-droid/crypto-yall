@@ -61,6 +61,13 @@ class JwtTests(unittest.TestCase):
         with self.assertRaises(PermissionError):
             self.verify(signing + "." + sig)
 
+    def test_reject_inconsistent_token_lifetime(self):
+        for changed in ({"exp": 89}, {"exp": 90, "nbf": 90},
+                        {"iat": 99, "exp": 98}, {"exp": True}):
+            with self.subTest(changed=changed):
+                with self.assertRaises(PermissionError):
+                    self.verify(token({**CLAIMS, **changed}))
+
     def test_algorithm_restriction(self):
         with self.assertRaises(PermissionError):
             self.verify(token(CLAIMS, algorithm="none"))
