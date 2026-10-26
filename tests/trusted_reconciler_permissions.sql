@@ -19,3 +19,22 @@ begin
  if pg_has_role('service_role','bot_reconciler','MEMBER')
  then raise exception 'routine service role must not inherit reconciler role'; end if;
 end $$;
+
+-- Explicitly protect intent resolution: no routine executor can clear the
+-- durable unresolved-order fence, and reconciliation cannot do so until
+-- a separately reviewed authorization path is implemented.
+do $$
+begin
+ if has_function_privilege('service_role',
+   'public.resolve_bot_entry_intent(text,text,uuid)','EXECUTE')
+ then raise exception 'routine service role can resolve durable intent'; end if;
+ if has_function_privilege('bot_entry_executor_trial',
+   'public.resolve_bot_entry_intent(text,text,uuid)','EXECUTE')
+ then raise exception 'trial executor can resolve durable intent'; end if;
+ if has_function_privilege('bot_reconciler',
+   'public.resolve_bot_entry_intent(text,text,uuid)','EXECUTE')
+ then raise exception 'reconciler intent resolution is not yet approved'; end if;
+ if has_function_privilege('service_role',
+   'public.release_closed_bot_position(text,text,uuid,boolean,boolean)','EXECUTE')
+ then raise exception 'routine service role can release verified ownership'; end if;
+end $$;
