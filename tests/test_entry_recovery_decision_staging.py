@@ -28,6 +28,15 @@ class RecoveryDecisionTests(unittest.TestCase):
                 self.assertEqual(decide_recovery(order_final=finality,
                     fill_snapshot=self.snapshot([]), position=position), Decision.KEEP_FENCED)
 
+    def test_contradictory_fill_evidence_remains_fenced(self):
+        from partial_fill_accounting_staging import FillSnapshot
+        for filled, remaining, exposed in [(1, 9, False), (0, 9, False), (float("nan"), 10, False)]:
+            with self.subTest(filled=filled, remaining=remaining):
+                snapshot = FillSnapshot(10, filled, remaining, False, exposed)
+                decision = decide_recovery(order_final=True, fill_snapshot=snapshot,
+                                           position=PositionEvidence(True, 0))
+                self.assertNotEqual(decision, Decision.RELEASE_NO_FILL)
+
     def test_missing_fill_evidence_remains_fenced(self):
         self.assertEqual(decide_recovery(order_final=True, fill_snapshot=None,
                                          position=PositionEvidence(True, 0)), Decision.KEEP_FENCED)
