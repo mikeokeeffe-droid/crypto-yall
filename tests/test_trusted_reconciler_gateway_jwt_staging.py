@@ -33,6 +33,21 @@ class JwtTests(unittest.TestCase):
         with self.assertRaises(PermissionError):
             self.verify(token(CLAIMS, key=b"wrong-key-not-used-by-the-gateway-000"))
 
+    def test_reject_extra_signing_headers(self):
+        def enc(obj):
+            return base64.urlsafe_b64encode(json.dumps(obj).encode()).rstrip(b"=").decode()
+        head = enc({"alg": "HS256", "typ": "JWT", "jku": "https://attacker.test/jwks"})
+        body = enc(CLAIMS)
+        signing = head + "." + body
+        sig = base64.urlsafe_b64encode(
+            hmac.new(KEY, signing.encode(), hashlib.sha256).digest()).rstrip(b"=").decode()
+        with self.assertRaises(PermissionError):
+            self.verify(signing + "." + sig)
+
+    def test_reject_whitespace_in_token(self):
+        with self.assertRaises(PermissionError):
+            self.verify(token(CLAIMS) + " ")
+
     def test_duplicate_claim_fields_rejected(self):
         def enc(value):
             return base64.urlsafe_b64encode(value.encode()).rstrip(b"=").decode()
