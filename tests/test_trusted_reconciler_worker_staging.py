@@ -28,7 +28,7 @@ class WorkerTests(unittest.TestCase):
         class NoReads:
             def __getattr__(self, name):
                 raise AssertionError("invalid input must not read exchange")
-        for order_id, start in ((True, 99000), (-1, 99000), (17, True), (17, -1)):
+        for order_id, start in ((True, 99000), (-1, 99000), ("unknown", 99000), ("17x", 99000), (17, True), (17, -1)):
             with self.subTest(order_id=order_id, start=start):
                 result = reconcile_entry(NoReads(), ADDRESS, coin="SOL",
                                          order_id=order_id,
