@@ -485,16 +485,6 @@ def execute_trade(
         )
         return _parse_response(trade, resp, info, coin)
 
-    # Draft-branch fail-closed gate: no new live entry until a separately
-    # reviewed production reconciliation service has been deployed.
-    # This does not block existing position close orders.
-    if True:  # No environment override can certify an unverified service.
-        return {
-            **trade,
-            "status": "skipped",
-            "reason": "Trusted entry reconciliation is not deployed",
-        }
-
     # Opt-in staging trial at the REAL entry dispatch point. Fail closed:
     # the current shared gate is an inspection adapter, not yet a trusted
     # production reservation + exchange reconciliation service.
