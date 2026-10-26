@@ -152,6 +152,7 @@ jobs:
         run: python -m unittest discover -s tests -p 'test_trusted_reconciler_service_staging.py' -v
       - name: Test signed identity-gated staging reconciliation
         run: python -m unittest discover -s tests -p 'test_trusted_reconciler_authenticated_staging.py' -v
+        run: python -m unittest discover -s tests -p 'test_trusted_reconciler_dispatch_staging.py' -v
       - name: Test offline signed reconciler identity verification
         run: python -m unittest discover -s tests -p 'test_trusted_reconciler_gateway_jwt_staging.py' -v
       - name: Test verified gateway principal authorization contract
