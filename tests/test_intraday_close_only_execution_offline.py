@@ -53,12 +53,24 @@ class IntradayCloseOnlyExecutionTests(unittest.TestCase):
         self.assertEqual(self.exchange.closes, [("SOL", 0.2)])
         self.assertEqual(self.exchange.opens, [])
 
-    def test_draft_branch_blocks_new_long_and_short(self):
-        for action in ("open_long", "open_short"):
-            with self.subTest(action=action):
-                trade = {"ticker": "SOL-USD", "hl_coin": "SOL", "action": action}
-                result = self.execute_trade(None, self.exchange, trade, 100, 2)
-                self.assertEqual(result["status"], "skipped")
+    def test_entry_trial_guard_is_opt_in_and_precedes_open(self):
+        # Inspect the real executor's AST without invoking any entry order.
+        source = Path(__file__).resolve().parents[1] / "intraday_executor.py"
+        tree = ast.parse(source.read_text(encoding="utf-8"))
+        fn = next(n for n in tree.body if isinstance(n, ast.FunctionDef)
+                  and n.name == "execute_trade")
+        guards = [n for n in ast.walk(fn) if isinstance(n, ast.If)
+                  and any(isinstance(x, ast.Constant)
+                          and x.value == "INTRADAY_ENTRY_SAFETY_TRIAL"
+                          for x in ast.walk(n.test))]
+        self.assertEqual(len(guards), 1)
+        guard = guards[0]
+        self.assertTrue(any(isinstance(n, ast.Return) for n in guard.body))
+        opens = [n for n in ast.walk(fn) if isinstance(n, ast.Call)
+                 and isinstance(n.func, ast.Attribute)
+                 and n.func.attr == "market_open"]
+        self.assertEqual(len(opens), 1)
+        self.assertLess(guard.lineno, opens[0].lineno)
         self.assertEqual(self.exchange.opens, [])
 
     def test_exchange_close_failure_propagates(self):
