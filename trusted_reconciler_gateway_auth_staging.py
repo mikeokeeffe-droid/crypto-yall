@@ -19,7 +19,9 @@ def authorize_verified_principal(principal, *, expected_issuer, expected_audienc
     """Accept only typed, previously verified identity claims, fail closed."""
     if not isinstance(principal, VerifiedGatewayPrincipal):
         raise PermissionError("verified gateway identity required")
-    if (not principal.subject or not principal.issuer or not principal.audience
+    if (type(principal.subject) is not str or not principal.subject.strip()
+            or type(principal.issuer) is not str or not principal.issuer
+            or type(principal.audience) is not str or not principal.audience
             or principal.issuer != expected_issuer
             or principal.audience != expected_audience
             or not isinstance(principal.expires_at, int)
