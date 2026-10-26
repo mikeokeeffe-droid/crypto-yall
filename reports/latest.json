@@ -375,7 +375,7 @@
     }
   },
   "date_utc": "2026-10-26",
-  "generated_at": "2026-10-26T08:08:14.936784+00:00",
+  "generated_at": "2026-10-26T09:08:20.156200+00:00",
   "report_errors": [],
   "reporting_only": true,
   "schema_version": 2,
@@ -3373,11 +3373,20 @@
           "SOL": {
             "asset": "SOL",
             "blocked_live_reason": "mid-cap allow_short=False",
-            "current_price": 100.67,
+            "current_price": 101.07,
             "entry_price": 100.99,
             "entry_time": "2026-10-25T12:00:00",
             "ticker": "SOL-USD",
-            "unrealized_gross_return_pct": 0.3169
+            "unrealized_gross_return_pct": -0.0792
+          },
+          "SUI": {
+            "asset": "SUI",
+            "blocked_live_reason": "mid-cap allow_short=False",
+            "current_price": 0.91605,
+            "entry_price": 0.91605,
+            "entry_time": "2026-10-26T08:00:00",
+            "ticker": "SUI20947-USD",
+            "unrealized_gross_return_pct": 0.0
           }
         },
         "today": {
@@ -3404,7 +3413,7 @@
             "win_rate_pct": 22.22,
             "wins": 8
           },
-          "btc_confirmed_short_now": true,
+          "btc_confirmed_short_now": false,
           "closed_trades": [
             {
               "asset": "AVAX",
@@ -3839,7 +3848,7 @@
               "ticker": "LINK-USD"
             }
           ],
-          "dual_short_confirmed_now": true,
+          "dual_short_confirmed_now": false,
           "eth_confirmed_short_now": true,
           "open_positions": {},
           "today": {
@@ -4064,6 +4073,6 @@
     "errors": [],
     "scope": "Shadow-only fresh short signals for SOL/AVAX/LINK/SUI/XRP/ONDO that live trading blocks because mid-cap allow_short=False.",
     "tracking_started_at": "2026-09-10T22:03:23.796957+00:00",
-    "updated_at": "2026-10-26T08:08:14.936784+00:00"
+    "updated_at": "2026-10-26T09:08:20.156200+00:00"
   }
 }
