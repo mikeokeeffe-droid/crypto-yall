@@ -10,6 +10,10 @@ do $$ begin
     or has_table_privilege(current_user,'public.bot_entry_intents','DELETE') then
    raise exception 'trial executor has direct table mutation privileges';
  end if;
+ if has_function_privilege(current_user,
+    'public.resolve_bot_entry_intent(text,text,uuid)','EXECUTE') then
+   raise exception 'trial executor can resolve durable intent';
+ end if;
  if not has_function_privilege(current_user,
     'public.try_reserve_bot_entry(text,text,uuid,integer)','EXECUTE') then
    raise exception 'trial executor lacks RPC access';
