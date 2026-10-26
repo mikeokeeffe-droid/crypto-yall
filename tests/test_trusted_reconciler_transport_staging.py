@@ -22,6 +22,13 @@ class TransportTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     TrustedRpcTransport(endpoint, "dedicated")
 
+    def test_reject_local_and_path_injected_endpoints(self):
+        for endpoint in ("https://localhost", "https://127.0.0.1",
+                         "https://[::1]", "https://example.test/custom/path"):
+            with self.subTest(endpoint=endpoint):
+                with self.assertRaises(ValueError):
+                    TrustedRpcTransport(endpoint, "dedicated")
+
     def test_reject_whitespace_credentials(self):
         for token in (" ", "bad token", "bad\\ntoken", "\\ttoken"):
             with self.subTest(token=repr(token)):
