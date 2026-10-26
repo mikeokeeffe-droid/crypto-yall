@@ -24,7 +24,7 @@ def _decode(segment):
 
 def verify_staging_jwt(token, secret, *, issuer, audience, now=None):
     """Verify signature and essential claims; never accept caller-supplied claims."""
-    if not isinstance(token, str) or len(token) > 16384:
+    if not isinstance(token, str) or len(token) > 16384 or any(ch.isspace() for ch in token):
         raise PermissionError("invalid token")
     if not isinstance(secret, bytes) or len(secret) < 32:
         raise ValueError("staging signing key must contain at least 32 bytes")
@@ -44,7 +44,8 @@ def verify_staging_jwt(token, secret, *, issuer, audience, now=None):
         signature = _decode(parts[2])
     except (ValueError, TypeError, UnicodeDecodeError):
         raise PermissionError("invalid token JSON") from None
-    if not isinstance(header, dict) or header.get("alg") != "HS256" or header.get("typ") != "JWT":
+    if (not isinstance(header, dict) or set(header) != {"alg", "typ"}
+            or header.get("alg") != "HS256" or header.get("typ") != "JWT"):
         raise PermissionError("unexpected signing algorithm")
     if not isinstance(payload, dict):
         raise PermissionError("invalid claims")
