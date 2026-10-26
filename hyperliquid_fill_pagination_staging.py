@@ -51,6 +51,4 @@ def fetch_fills_window(info, address, start_ms, end_ms, *, max_pages=20, page_li
             return FillWindow([], False, "missing page cursor")
         return FillWindow([], False, "full page without lossless cursor")
 
-        if cursor > end_ms:
-            return FillWindow(all_fills, True, "window fetched")
     return FillWindow([], False, "page budget exhausted")
