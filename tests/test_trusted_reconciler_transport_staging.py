@@ -30,7 +30,7 @@ class TransportTests(unittest.TestCase):
                     TrustedRpcTransport(endpoint, "dedicated")
 
     def test_reject_whitespace_credentials(self):
-        for token in (" ", "bad token", "bad\\ntoken", "\\ttoken"):
+        for token in (" ", "bad token", "bad\ntoken", "\ttoken"):
             with self.subTest(token=repr(token)):
                 with self.assertRaises(ValueError):
                     TrustedRpcTransport("https://example.test", token)
