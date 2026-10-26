@@ -1,12 +1,22 @@
 import unittest
 from unittest.mock import patch
 from types import SimpleNamespace
-from trusted_reconciler_service_staging import reconcile_submitted_entry, reconcile_flat_owner
+from trusted_reconciler_service_staging import reconcile_submitted_entry, reconcile_flat_owner, authenticated_rpc
 
 ARGS = dict(coin="SOL", bot="intraday", token="durable-token", order_id=17,
             order_start_ms=99000, clock=lambda: 100)
 
 class ServiceTests(unittest.TestCase):
+    def test_rpc_adapter_denies_missing_authorization(self):
+        for authorized in (False, None, "true", 1):
+            with self.subTest(authorized=authorized):
+                with self.assertRaises(PermissionError):
+                    authenticated_rpc(lambda *a: True, authorized=authorized)
+
+    def test_rpc_adapter_allows_explicit_authorization(self):
+        rpc = lambda *a: True
+        self.assertIs(authenticated_rpc(rpc, authorized=True), rpc)
+
     def test_verified_entry_calls_trusted_rpc(self):
         calls = []
         with patch("trusted_reconciler_service_staging.reconcile_entry",
