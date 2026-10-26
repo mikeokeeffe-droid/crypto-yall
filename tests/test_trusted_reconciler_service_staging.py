@@ -26,6 +26,30 @@ class ServiceTests(unittest.TestCase):
         self.assertFalse(result.confirmed)
         release.assert_called_once()
 
+    def test_authorized_release_transport_failure_keeps_fence(self):
+        with patch("trusted_reconciler_release_staging.reconcile_closed",
+                   return_value=SimpleNamespace(action="release_candidate")):
+            def broken_rpc(*args):
+                raise ConnectionError("offline")
+            result = authorized_reconcile_flat_owner(None, None,
+                broken_rpc, authorized=True, coin="SOL", bot="intraday",
+                token="durable-token", clock=lambda: 100)
+        self.assertFalse(result.confirmed)
+
+    def test_authorized_release_requires_two_fresh_checks(self):
+        checks = [SimpleNamespace(action="release_candidate"),
+                  SimpleNamespace(action="hold")]
+        calls = []
+        with patch("trusted_reconciler_release_staging.reconcile_closed",
+                   side_effect=checks) as exchange:
+            result = authorized_reconcile_flat_owner(None, None,
+                lambda name, params: calls.append(name) or True,
+                authorized=True, coin="SOL", bot="intraday",
+                token="durable-token", clock=lambda: 100)
+        self.assertFalse(result.confirmed)
+        self.assertEqual(exchange.call_count, 2)
+        self.assertEqual(calls, ["mark_bot_position_closed"])
+
     def test_denied_authorization_never_invokes_rpc(self):
         calls = []
         for value in (False, None, "true", 1, {}, []):
