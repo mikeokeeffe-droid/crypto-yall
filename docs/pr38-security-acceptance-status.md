@@ -29,3 +29,32 @@ Only consider cutover after CI is green at the **final commit**, identity-to-DB-
 ## Staging grant hardening (commit 9293816)
 
 The staging grant proposal now explicitly revokes direct table DML and routine reservation RPC access from service_role. This is intentionally fail-closed: no production or staging rollout is possible until a dedicated authenticated executor principal is configured. Existing PostgreSQL grants, inherited roles and function ownership still require inspection; revoking grants from service_role alone is not proof of effective isolation.
+
+## Final integration review — 26 October 2026
+
+The isolated PostgreSQL checks at commit `31082af` passed, including
+three-bot concurrent reservation/claim and restart fence scenarios. Dedicated
+ephemeral LOGIN checks also passed in disposable CI PostgreSQL. These are
+meaningful staging proofs, **not** evidence of a deployed gateway or production
+permissions.
+
+**Critical remaining acceptance items (no cosmetic additions):**
+
+1. **Real executor wiring:** Aggressive, Intraday and Daily production
+   `execute_trade` entry paths do not currently invoke the staging shared
+   entry fence. The offline tests extract their function ASTs and inject fake
+   exchanges; they do not prove runtime protection. Review actual call sites,
+   use a safe feature-gated integration plan, and test every order-opening path.
+2. **Real gateway and identity:** Provision an authenticated receiving gateway,
+   independent issuer/key management, revocation and dedicated DB principal
+   mapping. The ephemeral CI PostgreSQL login is not a deployed service.
+3. **Three-bot recovery evidence:** Capture full integration results with
+   independent credentials and exchange snapshots, partial fills, pagination,
+   concurrent entries, restart, uncertain orders, outages and audit trail.
+4. **Production migration and review:** Inventory current callers and database
+   grants, prepare rollback/canary, verify actual deployed permissions and
+   obtain independent security approval plus explicit user authorization.
+
+**Decision remains NO-GO.** Keep all bots OFF, do not merge, deploy, change
+credentials, or submit orders. Stop adding isolated edge-case tests unless a
+specific acceptance blocker requires them.
