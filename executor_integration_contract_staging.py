@@ -24,6 +24,8 @@ def evaluate_executor_trade(store, *, bot: str, trade: dict,
     A close is handed back to the original exit pathway, not blocked by
     a database failure. Callers must not mistake this for an executed exit.
     """
+    if not isinstance(trade, dict) or type(position_flat) is not bool or type(no_open_orders) is not bool:
+        return SimulatedExecution(bot, "", "", "deny")
     action = str(trade.get("action", ""))
     coin = str(trade.get("hl_coin", ""))
     if action == "close":
