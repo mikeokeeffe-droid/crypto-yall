@@ -24,7 +24,8 @@ class TransportTests(unittest.TestCase):
 
     def test_reject_local_and_path_injected_endpoints(self):
         for endpoint in ("https://localhost", "https://127.0.0.1",
-                         "https://[::1]", "https://example.test/custom/path"):
+                         "https://[::1]", "https://10.0.0.1", "https://192.168.1.1",
+                         "https://169.254.169.254", "https://example.test/custom/path"):
             with self.subTest(endpoint=endpoint):
                 with self.assertRaises(ValueError):
                     TrustedRpcTransport(endpoint, "dedicated")
