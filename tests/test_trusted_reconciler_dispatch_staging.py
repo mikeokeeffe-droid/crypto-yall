@@ -25,7 +25,7 @@ class GatewayDispatchTests(unittest.TestCase):
         with patch("trusted_reconciler_dispatch_staging.reconcile_entry_with_token") as run:
             with self.assertRaises(PermissionError):
                 dispatch_staging_reconciliation(
-                    {"token": "invalid", "operation": "reconcile_entry", "args": {"bot": "Intraday"}},
+                    {"token": "invalid", "operation": "reconcile_entry", "args": {"bot": "intraday"}},
                     **self.options)
             run.assert_not_called()
 
@@ -58,6 +58,27 @@ class GatewayDispatchTests(unittest.TestCase):
             dispatch_staging_reconciliation(
                 {"token": "invalid", "operation": "reconcile_entry",
                  "args": {"bot": "Intraday"}, "rpc": object()}, **self.options)
+
+
+    def test_rejects_incomplete_arguments_before_verification(self):
+        with patch("trusted_reconciler_dispatch_staging.verify_staging_jwt") as verify:
+            with self.assertRaises(PermissionError):
+                dispatch_staging_reconciliation(
+                    {"token": "signed", "operation": "reconcile_entry",
+                     "args": {"bot": "intraday"}}, **self.options)
+            verify.assert_not_called()
+
+    def test_rejects_other_bots_before_verification(self):
+        for bot in ("aggressive", "daily"):
+            with self.subTest(bot=bot):
+                args = {"coin": "SOL", "bot": bot, "token": "owner",
+                        "order_id": "1", "order_start_ms": 1, "clock": 1}
+                with patch("trusted_reconciler_dispatch_staging.verify_staging_jwt") as verify:
+                    with self.assertRaises(PermissionError):
+                        dispatch_staging_reconciliation(
+                            {"token": "signed", "operation": "reconcile_entry",
+                             "args": args}, **self.options)
+                    verify.assert_not_called()
 
 if __name__ == "__main__":
     unittest.main()
