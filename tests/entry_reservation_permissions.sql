@@ -14,3 +14,19 @@ begin
     raise exception 'Trusted role missing entry RPC permission';
   end if;
 end $$;
+
+-- Document current staging exposure explicitly. This is an expected-risk
+-- regression test, not proof that direct DML is safe for production.
+do $$
+begin
+  if not has_table_privilege('service_role',
+      'public.bot_entry_intents', 'INSERT, UPDATE, DELETE')
+     or not has_table_privilege('service_role',
+      'public.bot_entry_reservations', 'INSERT, UPDATE, DELETE') then
+    raise exception 'Staging privilege contract changed; review DML bypass risk';
+  end if;
+  if has_table_privilege('anon', 'public.bot_entry_intents', 'INSERT')
+     or has_table_privilege('authenticated', 'public.bot_entry_reservations', 'UPDATE') then
+    raise exception 'Untrusted role has direct entry-table write access';
+  end if;
+end $$;
