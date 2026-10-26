@@ -94,6 +94,42 @@ class EntryReservationPostgresTests(unittest.TestCase):
             ).fetchone()[0])
         self.assertTrue(reserve("AVAX", "intraday", second))
 
+    def test_restart_reservation_persists_across_connections(self):
+        owner = uuid.uuid4()
+        self.assertTrue(reserve("LINK", "daily", owner))
+        with connect() as restarted:
+            self.assertFalse(restarted.execute(
+                "select public.try_reserve_bot_entry(%s,%s,%s,%s)",
+                ("LINK", "intraday", uuid.uuid4(), 120),
+            ).fetchone()[0])
+        self.assertTrue(release("LINK", "daily", owner))
+
+    def test_restart_claim_survives_expiry_and_blocks_other_bots(self):
+        owner = uuid.uuid4()
+        self.assertTrue(reserve("SOL", "daily", owner))
+        with connect() as conn:
+            self.assertTrue(conn.execute(
+                "select public.claim_bot_entry_intent(%s,%s,%s)",
+                ("SOL", "daily", owner),
+            ).fetchone()[0])
+            conn.execute(
+                "update public.bot_entry_reservations "
+                "set expires_at=now()-interval '1 second' where coin='SOL'"
+            )
+        for bot in ("intraday", "aggressive", "daily"):
+            with self.subTest(bot=bot):
+                self.assertFalse(reserve("SOL", bot, uuid.uuid4()))
+        with connect() as conn:
+            self.assertFalse(conn.execute(
+                "select public.resolve_bot_entry_intent(%s,%s,%s)",
+                ("SOL", "intraday", uuid.uuid4()),
+            ).fetchone()[0])
+            self.assertTrue(conn.execute(
+                "select public.resolve_bot_entry_intent(%s,%s,%s)",
+                ("SOL", "daily", owner),
+            ).fetchone()[0])
+        self.assertTrue(reserve("SOL", "intraday", uuid.uuid4()))
+
     def test_invalid_arguments_fail_closed(self):
         for coin, bot, ttl in [
             ("BTC", "unknown", 120),
