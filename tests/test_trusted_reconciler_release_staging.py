@@ -19,6 +19,18 @@ class ReleaseTests(unittest.TestCase):
         self.assertEqual(count, 2)
         self.assertEqual(calls, ['mark_bot_position_closed', 'release_closed_bot_position'])
 
+    def test_other_bots_cannot_release_at_boundary(self):
+        for bot in ('aggressive', 'daily'):
+            with self.subTest(bot=bot):
+                calls = []
+                with patch('trusted_reconciler_release_staging.reconcile_closed') as verify:
+                    result = release_verified(None, 'address',
+                        lambda fn, args: calls.append(fn) or True,
+                        coin='SOL', bot=bot, token='token', clock=lambda: 1)
+                self.assertFalse(result)
+                verify.assert_not_called()
+                self.assertEqual(calls, [])
+
     def test_first_check_holds(self):
         calls = []
         result, count = self.run_release(['hold'], lambda fn, args: calls.append(fn) or True)
