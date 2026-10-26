@@ -28,9 +28,6 @@ begin
  if has_function_privilege('service_role',
    'public.resolve_bot_entry_intent(text,text,uuid)','EXECUTE')
  then raise exception 'routine service role can resolve durable intent'; end if;
- if has_function_privilege('bot_entry_executor_trial',
-   'public.resolve_bot_entry_intent(text,text,uuid)','EXECUTE')
- then raise exception 'trial executor can resolve durable intent'; end if;
  if has_function_privilege('bot_reconciler',
    'public.resolve_bot_entry_intent(text,text,uuid)','EXECUTE')
  then raise exception 'reconciler intent resolution is not yet approved'; end if;
