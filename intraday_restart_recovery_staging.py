@@ -9,8 +9,8 @@ class Recovery:
 def classify_restart(intent_status, owned, flat, no_open_orders, fresh):
     if not fresh or any(type(v) is not bool for v in (owned, flat, no_open_orders)):
         return Recovery("hold", "missing or stale evidence")
-    if owned and flat:
-        return Recovery("hold", "conflicting ownership evidence")
+    if owned and (flat or not no_open_orders):
+        return Recovery("hold", "conflicting ownership or open-order evidence")
     if owned:
         return Recovery("manage_existing", "existing owned position")
     if intent_status in ("pending", "submitted", "uncertain", "filled"):
