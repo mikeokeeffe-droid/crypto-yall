@@ -375,7 +375,7 @@
     }
   },
   "date_utc": "2026-10-27",
-  "generated_at": "2026-10-27T16:08:23.942673+00:00",
+  "generated_at": "2026-10-27T17:08:18.532728+00:00",
   "report_errors": [],
   "reporting_only": true,
   "schema_version": 2,
@@ -3433,20 +3433,20 @@
           "SUI": {
             "asset": "SUI",
             "blocked_live_reason": "mid-cap allow_short=False",
-            "current_price": 0.92454,
+            "current_price": 0.92417,
             "entry_price": 0.91605,
             "entry_time": "2026-10-26T08:00:00",
             "ticker": "SUI20947-USD",
-            "unrealized_gross_return_pct": -0.9268
+            "unrealized_gross_return_pct": -0.8864
           },
           "XRP": {
             "asset": "XRP",
             "blocked_live_reason": "mid-cap allow_short=False",
-            "current_price": 1.3211,
+            "current_price": 1.3222,
             "entry_price": 1.3024,
             "entry_time": "2026-10-27T11:00:00",
             "ticker": "XRP-USD",
-            "unrealized_gross_return_pct": -1.4358
+            "unrealized_gross_return_pct": -1.5203
           }
         },
         "today": {
@@ -4144,13 +4144,13 @@
             "XRP": {
               "asset": "XRP",
               "btc_confirmed_short": true,
-              "current_price": 1.3211,
+              "current_price": 1.3222,
               "entry_price": 1.3024,
               "entry_time": "2026-10-27T11:00:00",
               "eth_confirmed_short": true,
               "filter": "BTC+ETH confirmed short + mid-cap enter_short",
               "ticker": "XRP-USD",
-              "unrealized_gross_return_pct": -1.4358
+              "unrealized_gross_return_pct": -1.5203
             }
           },
           "today": {
@@ -4169,6 +4169,6 @@
     "errors": [],
     "scope": "Shadow-only fresh short signals for SOL/AVAX/LINK/SUI/XRP/ONDO that live trading blocks because mid-cap allow_short=False.",
     "tracking_started_at": "2026-09-10T22:03:23.796957+00:00",
-    "updated_at": "2026-10-27T16:08:23.942673+00:00"
+    "updated_at": "2026-10-27T17:08:18.532728+00:00"
   }
 }
