@@ -375,7 +375,7 @@
     }
   },
   "date_utc": "2026-10-27",
-  "generated_at": "2026-10-27T00:08:20.204475+00:00",
+  "generated_at": "2026-10-27T01:08:12.105755+00:00",
   "report_errors": [],
   "reporting_only": true,
   "schema_version": 2,
@@ -384,12 +384,12 @@
     "bots": {
       "aggressive": {
         "all_time": {
-          "average_loss_pct": -1.4283,
+          "average_loss_pct": -1.422,
           "average_win_pct": 2.1918,
-          "closed_trades": 177,
-          "cumulative_gross_return_pct": -46.4663,
-          "losses": 120,
-          "win_rate_pct": 32.2,
+          "closed_trades": 178,
+          "cumulative_gross_return_pct": -47.1346,
+          "losses": 121,
+          "win_rate_pct": 32.02,
           "wins": 57
         },
         "closed_trades": [
@@ -2516,26 +2516,28 @@
             "gross_return_pct": -1.2282,
             "outcome": "loss",
             "ticker": "LINK-USD"
-          }
-        ],
-        "open_positions": {
-          "SUI": {
+          },
+          {
             "asset": "SUI",
             "blocked_live_reason": "mid-cap allow_short=False",
-            "current_price": 0.91815,
             "entry_price": 0.9098,
             "entry_time": "2026-10-26T19:30:00",
-            "ticker": "SUI20947-USD",
-            "unrealized_gross_return_pct": -0.9178
+            "exit_action": "buy",
+            "exit_price": 0.91588,
+            "exit_time": "2026-10-27T00:30:00",
+            "gross_return_pct": -0.6683,
+            "outcome": "loss",
+            "ticker": "SUI20947-USD"
           }
-        },
+        ],
+        "open_positions": {},
         "today": {
-          "average_loss_pct": null,
+          "average_loss_pct": -0.6683,
           "average_win_pct": null,
-          "closed_trades": 0,
-          "cumulative_gross_return_pct": 0,
-          "losses": 0,
-          "win_rate_pct": null,
+          "closed_trades": 1,
+          "cumulative_gross_return_pct": -0.6683,
+          "losses": 1,
+          "win_rate_pct": 0.0,
           "wins": 0
         }
       },
@@ -3383,29 +3385,29 @@
           "LINK": {
             "asset": "LINK",
             "blocked_live_reason": "mid-cap allow_short=False",
-            "current_price": 11.401,
+            "current_price": 11.363,
             "entry_price": 11.401,
             "entry_time": "2026-10-26T23:00:00",
             "ticker": "LINK-USD",
-            "unrealized_gross_return_pct": 0.0
+            "unrealized_gross_return_pct": 0.3333
           },
           "SOL": {
             "asset": "SOL",
             "blocked_live_reason": "mid-cap allow_short=False",
-            "current_price": 100.93,
+            "current_price": 100.82,
             "entry_price": 100.99,
             "entry_time": "2026-10-25T12:00:00",
             "ticker": "SOL-USD",
-            "unrealized_gross_return_pct": 0.0594
+            "unrealized_gross_return_pct": 0.1683
           },
           "SUI": {
             "asset": "SUI",
             "blocked_live_reason": "mid-cap allow_short=False",
-            "current_price": 0.91815,
+            "current_price": 0.91588,
             "entry_price": 0.91605,
             "entry_time": "2026-10-26T08:00:00",
             "ticker": "SUI20947-USD",
-            "unrealized_gross_return_pct": -0.2292
+            "unrealized_gross_return_pct": 0.0186
           }
         },
         "today": {
@@ -3424,12 +3426,12 @@
       "bots": {
         "aggressive": {
           "all_time": {
-            "average_loss_pct": -1.3644,
+            "average_loss_pct": -1.3404,
             "average_win_pct": 1.9027,
-            "closed_trades": 36,
-            "cumulative_gross_return_pct": -22.9808,
-            "losses": 28,
-            "win_rate_pct": 22.22,
+            "closed_trades": 37,
+            "cumulative_gross_return_pct": -23.6491,
+            "losses": 29,
+            "win_rate_pct": 21.62,
             "wins": 8
           },
           "btc_confirmed_short_now": true,
@@ -3865,30 +3867,30 @@
               "gross_return_pct": -1.2282,
               "outcome": "loss",
               "ticker": "LINK-USD"
+            },
+            {
+              "asset": "SUI",
+              "entry_price": 0.9098,
+              "entry_time": "2026-10-26T19:30:00",
+              "exit_action": "buy",
+              "exit_price": 0.91588,
+              "exit_time": "2026-10-27T00:30:00",
+              "filter": "BTC+ETH confirmed short + mid-cap enter_short",
+              "gross_return_pct": -0.6683,
+              "outcome": "loss",
+              "ticker": "SUI20947-USD"
             }
           ],
           "dual_short_confirmed_now": true,
           "eth_confirmed_short_now": true,
-          "open_positions": {
-            "SUI": {
-              "asset": "SUI",
-              "btc_confirmed_short": true,
-              "current_price": 0.91815,
-              "entry_price": 0.9098,
-              "entry_time": "2026-10-26T19:30:00",
-              "eth_confirmed_short": true,
-              "filter": "BTC+ETH confirmed short + mid-cap enter_short",
-              "ticker": "SUI20947-USD",
-              "unrealized_gross_return_pct": -0.9178
-            }
-          },
+          "open_positions": {},
           "today": {
-            "average_loss_pct": null,
+            "average_loss_pct": -0.6683,
             "average_win_pct": null,
-            "closed_trades": 0,
-            "cumulative_gross_return_pct": 0,
-            "losses": 0,
-            "win_rate_pct": null,
+            "closed_trades": 1,
+            "cumulative_gross_return_pct": -0.6683,
+            "losses": 1,
+            "win_rate_pct": 0.0,
             "wins": 0
           }
         },
@@ -3902,7 +3904,7 @@
             "win_rate_pct": 20.0,
             "wins": 3
           },
-          "btc_confirmed_short_now": false,
+          "btc_confirmed_short_now": true,
           "closed_trades": [
             {
               "asset": "AVAX",
@@ -4085,7 +4087,7 @@
               "ticker": "SUI20947-USD"
             }
           ],
-          "dual_short_confirmed_now": false,
+          "dual_short_confirmed_now": true,
           "eth_confirmed_short_now": true,
           "open_positions": {},
           "today": {
@@ -4104,6 +4106,6 @@
     "errors": [],
     "scope": "Shadow-only fresh short signals for SOL/AVAX/LINK/SUI/XRP/ONDO that live trading blocks because mid-cap allow_short=False.",
     "tracking_started_at": "2026-09-10T22:03:23.796957+00:00",
-    "updated_at": "2026-10-27T00:08:20.204475+00:00"
+    "updated_at": "2026-10-27T01:08:12.105755+00:00"
   }
 }
