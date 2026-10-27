@@ -375,7 +375,7 @@
     }
   },
   "date_utc": "2026-10-27",
-  "generated_at": "2026-10-27T22:08:22.139646+00:00",
+  "generated_at": "2026-10-27T23:08:33.380405+00:00",
   "report_errors": [],
   "reporting_only": true,
   "schema_version": 2,
@@ -3445,11 +3445,11 @@
           "SUI": {
             "asset": "SUI",
             "blocked_live_reason": "mid-cap allow_short=False",
-            "current_price": 0.92848,
+            "current_price": 0.92892,
             "entry_price": 0.91605,
             "entry_time": "2026-10-26T08:00:00",
             "ticker": "SUI20947-USD",
-            "unrealized_gross_return_pct": -1.3569
+            "unrealized_gross_return_pct": -1.4049
           }
         },
         "today": {
@@ -4172,6 +4172,6 @@
     "errors": [],
     "scope": "Shadow-only fresh short signals for SOL/AVAX/LINK/SUI/XRP/ONDO that live trading blocks because mid-cap allow_short=False.",
     "tracking_started_at": "2026-09-10T22:03:23.796957+00:00",
-    "updated_at": "2026-10-27T22:08:22.139646+00:00"
+    "updated_at": "2026-10-27T23:08:33.380405+00:00"
   }
 }
