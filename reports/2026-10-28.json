@@ -375,7 +375,7 @@
     }
   },
   "date_utc": "2026-10-28",
-  "generated_at": "2026-10-28T01:08:07.535690+00:00",
+  "generated_at": "2026-10-28T02:08:08.048151+00:00",
   "report_errors": [],
   "reporting_only": true,
   "schema_version": 2,
@@ -2555,12 +2555,12 @@
       },
       "intraday": {
         "all_time": {
-          "average_loss_pct": -2.5506,
+          "average_loss_pct": -2.5435,
           "average_win_pct": 2.9934,
-          "closed_trades": 73,
-          "cumulative_gross_return_pct": 2.3029,
-          "losses": 39,
-          "win_rate_pct": 46.58,
+          "closed_trades": 74,
+          "cumulative_gross_return_pct": 0.0366,
+          "losses": 40,
+          "win_rate_pct": 45.95,
           "wins": 34
         },
         "closed_trades": [
@@ -3439,26 +3439,28 @@
             "gross_return_pct": -1.6201,
             "outcome": "loss",
             "ticker": "XRP-USD"
-          }
-        ],
-        "open_positions": {
-          "SUI": {
+          },
+          {
             "asset": "SUI",
             "blocked_live_reason": "mid-cap allow_short=False",
-            "current_price": 0.93245,
             "entry_price": 0.91605,
             "entry_time": "2026-10-26T08:00:00",
-            "ticker": "SUI20947-USD",
-            "unrealized_gross_return_pct": -1.7903
+            "exit_action": "cover_short",
+            "exit_price": 0.93681,
+            "exit_time": "2026-10-28T01:00:00",
+            "gross_return_pct": -2.2663,
+            "outcome": "loss",
+            "ticker": "SUI20947-USD"
           }
-        },
+        ],
+        "open_positions": {},
         "today": {
-          "average_loss_pct": null,
+          "average_loss_pct": -2.2663,
           "average_win_pct": null,
-          "closed_trades": 0,
-          "cumulative_gross_return_pct": 0,
-          "losses": 0,
-          "win_rate_pct": null,
+          "closed_trades": 1,
+          "cumulative_gross_return_pct": -2.2663,
+          "losses": 1,
+          "win_rate_pct": 0.0,
           "wins": 0
         }
       }
@@ -4172,6 +4174,6 @@
     "errors": [],
     "scope": "Shadow-only fresh short signals for SOL/AVAX/LINK/SUI/XRP/ONDO that live trading blocks because mid-cap allow_short=False.",
     "tracking_started_at": "2026-09-10T22:03:23.796957+00:00",
-    "updated_at": "2026-10-28T01:08:07.535690+00:00"
+    "updated_at": "2026-10-28T02:08:08.048151+00:00"
   }
 }
