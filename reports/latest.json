@@ -375,7 +375,7 @@
     }
   },
   "date_utc": "2026-10-28",
-  "generated_at": "2026-10-28T18:08:17.566809+00:00",
+  "generated_at": "2026-10-28T19:08:14.681731+00:00",
   "report_errors": [],
   "reporting_only": true,
   "schema_version": 2,
@@ -384,12 +384,12 @@
     "bots": {
       "aggressive": {
         "all_time": {
-          "average_loss_pct": -1.4131,
+          "average_loss_pct": -1.4147,
           "average_win_pct": 2.1918,
-          "closed_trades": 180,
-          "cumulative_gross_return_pct": -48.8756,
-          "losses": 123,
-          "win_rate_pct": 31.67,
+          "closed_trades": 181,
+          "cumulative_gross_return_pct": -50.4944,
+          "losses": 124,
+          "win_rate_pct": 31.49,
           "wins": 57
         },
         "closed_trades": [
@@ -2552,25 +2552,27 @@
             "gross_return_pct": -0.4148,
             "outcome": "loss",
             "ticker": "XRP-USD"
-          }
-        ],
-        "open_positions": {
-          "SUI": {
+          },
+          {
             "asset": "SUI",
             "blocked_live_reason": "mid-cap allow_short=False",
-            "current_price": 0.9243,
             "entry_price": 0.92477,
             "entry_time": "2026-10-28T12:30:00",
-            "ticker": "SUI20947-USD",
-            "unrealized_gross_return_pct": 0.0508
+            "exit_action": "cover_short",
+            "exit_price": 0.93974,
+            "exit_time": "2026-10-28T18:30:00",
+            "gross_return_pct": -1.6188,
+            "outcome": "loss",
+            "ticker": "SUI20947-USD"
           }
-        },
+        ],
+        "open_positions": {},
         "today": {
-          "average_loss_pct": -0.4148,
+          "average_loss_pct": -1.0168,
           "average_win_pct": null,
-          "closed_trades": 1,
-          "cumulative_gross_return_pct": -0.4148,
-          "losses": 1,
+          "closed_trades": 2,
+          "cumulative_gross_return_pct": -2.0336,
+          "losses": 2,
           "win_rate_pct": 0.0,
           "wins": 0
         }
@@ -3479,47 +3481,47 @@
           "LINK": {
             "asset": "LINK",
             "blocked_live_reason": "mid-cap allow_short=False",
-            "current_price": 11.542,
+            "current_price": 11.683,
             "entry_price": 11.542,
             "entry_time": "2026-10-28T17:00:00",
             "ticker": "LINK-USD",
-            "unrealized_gross_return_pct": 0.0
+            "unrealized_gross_return_pct": -1.2216
           },
           "ONDO": {
             "asset": "ONDO",
             "blocked_live_reason": "mid-cap allow_short=False",
-            "current_price": 0.4141,
+            "current_price": 0.42139,
             "entry_price": 0.42022,
             "entry_time": "2026-10-28T11:00:00",
             "ticker": "ONDO-USD",
-            "unrealized_gross_return_pct": 1.4564
+            "unrealized_gross_return_pct": -0.2784
           },
           "SOL": {
             "asset": "SOL",
             "blocked_live_reason": "mid-cap allow_short=False",
-            "current_price": 101.64,
+            "current_price": 102.11,
             "entry_price": 101.64,
             "entry_time": "2026-10-28T17:00:00",
             "ticker": "SOL-USD",
-            "unrealized_gross_return_pct": 0.0
+            "unrealized_gross_return_pct": -0.4624
           },
           "SUI": {
             "asset": "SUI",
             "blocked_live_reason": "mid-cap allow_short=False",
-            "current_price": 0.9243,
+            "current_price": 0.93974,
             "entry_price": 0.92495,
             "entry_time": "2026-10-28T16:00:00",
             "ticker": "SUI20947-USD",
-            "unrealized_gross_return_pct": 0.0703
+            "unrealized_gross_return_pct": -1.599
           },
           "XRP": {
             "asset": "XRP",
             "blocked_live_reason": "mid-cap allow_short=False",
-            "current_price": 1.3169,
+            "current_price": 1.3272,
             "entry_price": 1.3246,
             "entry_time": "2026-10-28T11:00:00",
             "ticker": "XRP-USD",
-            "unrealized_gross_return_pct": 0.5813
+            "unrealized_gross_return_pct": -0.1963
           }
         },
         "today": {
@@ -4229,35 +4231,35 @@
             "LINK": {
               "asset": "LINK",
               "btc_confirmed_short": true,
-              "current_price": 11.542,
+              "current_price": 11.683,
               "entry_price": 11.542,
               "entry_time": "2026-10-28T17:00:00",
               "eth_confirmed_short": true,
               "filter": "BTC+ETH confirmed short + mid-cap enter_short",
               "ticker": "LINK-USD",
-              "unrealized_gross_return_pct": 0.0
+              "unrealized_gross_return_pct": -1.2216
             },
             "SOL": {
               "asset": "SOL",
               "btc_confirmed_short": true,
-              "current_price": 101.64,
+              "current_price": 102.11,
               "entry_price": 101.64,
               "entry_time": "2026-10-28T17:00:00",
               "eth_confirmed_short": true,
               "filter": "BTC+ETH confirmed short + mid-cap enter_short",
               "ticker": "SOL-USD",
-              "unrealized_gross_return_pct": 0.0
+              "unrealized_gross_return_pct": -0.4624
             },
             "SUI": {
               "asset": "SUI",
               "btc_confirmed_short": true,
-              "current_price": 0.9243,
+              "current_price": 0.93974,
               "entry_price": 0.92495,
               "entry_time": "2026-10-28T16:00:00",
               "eth_confirmed_short": true,
               "filter": "BTC+ETH confirmed short + mid-cap enter_short",
               "ticker": "SUI20947-USD",
-              "unrealized_gross_return_pct": 0.0703
+              "unrealized_gross_return_pct": -1.599
             }
           },
           "today": {
@@ -4276,6 +4278,6 @@
     "errors": [],
     "scope": "Shadow-only fresh short signals for SOL/AVAX/LINK/SUI/XRP/ONDO that live trading blocks because mid-cap allow_short=False.",
     "tracking_started_at": "2026-09-10T22:03:23.796957+00:00",
-    "updated_at": "2026-10-28T18:08:17.566809+00:00"
+    "updated_at": "2026-10-28T19:08:14.681731+00:00"
   }
 }
