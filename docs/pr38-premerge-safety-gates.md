@@ -2,11 +2,11 @@
 
 This branch is staging-only. Do not merge it into the production executor branch until all gates below are reviewed and satisfied.
 
-## Blocking finding: live Intraday entry path modified
+## Blocking finding: production Supabase credential boundary is unverified
 
-`intraday_executor.py` adds a hard-coded `if True` return after the close/exit branch and before new order submission. Although fail-closed, merging this changes production entry behaviour even with every staging flag OFF.
+The staging branch includes `supabase_state_store.py`, and Intraday imports it only inside its state load/save methods. Persistence is disabled unless `SUPABASE_STATE_ENABLED=ON`; when enabled, the adapter uses `SUPABASE_SERVICE_ROLE_KEY` for the `bot_state` REST API. Do not set this flag or provide a production service-role key until an independent review verifies the deployed role, table/RPC grants, CAS behavior, and every caller. Offline PostgreSQL role tests do not establish the Supabase REST credential boundary.
 
-**Required before merge:** Move the hard-coded entry block and the staging observer out of the production executor diff, or obtain explicit approval for a separately reviewed intentional entry shutdown. Retain and verify existing close-only protection semantics.
+**Required before production integration:** Keep production Supabase persistence disabled until the credential boundary and least-privilege access have been independently verified. Preserve existing entry and close behavior unless a separate change is explicitly reviewed.
 
 ## Other merge gates
 

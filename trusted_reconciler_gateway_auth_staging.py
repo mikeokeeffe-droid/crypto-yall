@@ -29,6 +29,6 @@ def authorize_verified_principal(principal, *, expected_issuer, expected_audienc
             or not isinstance(now, int) or isinstance(now, bool)
             or principal.expires_at <= now
             or not isinstance(principal.scopes, frozenset)
-            or not _ALLOWED_SCOPES.issubset(principal.scopes)):
+            or principal.scopes != _ALLOWED_SCOPES):
         raise PermissionError("reconciler identity rejected")
     return True

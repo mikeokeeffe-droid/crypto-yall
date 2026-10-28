@@ -4,7 +4,7 @@
 
 | Workstream | Implemented in draft | Outstanding before production |
 | --- | --- | --- |
-| 1. Authentication | Offline HS256 signature verification and opt-in staging entry/release wrappers; mocked positive and negative tests | Actual receiving gateway; dedicated issuer/key management and rotation/revocation; identity-to-restricted-DB-principal binding; gateway integration test |
+| 1. Authentication | Offline HS256 verification; distinct reconciler and executor scopes; bot-specific executor identities and signing keys for Aggressive, Intraday and Daily; offline valid/invalid and impersonation tests | Actual receiving gateway; dedicated issuer/key issuance, storage, rotation and revocation; identity-to-restricted-DB-principal binding; gateway integration test |
 | 2. Database isolation | Disposable PostgreSQL trial revokes service_role direct DML and reservation RPC rights; role-switch tests | Production migration plan and credential separation; inventory/migrate all existing callers; prove deployed role privileges and rollback |
 | 3. Three-bot integration | Mocked staging entry fencing, reconciler handoff/release, selected restart/failure tests | Full three-bot end-to-end runs with independent principals, exchange snapshots, pagination/partial fills, concurrency, restart, failure injection and audit evidence |
 | 4. Review and rollout | Draft PR, CI workflows, review notes | Independent security review; approvals; canary and rollback plan; explicit live cutover authorization |
