@@ -16,12 +16,15 @@ begin
      or not exists (select 1 from pg_roles where rolname = 'bot_reconciler') then
     raise exception 'missing separate executor or reconciler database role';
   end if;
-  if pg_has_role('bot_entry_executor_trial', 'service_role', 'MEMBER')
-     or pg_has_role('bot_entry_executor_trial', 'postgres', 'MEMBER')
-     or pg_has_role('bot_entry_executor_trial', 'supabase_admin', 'MEMBER')
-     or pg_has_role('bot_reconciler', 'service_role', 'MEMBER')
-     or pg_has_role('bot_reconciler', 'postgres', 'MEMBER')
-     or pg_has_role('bot_reconciler', 'supabase_admin', 'MEMBER') then
+  if exists (
+    select 1
+    from pg_roles privileged_role
+    where privileged_role.rolname in ('service_role', 'postgres', 'supabase_admin')
+      and (
+        pg_has_role('bot_entry_executor_trial', privileged_role.oid, 'MEMBER')
+        or pg_has_role('bot_reconciler', privileged_role.oid, 'MEMBER')
+      )
+  ) then
     raise exception 'restricted role inherits a privileged database role';
   end if;
   if exists (

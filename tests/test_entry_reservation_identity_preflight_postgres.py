@@ -125,6 +125,28 @@ class EntryReservationIdentityPreflightPostgresTests(unittest.TestCase):
             )
             self.admin.execute(sql.SQL("DROP ROLE {}").format(sql.Identifier(inherited_role)))
 
+    def test_inherited_supabase_admin_role_is_rejected(self):
+        self.admin.execute("CREATE ROLE supabase_admin NOLOGIN")
+        try:
+            self.admin.execute(
+                "GRANT supabase_admin TO bot_entry_executor_trial"
+            )
+            self.assert_preflight_rejects(
+                "restricted role inherits a privileged database role"
+            )
+        finally:
+            self.admin.execute(
+                "REVOKE supabase_admin FROM bot_entry_executor_trial"
+            )
+            self.admin.execute("DROP ROLE supabase_admin")
+
+    def test_missing_supabase_admin_role_is_allowed(self):
+        exists = self.admin.execute(
+            "SELECT 1 FROM pg_roles WHERE rolname = 'supabase_admin'"
+        ).fetchone()
+        self.assertIsNone(exists)
+        self.run_preflight()
+
     def test_restricted_executor_login_passes(self):
         login = "preflight_executor_login_" + uuid.uuid4().hex
         self.admin.execute(
