@@ -4,7 +4,11 @@ begin
   if has_function_privilege('anon',
       'public.try_reserve_bot_entry(text,text,uuid,integer)', 'EXECUTE')
      or has_function_privilege('authenticated',
-      'public.claim_bot_entry_intent(text,text,uuid)', 'EXECUTE') then
+      'public.claim_bot_entry_intent(text,text,uuid)', 'EXECUTE')
+     or has_table_privilege('anon',
+      'public.bot_entry_executor_identities', 'SELECT')
+     or has_table_privilege('authenticated',
+      'public.bot_entry_executor_identities', 'INSERT') then
     raise exception 'Untrusted role has reservation RPC permission';
   end if;
   if has_function_privilege('service_role',

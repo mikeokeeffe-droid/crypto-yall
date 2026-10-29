@@ -8,6 +8,10 @@ from staging_jwt_verification import verify_signed_staging_jwt
 EXECUTOR_ENTRY_SCOPE = "executor:entry"
 
 
+class ExecutorAuthenticationError(PermissionError):
+    """A client token did not authenticate the requested executor identity."""
+
+
 @dataclass(frozen=True)
 class VerifiedExecutorPrincipal:
     bot: str
@@ -31,11 +35,14 @@ def verify_executor_jwt(token, signing_keys, *, bot, issuer, audience, now=None)
             or len(set(secrets)) != len(BOTS)):
         raise PermissionError("executor signing keys must be distinct and at least 32 bytes")
     secret = signing_keys.get(bot)
-    principal = verify_signed_staging_jwt(
-        token, secret, issuer=issuer, audience=audience, now=now)
+    try:
+        principal = verify_signed_staging_jwt(
+            token, secret, issuer=issuer, audience=audience, now=now)
+    except PermissionError as error:
+        raise ExecutorAuthenticationError("executor token rejected") from error
     if (principal.subject != "executor:" + bot
             or principal.scopes != frozenset((EXECUTOR_ENTRY_SCOPE,))):
-        raise PermissionError("executor identity or scope rejected")
+        raise ExecutorAuthenticationError("executor identity or scope rejected")
     return VerifiedExecutorPrincipal(
         bot=bot,
         subject=principal.subject,

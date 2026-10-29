@@ -46,7 +46,8 @@ class ExecutorTransportTests(unittest.TestCase):
     def setUp(self):
         self.conn = Connection(("executor_login_test", "executor_login_test"))
         self.rpc = restricted_executor_rpc(
-            lambda: self.conn, expected_login="executor_login_test")
+            lambda: self.conn, expected_login="executor_login_test",
+            expected_bot="intraday")
         self.params = dict(p_coin="BTC", p_bot="intraday",
                            p_token=str(uuid4()), p_ttl_seconds=120)
 
@@ -76,7 +77,14 @@ class ExecutorTransportTests(unittest.TestCase):
 
     def test_privileged_expected_login_denied(self):
         with self.assertRaises(ValueError):
-            restricted_executor_rpc(lambda: self.conn, expected_login="postgres")
+            restricted_executor_rpc(
+                lambda: self.conn, expected_login="postgres",
+                expected_bot="intraday")
+
+    def test_login_cannot_reserve_for_another_bot(self):
+        with self.assertRaises(PermissionError):
+            self.rpc("try_reserve_bot_entry", dict(self.params, p_bot="daily"))
+        self.assertEqual(self.conn.queries, [])
 
 
 if __name__ == "__main__":

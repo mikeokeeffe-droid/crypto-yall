@@ -38,6 +38,10 @@ on:
       - 'hyperliquid_reconciliation_pipeline_staging.py'
       - 'hyperliquid_fill_pagination_staging.py'
       - 'intraday_restart_recovery_staging.py'
+      - 'staging_executor_http_gateway.py'
+      - 'trusted_executor_gateway_staging.py'
+      - 'trusted_executor_jwt_staging.py'
+      - 'trusted_executor_postgres_transport_staging.py'
       - '.github/workflows/test-atomic-entry-reservations.yml'
   workflow_dispatch:
 permissions:
@@ -91,12 +95,23 @@ jobs:
         run: |
           psql -v ON_ERROR_STOP=1 -f db/entry_reservation_least_privilege_trial.sql
           psql -v ON_ERROR_STOP=1 -f tests/entry_reservation_least_privilege_trial.sql
+      - name: Test simulated authenticated HTTP entry gateway
+        run: |
+          python -m unittest discover -s tests -p 'test_staging_executor_http_gateway.py' -v
+          python -m unittest discover -s tests -p 'test_trusted_executor_gateway_staging.py' -v
       - name: Verify isolated service-role write-bypass revocation
         run: |
           psql -v ON_ERROR_STOP=1 -f db/entry_reservations_restricted_grants_trial.sql
           psql -v ON_ERROR_STOP=1 -f tests/entry_reservation_restricted_grants_trial.sql
           psql -v ON_ERROR_STOP=1 -f tests/entry_reservation_cross_role_isolation.sql
-          psql -v ON_ERROR_STOP=1 -f db/entry_reservation_identity_preflight_staging.sql
+      - name: Test HTTP gateway with three disposable PostgreSQL LOGINs
+        env:
+          ISOLATED_POSTGRES_CI: '1'
+        run: |
+          python -m unittest discover -s tests -p 'test_executor_gateway_postgres_integration.py' -v
+          python -m unittest discover -s tests -p 'test_executor_dedicated_login_postgres.py' -v
+          python -m unittest discover -s tests -p 'test_authenticated_executor_integration_postgres.py' -v
+          python -m unittest discover -s tests -p 'test_entry_reservation_identity_preflight_postgres.py' -v
       - name: Verify signed gateway to restricted PostgreSQL identity boundary
         run: python -m unittest discover -s tests -p 'test_gateway_database_boundary_postgres.py' -v
       - name: Verify ephemeral restricted PostgreSQL LOGIN (isolated CI only)

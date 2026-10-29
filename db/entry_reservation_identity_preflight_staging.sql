@@ -16,6 +16,26 @@ begin
      or not exists (select 1 from pg_roles where rolname = 'bot_reconciler') then
     raise exception 'missing separate executor or reconciler database role';
   end if;
+  if (select count(*) from public.bot_entry_executor_identities) <> 3
+     or exists (
+       select expected.bot
+       from unnest(array['aggressive', 'intraday', 'daily']) as expected(bot)
+       where not exists (
+         select 1 from public.bot_entry_executor_identities i
+         where i.bot = expected.bot
+       )
+     ) then
+    raise exception 'executor LOGIN-to-bot identity map must contain all three bots';
+  end if;
+  if exists (
+    select 1
+    from public.bot_entry_executor_identities i
+    left join pg_roles r on r.rolname = i.db_login
+    where r.oid is null or not r.rolcanlogin or r.rolsuper
+      or not pg_has_role(r.oid, 'bot_entry_executor_trial'::regrole, 'MEMBER')
+  ) then
+    raise exception 'mapped executor identity must be a restricted LOGIN member';
+  end if;
   if exists (
     select 1
     from pg_roles privileged_role
@@ -54,6 +74,10 @@ begin
      or has_table_privilege('service_role', 'public.bot_entry_intents', 'TRUNCATE')
      or has_table_privilege('service_role', 'public.bot_entry_intents', 'REFERENCES')
      or has_table_privilege('service_role', 'public.bot_entry_intents', 'TRIGGER')
+     or has_table_privilege('service_role', 'public.bot_entry_executor_identities', 'SELECT')
+     or has_table_privilege('service_role', 'public.bot_entry_executor_identities', 'INSERT')
+     or has_table_privilege('service_role', 'public.bot_entry_executor_identities', 'UPDATE')
+     or has_table_privilege('service_role', 'public.bot_entry_executor_identities', 'DELETE')
      or has_table_privilege('service_role', 'public.bot_position_owners', 'SELECT')
      or has_table_privilege('service_role', 'public.bot_position_owners', 'INSERT')
      or has_table_privilege('service_role', 'public.bot_position_owners', 'UPDATE')
@@ -83,6 +107,7 @@ begin
     from (values
       ('public.bot_entry_reservations'),
       ('public.bot_entry_intents'),
+      ('public.bot_entry_executor_identities'),
       ('public.bot_position_owners')
     ) as t(table_name)
     cross join (values
@@ -175,6 +200,12 @@ begin
     ) then
       raise exception 'executor login % inherits an unapproved database role',
         v_role_name;
+    end if;
+    if not exists (
+      select 1 from public.bot_entry_executor_identities i
+      where i.db_login = v_role_name::name
+    ) then
+      raise exception 'executor login % has no bot identity mapping', v_role_name;
     end if;
     if has_schema_privilege(v_role_name, 'public', 'CREATE') then
       raise exception 'executor login % can create objects in public', v_role_name;
@@ -274,5 +305,21 @@ begin
     );
   if v_count <> 3 then
     raise exception 'SECURITY DEFINER routines have unsafe owner or search_path';
+  end if;
+  select count(*) into v_count
+  from pg_proc p
+  where p.oid in (
+    to_regprocedure('public.try_reserve_bot_entry(text,text,uuid,integer)'),
+    to_regprocedure('public.claim_bot_entry_intent(text,text,uuid)'),
+    to_regprocedure('public.release_bot_entry(text,text,uuid)')
+  )
+    and p.prosecdef
+    and p.proconfig @> array['search_path=pg_catalog, public']::text[]
+    and pg_get_userbyid(p.proowner) not in (
+      'anon', 'authenticated', 'service_role',
+      'bot_entry_executor_trial', 'bot_reconciler'
+    );
+  if v_count <> 3 then
+    raise exception 'executor entry RPCs must be safe SECURITY DEFINER routines';
   end if;
 end $$;

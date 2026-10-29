@@ -11,6 +11,7 @@ from test_trusted_executor_gateway_staging import (
     KEYS,
     signed_token,
 )
+from trusted_executor_jwt_staging import ExecutorAuthenticationError
 
 
 class RecordingRpc:
@@ -61,7 +62,7 @@ class AuthenticatedExecutorHarnessOfflineTests(unittest.TestCase):
         result = self.run_trade(
             "aggressive", "open_long", rpc, token=signed_token(bot="daily")
         )
-        self.assertEqual(result.failure, "PermissionError")
+        self.assertEqual(result.failure, ExecutorAuthenticationError.__name__)
         self.assertIsNone(result.claim)
         self.assertFalse(result.live_order_submitted)
         self.assertEqual(rpc.calls, [])
@@ -75,7 +76,7 @@ class AuthenticatedExecutorHarnessOfflineTests(unittest.TestCase):
             rpc,
             token=signed_token(bot="intraday", expires=100),
         )
-        self.assertEqual(result.failure, "PermissionError")
+        self.assertEqual(result.failure, ExecutorAuthenticationError.__name__)
         self.assertIsNone(result.claim)
         self.assertEqual(rpc.calls, [])
         self.assertEqual(result.exchange_calls, ())

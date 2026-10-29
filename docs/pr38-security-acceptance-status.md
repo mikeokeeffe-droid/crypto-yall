@@ -4,8 +4,8 @@
 
 | Workstream | Implemented in draft | Outstanding before production |
 | --- | --- | --- |
-| 1. Authentication | Offline HS256 verification; distinct reconciler and executor scopes; bot-specific executor identities and signing keys for Aggressive, Intraday and Daily; offline valid/invalid and impersonation tests | Actual receiving gateway; dedicated issuer/key issuance, storage, rotation and revocation; identity-to-restricted-DB-principal binding; gateway integration test |
-| 2. Database isolation | Disposable PostgreSQL trial revokes service_role direct DML and reservation RPC rights; role-switch tests | Production migration plan and credential separation; inventory/migrate all existing callers; prove deployed role privileges and rollback |
+| 1. Authentication | Offline HS256 verification; bot-specific executor identities and signing keys; a WSGI-callable staging handler selects per-bot restricted LOGINs; simulated HTTP and disposable PostgreSQL identity tests | Gateway deployment, dedicated issuer/key issuance, storage, rotation and revocation; TLS/network policy; production grants and runtime identity-to-DB-principal proof |
+| 2. Database isolation | Staging RPCs validate protected bot-to-LOGIN mappings against PostgreSQL `session_user`; direct-RPC cross-bot attempts are denied for all three disposable LOGINs; trial revokes service_role direct DML and reservation RPC rights | Provision the three restricted identities and protected mappings in staging, review deployed grants/role memberships, inventory callers, and prove rollback |
 | 3. Three-bot integration | Mocked staging entry fencing, reconciler handoff/release, selected restart/failure tests | Full three-bot end-to-end runs with independent principals, exchange snapshots, pagination/partial fills, concurrency, restart, failure injection and audit evidence |
 | 4. Review and rollout | Draft PR, CI workflows, review notes | Independent security review; approvals; canary and rollback plan; explicit live cutover authorization |
 
@@ -14,7 +14,7 @@
 - Do not merge this draft into main or deploy staging grants to production.
 - Do not switch on Aggressive, Intraday or Daily bots, modify secrets, production database, or kill switches.
 - Never treat passing isolated PostgreSQL tests as proof that Supabase service_role is restricted in production.
-- Staging grant SQL now revokes service_role direct DML and routine reservation RPCs; this is **not deployed** and does not provision a replacement executor identity. Actual production grants remain unverified.
+- Staging grant SQL revokes service_role direct DML and routine reservation RPCs. The protected LOGIN-to-bot mapping is implemented and tested only with disposable roles; no staging identities or grants have been provisioned. Actual production grants remain unverified.
 
 ## Acceptance gate
 
@@ -45,9 +45,11 @@ permissions.
    entry fence. The offline tests extract their function ASTs and inject fake
    exchanges; they do not prove runtime protection. Review actual call sites,
    use a safe feature-gated integration plan, and test every order-opening path.
-2. **Real gateway and identity:** Provision an authenticated receiving gateway,
-   independent issuer/key management, revocation and dedicated DB principal
-   mapping. The ephemeral CI PostgreSQL login is not a deployed service.
+2. **Gateway operations and identity:** The staging request handler is a
+   callable only; it creates no listener and is not deployed or connected to
+   executors. Provision and independently review hosting, TLS/network policy,
+   issuer/key lifecycle and dedicated DB principals before any deployment.
+   The ephemeral CI PostgreSQL LOGINs are not deployed service identities.
 3. **Three-bot recovery evidence:** Capture full integration results with
    independent credentials and exchange snapshots, partial fills, pagination,
    concurrent entries, restart, uncertain orders, outages and audit trail.

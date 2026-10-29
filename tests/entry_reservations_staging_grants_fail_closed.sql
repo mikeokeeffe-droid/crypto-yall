@@ -22,6 +22,8 @@ do $$
 begin
   if has_table_privilege(current_user,'public.bot_entry_reservations','INSERT')
      or has_table_privilege(current_user,'public.bot_entry_intents','UPDATE')
+     or has_table_privilege(current_user,'public.bot_entry_executor_identities','SELECT')
+     or has_table_privilege(current_user,'public.bot_entry_executor_identities','INSERT')
      or has_function_privilege(current_user,'public.try_reserve_bot_entry(text,text,uuid,integer)','EXECUTE')
   then
     raise exception 'service_role effective permissions exceed read-only staging policy';

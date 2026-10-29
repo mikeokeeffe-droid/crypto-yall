@@ -2,6 +2,8 @@
 -- Keep service-role secrets exclusively in trusted server-side environments.
 revoke all on public.bot_entry_reservations from public, anon, authenticated;
 revoke all on public.bot_entry_intents from public, anon, authenticated;
+revoke all on public.bot_entry_executor_identities
+  from public, anon, authenticated, service_role;
 revoke all on function public.try_reserve_bot_entry(text,text,uuid,integer)
   from public, anon, authenticated;
 revoke all on function public.claim_bot_entry_intent(text,text,uuid)

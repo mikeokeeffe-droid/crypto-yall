@@ -11,6 +11,10 @@ from staging_executor_gateway_contract import BOTS, ENTRY_ACTIONS
 from trusted_executor_jwt_staging import verify_executor_jwt
 
 
+class EntryClaimDenied(PermissionError):
+    """The reservation or durable intent was denied by the database."""
+
+
 @dataclass(frozen=True)
 class StagedEntryClaim:
     bot: str
@@ -39,9 +43,9 @@ def stage_entry_claim(*, jwt_token, bot, coin, action, signing_keys, issuer,
     token = str(uuid4())
     params = {"p_coin": coin, "p_bot": bot, "p_token": token}
     if rpc("try_reserve_bot_entry", dict(params, p_ttl_seconds=ttl_seconds)) is not True:
-        raise PermissionError("reservation denied")
+        raise EntryClaimDenied("reservation denied")
     # On claim failure, retain reservation conservatively. A reconciler must
     # inspect uncertain outcomes; never automatically clear a durable intent.
     if rpc("claim_bot_entry_intent", params) is not True:
-        raise PermissionError("entry intent denied")
+        raise EntryClaimDenied("entry intent denied")
     return StagedEntryClaim(bot=bot, coin=coin, token=token, claimed=True)

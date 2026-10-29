@@ -20,11 +20,20 @@ _ALLOWED = {
 _BOTS = frozenset(("aggressive", "intraday", "daily"))
 
 
-def restricted_executor_rpc(connection_factory, *, expected_login):
-    """Build an allowlisted RPC callable; reject privileged or switched roles."""
+class ExecutorDatabaseError(RuntimeError):
+    """A restricted PostgreSQL operation failed; the entry must remain blocked."""
+
+
+class ExecutorIdentityMismatch(PermissionError):
+    """The database session did not use the configured restricted LOGIN."""
+
+
+def restricted_executor_rpc(connection_factory, *, expected_login, expected_bot):
+    """Build a bot- and LOGIN-bound RPC callable for the staging gateway."""
     if (not callable(connection_factory) or type(expected_login) is not str
             or not expected_login or expected_login in
-            {"postgres", "service_role", "bot_entry_executor_trial", "bot_reconciler"}):
+            {"postgres", "service_role", "bot_entry_executor_trial", "bot_reconciler"}
+            or type(expected_bot) is not str or expected_bot not in _BOTS):
         raise ValueError("dedicated executor login and connection factory required")
 
     def rpc(function, params):
@@ -38,18 +47,27 @@ def restricted_executor_rpc(connection_factory, *, expected_login):
                 or not coin.isalnum() or coin != coin.upper()
                 or type(bot) is not str or bot not in _BOTS):
             raise ValueError("invalid coin or bot")
+        if bot != expected_bot:
+            raise PermissionError("executor database identity is bound to another bot")
         UUID(str(token))
         if function == "try_reserve_bot_entry":
             ttl = params["p_ttl_seconds"]
             if type(ttl) is not int or not 30 <= ttl <= 600:
                 raise ValueError("invalid reservation TTL")
         values = tuple(params[key] for key in keys)
-        with connection_factory() as conn:
-            with conn.transaction():
-                identity = conn.execute(
-                    "select session_user, current_user").fetchone()
-                if identity != (expected_login, expected_login):
-                    raise PermissionError("database principal mismatch")
-                return conn.execute(statement, values).fetchone()[0] is True
+        try:
+            with connection_factory() as conn:
+                with conn.transaction():
+                    identity = conn.execute(
+                        "select session_user, current_user").fetchone()
+                    if identity != (expected_login, expected_login):
+                        raise ExecutorIdentityMismatch("database principal mismatch")
+                    return conn.execute(statement, values).fetchone()[0] is True
+        except ExecutorIdentityMismatch:
+            raise
+        except Exception as error:
+            raise ExecutorDatabaseError(
+                "restricted executor database operation failed"
+            ) from error
 
     return rpc

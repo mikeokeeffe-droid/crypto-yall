@@ -2,6 +2,13 @@
 -- A reservation serializes entry intent across Aggressive, Intraday and Daily.
 -- This is not sufficient alone: executors must acquire before order placement,
 -- renew as needed, and reconcile exchange fills before releasing.
+-- Superusers remain trusted database administrators; ordinary LOGINs must map
+-- to exactly their own bot below.
+create table if not exists public.bot_entry_executor_identities (
+  bot text primary key check (bot in ('aggressive', 'intraday', 'daily')),
+  db_login name not null unique
+);
+
 create table if not exists public.bot_entry_reservations (
   coin text primary key check (coin ~ '^[A-Z0-9]+$'),
   bot text not null check (bot in ('aggressive', 'intraday', 'daily')),
@@ -18,9 +25,19 @@ as $$
 declare v_count integer;
 begin
   if p_coin is null or p_coin !~ '^[A-Z0-9]+$'
-     or p_bot not in ('aggressive', 'intraday', 'daily')
+     or p_bot is null or p_bot not in ('aggressive', 'intraday', 'daily')
      or p_token is null or p_ttl_seconds not between 30 and 600 then
     raise exception 'invalid entry reservation arguments';
+  end if;
+  if not exists (
+    select 1 from pg_catalog.pg_roles r
+    where r.rolname = session_user and r.rolsuper
+  ) and not exists (
+    select 1 from public.bot_entry_executor_identities i
+    where i.bot = p_bot and i.db_login = session_user::name
+  ) then
+    raise exception 'database login is not authorized for requested bot'
+      using errcode = '42501';
   end if;
   insert into public.bot_entry_reservations(coin,bot,token,expires_at)
   values (p_coin,p_bot,p_token,now() + make_interval(secs => p_ttl_seconds))
@@ -42,6 +59,16 @@ set search_path = public
 as $$
 declare v_count integer;
 begin
+  if not exists (
+    select 1 from pg_catalog.pg_roles r
+    where r.rolname = session_user and r.rolsuper
+  ) and not exists (
+    select 1 from public.bot_entry_executor_identities i
+    where i.bot = p_bot and i.db_login = session_user::name
+  ) then
+    raise exception 'database login is not authorized for requested bot'
+      using errcode = '42501';
+  end if;
   delete from public.bot_entry_reservations
   where coin = p_coin and bot = p_bot and token = p_token;
   get diagnostics v_count = row_count;
@@ -79,6 +106,16 @@ declare v_count integer;
 begin
   if p_coin is null or p_bot is null or p_token is null then
     raise exception 'invalid intent arguments';
+  end if;
+  if not exists (
+    select 1 from pg_catalog.pg_roles r
+    where r.rolname = session_user and r.rolsuper
+  ) and not exists (
+    select 1 from public.bot_entry_executor_identities i
+    where i.bot = p_bot and i.db_login = session_user::name
+  ) then
+    raise exception 'database login is not authorized for requested bot'
+      using errcode = '42501';
   end if;
   insert into public.bot_entry_intents(coin,bot,token,status)
   select r.coin,r.bot,r.token,'pending'
@@ -118,9 +155,19 @@ as $$
 declare v_count integer;
 begin
   if p_coin is null or p_coin !~ '^[A-Z0-9]+$'
-     or p_bot not in ('aggressive','intraday','daily')
+     or p_bot is null or p_bot not in ('aggressive','intraday','daily')
      or p_token is null or p_ttl_seconds not between 30 and 600 then
     raise exception 'invalid entry reservation arguments';
+  end if;
+  if not exists (
+    select 1 from pg_catalog.pg_roles r
+    where r.rolname = session_user and r.rolsuper
+  ) and not exists (
+    select 1 from public.bot_entry_executor_identities i
+    where i.bot = p_bot and i.db_login = session_user::name
+  ) then
+    raise exception 'database login is not authorized for requested bot'
+      using errcode = '42501';
   end if;
   perform pg_advisory_xact_lock(hashtextextended('entry:' || p_coin, 0));
   if exists (select 1 from public.bot_entry_intents where coin=p_coin) then
@@ -150,6 +197,16 @@ begin
   if p_coin is null or p_bot is null or p_token is null then
     raise exception 'invalid intent arguments';
   end if;
+  if not exists (
+    select 1 from pg_catalog.pg_roles r
+    where r.rolname = session_user and r.rolsuper
+  ) and not exists (
+    select 1 from public.bot_entry_executor_identities i
+    where i.bot = p_bot and i.db_login = session_user::name
+  ) then
+    raise exception 'database login is not authorized for requested bot'
+      using errcode = '42501';
+  end if;
   perform pg_advisory_xact_lock(hashtextextended('entry:' || p_coin, 0));
   insert into public.bot_entry_intents(coin,bot,token,status)
   select r.coin,r.bot,r.token,'pending'
@@ -163,6 +220,7 @@ end;
 $$;
 
 revoke all on public.bot_entry_intents from public,anon,authenticated;
+revoke all on public.bot_entry_executor_identities from public,anon,authenticated;
 revoke all on function public.claim_bot_entry_intent(text,text,uuid)
   from public,anon,authenticated;
 revoke all on function public.resolve_bot_entry_intent(text,text,uuid)

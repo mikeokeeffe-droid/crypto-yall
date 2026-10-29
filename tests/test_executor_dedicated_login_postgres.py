@@ -18,36 +18,51 @@ class DedicatedExecutorLoginTests(unittest.TestCase):
     def setUpClass(cls):
         cls.password = secrets.token_urlsafe(36)
         cls.admin = psycopg.connect(
-            host="localhost", port=5432, dbname="safety_test",
+            host=os.getenv("PGHOST", "localhost"),
+            port=int(os.getenv("PGPORT", "5432")),
+            dbname=os.getenv("PGDATABASE", "safety_test"),
             user="postgres", password=os.environ["PGPASSWORD"],
             autocommit=True)
         cls.admin.execute(sql.SQL("create role {} login password {}").format(
             sql.Identifier(ROLE), sql.Literal(cls.password)))
         cls.admin.execute(sql.SQL("grant bot_entry_executor_trial to {}").format(
             sql.Identifier(ROLE)))
+        cls.admin.execute(
+            "insert into public.bot_entry_executor_identities (bot, db_login) "
+            "values ('aggressive', %s)",
+            (ROLE,),
+        )
 
     @classmethod
     def tearDownClass(cls):
+        cls.admin.execute(
+            "delete from public.bot_entry_executor_identities where db_login = %s",
+            (ROLE,),
+        )
         cls.admin.execute(sql.SQL("drop role if exists {}").format(
             sql.Identifier(ROLE)))
         cls.admin.close()
 
     def connect_restricted(self):
-        return psycopg.connect(host="localhost", port=5432,
-                               dbname="safety_test", user=ROLE,
+        return psycopg.connect(host=os.getenv("PGHOST", "localhost"),
+                               port=int(os.getenv("PGPORT", "5432")),
+                               dbname=os.getenv("PGDATABASE", "safety_test"),
+                               user=ROLE,
                                password=self.password)
 
     def test_transport_reserves_and_claims_but_cannot_resolve(self):
         rpc = restricted_executor_rpc(
-            self.connect_restricted, expected_login=ROLE)
+            self.connect_restricted, expected_login=ROLE,
+            expected_bot="aggressive")
         token = uuid.uuid4()
         reserve = dict(p_coin="XRP", p_bot="aggressive",
                        p_token=token, p_ttl_seconds=120)
         self.assertTrue(rpc("try_reserve_bot_entry", reserve))
         self.assertTrue(rpc("claim_bot_entry_intent", {
             k: reserve[k] for k in ("p_coin", "p_bot", "p_token")}))
-        self.assertFalse(rpc("try_reserve_bot_entry", dict(
-            reserve, p_bot="intraday", p_token=uuid.uuid4())))
+        with self.assertRaises(PermissionError):
+            rpc("try_reserve_bot_entry", dict(
+                reserve, p_bot="intraday", p_token=uuid.uuid4()))
         with self.assertRaises(PermissionError):
             rpc("resolve_bot_entry_intent", {})
         with self.connect_restricted() as conn:

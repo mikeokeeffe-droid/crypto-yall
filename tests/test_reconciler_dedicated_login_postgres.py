@@ -19,8 +19,11 @@ class DedicatedLoginTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.password = secrets.token_urlsafe(36)
-        cls.admin = psycopg.connect(host="localhost", port=5432,
-                                   dbname="safety_test", user="postgres",
+        cls.admin = psycopg.connect(
+                                   host=os.getenv("PGHOST", "localhost"),
+                                   port=int(os.getenv("PGPORT", "5432")),
+                                   dbname=os.getenv("PGDATABASE", "safety_test"),
+                                   user=os.getenv("PGUSER", "postgres"),
                                    password=os.environ["PGPASSWORD"],
                                    autocommit=True)
         cls.admin.execute(
@@ -36,8 +39,10 @@ class DedicatedLoginTests(unittest.TestCase):
         cls.admin.close()
 
     def connect_restricted(self):
-        return psycopg.connect(host="localhost", port=5432,
-                               dbname="safety_test", user=ROLE,
+        return psycopg.connect(host=os.getenv("PGHOST", "localhost"),
+                               port=int(os.getenv("PGPORT", "5432")),
+                               dbname=os.getenv("PGDATABASE", "safety_test"),
+                               user=ROLE,
                                password=self.password)
 
     def test_distinct_login_and_no_executor_rights(self):

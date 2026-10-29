@@ -8,6 +8,8 @@ end $$;
 grant usage on schema public to bot_entry_executor_trial;
 revoke create on schema public from bot_entry_executor_trial;
 revoke all on public.bot_entry_reservations, public.bot_entry_intents from bot_entry_executor_trial;
+revoke all on public.bot_entry_executor_identities
+  from public, anon, authenticated, service_role, bot_entry_executor_trial;
 grant select on public.bot_entry_reservations, public.bot_entry_intents to bot_entry_executor_trial;
 -- SECURITY DEFINER avoids granting table writes to the trial executor role.
 alter function public.try_reserve_bot_entry(text,text,uuid,integer)

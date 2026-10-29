@@ -19,8 +19,11 @@ from test_trusted_executor_gateway_staging import (
     KEYS,
     signed_token,
 )
-from trusted_executor_gateway_staging import stage_entry_claim
-from trusted_executor_postgres_transport_staging import restricted_executor_rpc
+from trusted_executor_gateway_staging import EntryClaimDenied
+from trusted_executor_postgres_transport_staging import (
+    ExecutorDatabaseError,
+    restricted_executor_rpc,
+)
 
 
 @unittest.skipUnless(os.getenv("ISOLATED_POSTGRES_CI") == "1",
@@ -28,8 +31,14 @@ from trusted_executor_postgres_transport_staging import restricted_executor_rpc
 class AuthenticatedExecutorPostgresIntegration(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.role = "executor_harness_" + uuid.uuid4().hex
-        cls.password = secrets.token_urlsafe(36)
+        bots = ("aggressive", "intraday", "daily")
+        cls.roles = {
+            bot: f"executor_harness_{bot}_{uuid.uuid4().hex[:8]}"
+            for bot in bots
+        }
+        cls.passwords = {
+            bot: secrets.token_urlsafe(36) for bot in bots
+        }
         cls.connect_args = {
             "host": os.getenv("PGHOST", "localhost"),
             "port": int(os.getenv("PGPORT", "5432")),
@@ -39,22 +48,34 @@ class AuthenticatedExecutorPostgresIntegration(unittest.TestCase):
             "autocommit": True,
         }
         cls.admin = psycopg.connect(**cls.connect_args)
-        cls.admin.execute(
-            sql.SQL("CREATE ROLE {} LOGIN PASSWORD {}").format(
-                sql.Identifier(cls.role), sql.Literal(cls.password)
+        for bot in bots:
+            cls.admin.execute(
+                sql.SQL("CREATE ROLE {} LOGIN PASSWORD {}").format(
+                    sql.Identifier(cls.roles[bot]),
+                    sql.Literal(cls.passwords[bot]),
+                )
             )
-        )
-        cls.admin.execute(
-            sql.SQL("GRANT bot_entry_executor_trial TO {}").format(
-                sql.Identifier(cls.role)
+            cls.admin.execute(
+                sql.SQL("GRANT bot_entry_executor_trial TO {}").format(
+                    sql.Identifier(cls.roles[bot])
+                )
             )
-        )
+            cls.admin.execute(
+                "insert into public.bot_entry_executor_identities (bot, db_login) "
+                "values (%s, %s)",
+                (bot, cls.roles[bot]),
+            )
 
     @classmethod
     def tearDownClass(cls):
         cls.admin.execute(
-            sql.SQL("DROP ROLE IF EXISTS {}").format(sql.Identifier(cls.role))
+            "delete from public.bot_entry_executor_identities where db_login = any(%s)",
+            (list(cls.roles.values()),),
         )
+        for login in cls.roles.values():
+            cls.admin.execute(
+                sql.SQL("DROP ROLE IF EXISTS {}").format(sql.Identifier(login))
+            )
         cls.admin.close()
 
     def setUp(self):
@@ -62,19 +83,20 @@ class AuthenticatedExecutorPostgresIntegration(unittest.TestCase):
             "TRUNCATE public.bot_entry_intents, public.bot_entry_reservations"
         )
 
-    def connect_executor(self):
+    def connect_executor(self, bot):
         return psycopg.connect(
             host=os.getenv("PGHOST", "localhost"),
             port=int(os.getenv("PGPORT", "5432")),
             dbname=os.getenv("PGDATABASE", "safety_test"),
-            user=self.role,
-            password=self.password,
+            user=self.roles[bot],
+            password=self.passwords[bot],
         )
 
-    def executor_rpc(self):
+    def executor_rpc(self, bot):
         return restricted_executor_rpc(
-            self.connect_executor,
-            expected_login=self.role,
+            lambda: self.connect_executor(bot),
+            expected_login=self.roles[bot],
+            expected_bot=bot,
         )
 
     def run_trade(self, bot, action, coin, rpc=None):
@@ -87,7 +109,7 @@ class AuthenticatedExecutorPostgresIntegration(unittest.TestCase):
             signing_keys=KEYS,
             issuer=ISSUER,
             audience=AUDIENCE,
-            rpc=rpc or self.executor_rpc(),
+            rpc=rpc or self.executor_rpc(bot),
             now=100,
         )
 
@@ -129,7 +151,7 @@ class AuthenticatedExecutorPostgresIntegration(unittest.TestCase):
         # this offline harness never submits the order or calls market_open.
         restarted = self.run_trade("aggressive", "open_long", "ETH")
         self.assertIsNone(restarted.claim)
-        self.assertEqual(restarted.failure, "PermissionError")
+        self.assertEqual(restarted.failure, EntryClaimDenied.__name__)
         self.assertFalse(restarted.live_order_submitted)
         self.assertEqual(restarted.exchange_calls, ())
         with self.admin.cursor() as cursor:
@@ -139,7 +161,7 @@ class AuthenticatedExecutorPostgresIntegration(unittest.TestCase):
         self.assertEqual(status, "uncertain")
 
     def test_ambiguous_claim_response_remains_fenced_after_restart(self):
-        rpc = self.executor_rpc()
+        rpc = self.executor_rpc("daily")
 
         def claim_then_timeout(function, params):
             result = rpc(function, params)
@@ -155,7 +177,7 @@ class AuthenticatedExecutorPostgresIntegration(unittest.TestCase):
 
         restarted = self.run_trade("intraday", "open_short", "SOL")
         self.assertIsNone(restarted.claim)
-        self.assertEqual(restarted.failure, "PermissionError")
+        self.assertEqual(restarted.failure, EntryClaimDenied.__name__)
         with self.admin.cursor() as cursor:
             state = cursor.execute(
                 "SELECT bot, status FROM public.bot_entry_intents WHERE coin='SOL'"
@@ -168,10 +190,11 @@ class AuthenticatedExecutorPostgresIntegration(unittest.TestCase):
 
         rpc = restricted_executor_rpc(
             unavailable_connection,
-            expected_login=self.role,
+            expected_login=self.roles["aggressive"],
+            expected_bot="aggressive",
         )
         result = self.run_trade("aggressive", "open_long", "AVAX", rpc=rpc)
-        self.assertEqual(result.failure, "ConnectionError")
+        self.assertEqual(result.failure, ExecutorDatabaseError.__name__)
         self.assertIsNone(result.claim)
         self.assertFalse(result.live_order_submitted)
         self.assertEqual(result.exchange_calls, ())
