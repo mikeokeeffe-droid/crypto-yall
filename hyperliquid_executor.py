@@ -429,7 +429,15 @@ def get_size_decimals(info, coin: str) -> int:
     return 3
 
 
-def execute_trade(info, exchange, trade: dict, capital: float, leverage: float) -> dict:
+def execute_trade(
+    info,
+    exchange,
+    trade: dict,
+    capital: float,
+    leverage: float,
+    *,
+    entry_gateway=None,
+) -> dict:
     """Execute a single trade via Hyperliquid market order."""
     coin = trade["hl_coin"]
 
@@ -442,69 +450,13 @@ def execute_trade(info, exchange, trade: dict, capital: float, leverage: float) 
         )
         return _parse_response(trade, resp, info, coin)
 
-    return {
-        **trade,
-        "status": "blocked",
-        "reason": (
-            "Entry blocked: authenticated atomic reservation and durable "
-            "intent are not wired into this executor"
-        ),
-    }
+    from executor_staging_entry_integration import staging_entry_dispatch_result
 
-    mid = get_mid_price(info, coin)
-    requested_notional = capital * POSITION_SIZE_PCT * leverage
-    is_testnet = os.environ.get("HL_TESTNET", "true").lower() == "true"
-
-    # Testnet may raise a tiny simulated order above the exchange minimum.
-    # Mainnet must never silently increase real-money risk: if the strategy's
-    # requested order is below Hyperliquid's $10 minimum, skip it.
-    if is_testnet and requested_notional < MIN_ORDER_NOTIONAL:
-        notional = MIN_ORDER_NOTIONAL
-
-        # Keep the existing safety guard: even on testnet, do not let the
-        # minimum-order adjustment exceed this bot's leveraged allocation.
-        max_notional = capital * max(leverage, 1.0)
-        if notional > max_notional:
-            return {
-                **trade,
-                "status": "skipped",
-                "reason": (
-                    f"Allocated capital too small for "
-                    f"${MIN_ORDER_NOTIONAL:.2f} minimum order"
-                ),
-            }
-    elif (not is_testnet) and requested_notional < 10.0:
-        return {
-            **trade,
-            "status": "skipped",
-            "reason": (
-                f"Calculated order ${requested_notional:.2f} is below "
-                "Hyperliquid's $10 minimum"
-            ),
-        }
-    else:
-        notional = requested_notional
-
-    raw_size = notional / mid
-    sz_decimals = get_size_decimals(info, coin)
-    size = round_size(raw_size, sz_decimals)
-
-    if size <= 0:
-        return {
-            **trade,
-            "status": "skipped",
-            "reason": "Size rounded to zero",
-        }
-
-    try:
-        exchange.update_leverage(int(leverage), coin, True)
-    except Exception as e:
-        print(f"Warning: could not set leverage for {coin}: {e}")
-
-    is_buy = trade["action"] == "open_long"
-    resp = exchange.market_open(coin, is_buy, size)
-
-    return _parse_response(trade, resp, info, coin)
+    return staging_entry_dispatch_result(
+        entry_gateway=entry_gateway,
+        bot="daily",
+        trade=trade,
+    )
 
 
 def _parse_response(trade: dict, resp: dict, info, coin: str) -> dict:
@@ -1144,7 +1096,7 @@ def update_peak_tracking(state: dict, positions: dict, owned_coins: set[str]) ->
 
 # ── Main ────────────────────────────────────────────────────────────────────
 
-def main():
+def main(*, entry_gateway=None):
     print(f"Trade executor started at {dt.datetime.now(dt.UTC).isoformat()}")
 
     # Kill switch check
@@ -1296,6 +1248,7 @@ def main():
             trade,
             capital,
             leverage,
+            entry_gateway=entry_gateway,
         )
 
         if is_new_entry and result.get("status") != "filled":

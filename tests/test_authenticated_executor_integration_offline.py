@@ -102,6 +102,40 @@ class AuthenticatedExecutorHarnessOfflineTests(unittest.TestCase):
         self.assertFalse(result.live_order_submitted)
         self.assertEqual(result.exchange_calls, ())
 
+    def test_restart_retries_are_fenced_before_executor_order_dispatch(self):
+        class DurableRpc:
+            def __init__(self):
+                self.reservations = set()
+                self.calls = []
+
+            def __call__(self, function, params):
+                self.calls.append((function, params["p_coin"], params["p_bot"]))
+                if function == "try_reserve_bot_entry":
+                    coin = params["p_coin"]
+                    if coin in self.reservations:
+                        return False
+                    self.reservations.add(coin)
+                    return True
+                return True
+
+        rpc = DurableRpc()
+        first_run = self.run_trade("aggressive", "open_long", rpc)
+        simulated_restart = self.run_trade("aggressive", "open_long", rpc)
+        self.assertTrue(first_run.trade_result["staging_claimed"])
+        self.assertEqual(first_run.trade_result["status"], "blocked")
+        self.assertEqual(simulated_restart.trade_result["status"], "blocked")
+        self.assertFalse(simulated_restart.trade_result["staging_claimed"])
+        self.assertEqual(first_run.exchange_calls, ())
+        self.assertEqual(simulated_restart.exchange_calls, ())
+        self.assertEqual(
+            [call[0] for call in rpc.calls],
+            [
+                "try_reserve_bot_entry",
+                "claim_bot_entry_intent",
+                "try_reserve_bot_entry",
+            ],
+        )
+
     def test_closes_bypass_authentication_and_reservation_gateway(self):
         for bot in ("aggressive", "intraday", "daily"):
             with self.subTest(bot=bot):

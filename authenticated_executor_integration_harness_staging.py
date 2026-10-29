@@ -65,33 +65,42 @@ def execute_offline_authenticated_trade(
             failure="PermissionError",
         )
 
-    try:
-        claim = stage_entry_claim(
-            jwt_token=jwt_token,
-            bot=bot,
-            coin=trade.get("hl_coin"),
-            action=action,
-            signing_keys=signing_keys,
-            issuer=issuer,
-            audience=audience,
-            rpc=rpc,
-            now=now,
-        )
-    except Exception as error:
-        return OfflineHarnessResult(
-            {
-                **trade,
-                "status": "blocked",
-                "reason": "authenticated staging entry denied",
-            },
-            None,
-            tuple(exchange.calls),
-            failure=type(error).__name__,
-        )
+    claims = []
+    failures = []
 
-    result = execute_trade(info, exchange, trade, capital, leverage)
+    def authenticated_gateway(**request):
+        try:
+            claim = stage_entry_claim(
+                jwt_token=jwt_token,
+                bot=request["bot"],
+                coin=request["coin"],
+                action=request["action"],
+                signing_keys=signing_keys,
+                issuer=issuer,
+                audience=audience,
+                rpc=rpc,
+                now=now,
+            )
+        except Exception as error:
+            failures.append(type(error).__name__)
+            raise
+        claims.append(claim)
+        return {
+            "reservation_claimed": claim.claimed,
+            "intent_claimed": claim.claimed,
+        }
+
+    result = execute_trade(
+        info,
+        exchange,
+        trade,
+        capital,
+        leverage,
+        entry_gateway=authenticated_gateway,
+    )
     return OfflineHarnessResult(
         result,
-        claim,
+        claims[0] if claims else None,
         tuple(exchange.calls),
+        failure=failures[0] if failures else None,
     )

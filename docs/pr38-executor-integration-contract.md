@@ -1,12 +1,12 @@
 # PR #38 — executor integration contract (review-only)
 
-**Status: LIVE ENTRIES BLOCKED; NO-GO.** No live executor imports the staging
-fence. The three `execute_trade()` functions now reject every non-close action
-before sizing, leverage changes, or order submission. Close paths remain
-independent. A staging-only WSGI-callable request handler now authenticates
-each bot with its own key and restricted LOGIN and returns reservation/intent
-results only. It starts no listener and is not wired to live executors; it does
-not authorize orders or satisfy production integration requirements.
+**Status: LIVE ENTRIES BLOCKED; NO-GO.** Each executor's real `execute_trade()`
+dispatch accepts an optional, injected staging gateway callable. The default is
+`None`; no network client or credentials are loaded. If injected, the callable
+may authenticate and claim a staging reservation/intent, but the executor
+unconditionally returns `blocked` and contains no `market_open` or leverage
+change path. The close/partial-close branch runs before the gateway and remains
+independent. The WSGI gateway starts no listener and is not production wired.
 
 Do not merge, deploy, enable bots or place orders from this document.
 
@@ -14,14 +14,23 @@ Do not merge, deploy, enable bots or place orders from this document.
 
 | Bot | File | Entry dispatch |
 | --- | --- | --- |
-| Aggressive | `aggressive_executor.py` | `main()` around line 802 calls `execute_trade()`; `market_open()` around line 544 |
-| Intraday | `intraday_executor.py` | `main()` around line 838 calls `execute_trade()`; `market_open()` around line 553 |
-| Daily | `hyperliquid_executor.py` | `main()` around line 1278 calls `execute_trade()`; `market_open()` around line 490 |
+| Aggressive | `aggressive_executor.py` | `main(entry_gateway=None)` injects the optional dependency into `execute_trade()` |
+| Intraday | `intraday_executor.py` | `main(entry_gateway=None)` injects the optional dependency into `execute_trade()` |
+| Daily | `hyperliquid_executor.py` | `main(entry_gateway=None)` injects the optional dependency into `execute_trade()` |
 
-These are code-review locations, not a guarantee that no other order-producing
-path exists. Search all exchange order methods and alternate workflows before
-implementation. The existing `pending_entry_claims` Gist state is local
-recovery metadata, **not** a cross-bot atomic reservation.
+These dispatch functions now contain no market-open or leverage mutation call.
+This only fences the reviewed `execute_trade()` path; search all alternate
+order-producing workflows before any future integration. The existing
+`pending_entry_claims` Gist state is local recovery metadata, **not** a
+cross-bot atomic reservation.
+
+The injected callable receives keyword arguments `bot`, `coin`, and `action`.
+It must return literal `True` or exactly
+`{"reservation_claimed": true, "intent_claimed": true}` only after validating
+the authenticated gateway response. All other results and expected
+authentication, reservation, intent, permission, and transport failures return
+`blocked`. Even the exact success response sets only `staging_claimed`; it
+never changes the executor's blocked status.
 
 ## Staging request handler
 
@@ -40,35 +49,41 @@ test directly calls those RPCs through each bot LOGIN and verifies cross-bot
 requests are denied. Privileged database administrators remain outside this
 restricted-LOGIN boundary and must not be used by server request handling.
 
-## Required live integration contract
+## Required production integration contract
 
-1. An authenticated, dedicated **executor** database principal (distinct from
-   reconciler and privileged service credentials) must atomically acquire a
-   per-coin reservation and durable pending intent before any `market_open`.
-   Reject absent/mismatched tokens, stale leases, DB outages and ambiguous
-   responses. Never fall back to the old unguarded entry path.
-2. Query exchange position and open-order evidence with bounded pagination and
+1. Implement and independently review a real gateway client/host adapter that
+   authenticates to the WSGI boundary with bot-specific credentials and uses a
+   dedicated **executor** database principal. The current callable is only an
+   injected interface; production main entrypoints leave it unset. No successful
+   staging claim authorizes an order in this milestone.
+2. Before any separately approved live order path, atomically acquire a
+   per-coin reservation and durable pending intent. Reject absent/mismatched
+   tokens, stale leases, DB outages and ambiguous responses. Never fall back to
+   an unguarded entry path.
+3. Query exchange position and open-order evidence with bounded pagination and
    freshness checks. Unknown/partial/unavailable evidence blocks **entries**.
    Close and protective exit paths remain independent of entry-gate failures.
-3. After submission, persist the exchange order identity and observed state.
+4. After a separately authorized order submission, persist the exchange order identity and observed state.
    Network timeouts or unknown fills retain the durable fence; never release
    based only on an expired reservation or a failed local Gist write.
-4. Only an independently authenticated reconciler using a separate restricted
+5. Only an independently authenticated reconciler using a separate restricted
    DB principal can confirm fills and release verified-flat owners. Never
    infer a safe release from a missing position in a single stale snapshot.
-5. Add explicit offline feature gating and exhaustive order-method call-site
-   coverage. A gate disabled or misconfigured in production must not silently
-   permit an unprotected entry. Stage with disposable credentials and fake
-   exchange clients before any separately approved canary.
-6. Require independent security review of SQL ownership/grants, credential
+6. Preserve the default-disabled callable injection and fail-closed behavior.
+   Any future order authorization requires a separately reviewed feature gate,
+   exhaustive alternate order-call coverage, and explicit approval.
+7. Require independent security review of SQL ownership/grants, credential
    provisioning, authenticated gateway, rollback, three-bot concurrency,
    uncertain order recovery and audit logs.
 
 ## Acceptance evidence still missing
 
-- Real executor runtime wiring and tests against their actual entry dispatch
-  (the added offline tests extract the real `execute_trade()` function ASTs;
-  they do not prove a live authenticated reservation integration).
+- A real staging host/client adapter, deployed identity-to-dedicated-LOGIN
+  binding, startup permission gate, secret lifecycle, and audit/network controls.
+- Independent staging verification of the currently injected boundary using
+  approved staging-only identities. Fake-service tests prove the executor
+  dispatch cannot submit an order even after a successful claim, not that a
+  deployed service is correctly authenticated or reachable.
 - Deployed gateway identity-to-dedicated-login binding, key lifecycle and
   production grants inventory.
 - Server hosting, staging credential provisioning, key rotation/revocation,

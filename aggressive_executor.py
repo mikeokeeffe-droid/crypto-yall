@@ -496,7 +496,15 @@ def decide_trades(signals: dict, open_positions: dict, max_positions: int,
     return trades
 
 
-def execute_trade(info, exchange, trade: dict, capital: float, leverage: float) -> dict:
+def execute_trade(
+    info,
+    exchange,
+    trade: dict,
+    capital: float,
+    leverage: float,
+    *,
+    entry_gateway=None,
+) -> dict:
     coin = trade["hl_coin"]
     if trade["action"] == "close":
         close_size = float(trade.get("close_size", 0.0) or 0.0)
@@ -507,57 +515,13 @@ def execute_trade(info, exchange, trade: dict, capital: float, leverage: float) 
         )
         return _parse_response(trade, resp, info, coin)
 
-    return {
-        **trade,
-        "status": "blocked",
-        "reason": (
-            "Entry blocked: authenticated atomic reservation and durable "
-            "intent are not wired into this executor"
-        ),
-    }
+    from executor_staging_entry_integration import staging_entry_dispatch_result
 
-    mid = get_mid_price(info, coin)
-    # Pyramid adds use smaller size
-    size_pct = PYRAMID_SIZE_PCT if trade["action"].startswith("pyramid_") else POSITION_SIZE_PCT
-    requested_notional = capital * size_pct * leverage
-    test_notional = float(os.environ.get("AGGRESSIVE_TEST_NOTIONAL", "0") or 0)
-
-    # On testnet only, raise tiny test orders above Hyperliquid's $10 minimum.
-    # On mainnet, never silently increase real-money risk: skip undersized orders.
-    is_testnet = os.environ.get("HL_TESTNET", "true").lower() == "true"
-
-    # Optional controlled mainnet test size for NEW positions only.
-    # Pyramid adds keep their normal smaller strategy sizing.
-    if (not is_testnet) and test_notional > 0 and not trade["action"].startswith("pyramid_"):
-        requested_notional = test_notional
-    if is_testnet and requested_notional < TESTNET_MIN_ORDER_NOTIONAL:
-        notional = TESTNET_MIN_ORDER_NOTIONAL
-    elif (not is_testnet) and requested_notional < 10.0:
-        return {
-            **trade,
-            "status": "skipped",
-            "reason": (
-                f"Calculated order ${requested_notional:.2f} is below "
-                "Hyperliquid's $10 minimum"
-            ),
-        }
-    else:
-        notional = requested_notional
-
-    raw_size = notional / mid
-    sz_decimals = get_size_decimals(info, coin)
-    size = round_size(raw_size, sz_decimals)
-    if size <= 0:
-        return {**trade, "status": "skipped", "reason": "Size rounded to zero"}
-
-    try:
-        exchange.update_leverage(int(leverage), coin, True)
-    except Exception as e:
-        print(f"Leverage warning for {coin}: {e}")
-
-    is_buy = trade["action"] in ("open_long", "pyramid_long")
-    resp = exchange.market_open(coin, is_buy, size)
-    return _parse_response(trade, resp, info, coin)
+    return staging_entry_dispatch_result(
+        entry_gateway=entry_gateway,
+        bot="aggressive",
+        trade=trade,
+    )
 
 
 # ── Guardrails ──────────────────────────────────────────────────────────────
@@ -635,7 +599,7 @@ def check_daily_drawdown(
 
 # ── Main ────────────────────────────────────────────────────────────────────
 
-def main():
+def main(*, entry_gateway=None):
     print(f"Aggressive executor started at {dt.datetime.now(dt.UTC).isoformat()}")
     protection_only = os.environ.get("AGGRESSIVE_PROTECTION_ONLY", "OFF").upper() == "ON"
     if protection_only:
@@ -814,7 +778,10 @@ def main():
             state["owned_coins"] = sorted(owned_coins)
             save_state(state)
 
-        result = execute_trade(info, exchange, trade, capital, leverage)
+        result = execute_trade(
+            info, exchange, trade, capital, leverage,
+            entry_gateway=entry_gateway,
+        )
 
         if is_new_entry and result.get("status") != "filled":
             state.setdefault("pending_entry_claims", {}).pop(trade["hl_coin"], None)

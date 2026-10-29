@@ -17,7 +17,7 @@ EXECUTORS = {
 
 
 class ExecutorPathContractTests(unittest.TestCase):
-    def test_each_executor_has_exactly_one_market_open_in_execute_trade(self):
+    def test_no_executor_market_open_is_reachable_from_execute_trade(self):
         for bot, filename in EXECUTORS.items():
             with self.subTest(bot=bot):
                 tree = ast.parse((ROOT / filename).read_text())
@@ -33,7 +33,28 @@ class ExecutorPathContractTests(unittest.TestCase):
                     and isinstance(node.func, ast.Attribute)
                     and node.func.attr == "market_open"
                 ]
-                self.assertEqual(len(calls), 1)
+                self.assertEqual(calls, [])
+
+                main = next(
+                    node for node in tree.body
+                    if isinstance(node, ast.FunctionDef) and node.name == "main"
+                )
+                self.assertIn("entry_gateway", {
+                    arg.arg for arg in main.args.kwonlyargs
+                })
+                dispatches = [
+                    node for node in ast.walk(main)
+                    if isinstance(node, ast.Call)
+                    and isinstance(node.func, ast.Name)
+                    and node.func.id == "execute_trade"
+                ]
+                self.assertTrue(dispatches)
+                self.assertTrue(all(any(
+                    keyword.arg == "entry_gateway"
+                    and isinstance(keyword.value, ast.Name)
+                    and keyword.value.id == "entry_gateway"
+                    for keyword in call.keywords
+                ) for call in dispatches))
 
     def test_close_path_remains_separate_from_open_path(self):
         for bot, filename in EXECUTORS.items():

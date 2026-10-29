@@ -479,6 +479,8 @@ def execute_trade(
     trade: dict,
     capital: float,
     leverage: float,
+    *,
+    entry_gateway=None,
 ) -> dict:
     coin = trade["hl_coin"]
 
@@ -491,77 +493,13 @@ def execute_trade(
         )
         return _parse_response(trade, resp, info, coin)
 
-    return {
-        **trade,
-        "status": "blocked",
-        "reason": (
-            "Entry blocked: authenticated atomic reservation and durable "
-            "intent are not wired into this executor"
-        ),
-    }
+    from executor_staging_entry_integration import staging_entry_dispatch_result
 
-    mid = get_mid_price(info, coin)
-    calculated_notional = capital * POSITION_SIZE_PCT * leverage
-    test_notional = float(os.environ.get("INTRADAY_TEST_NOTIONAL", "0") or 0)
-    is_testnet = os.environ.get("HL_TESTNET", "true").lower() == "true"
-
-    if is_testnet:
-        # Testnet: use a small buffer above Hyperliquid's $10 minimum so
-        # low-capital validation trades can actually be accepted.
-        notional = max(
-            calculated_notional,
-            TESTNET_MIN_ORDER_NOTIONAL,
-        )
-    else:
-        if test_notional > 0:
-            calculated_notional = test_notional
-        # Mainnet: never silently increase real-money risk above the
-        # strategy's calculated position size.
-        if calculated_notional < MAINNET_MIN_ORDER_NOTIONAL:
-            return {
-                **trade,
-                "status": "skipped",
-                "reason": (
-                    f"Calculated order ${calculated_notional:.2f} is below "
-                    f"the ${MAINNET_MIN_ORDER_NOTIONAL:.2f} minimum"
-                ),
-            }
-
-        notional = calculated_notional
-
-    # Do not let the testnet minimum exceed the capital pool multiplied by
-    # the strategy leverage.
-    max_notional = capital * max(leverage, 1.0)
-
-    if notional > max_notional:
-        return {
-            **trade,
-            "status": "skipped",
-            "reason": (
-                f"Capital pool too small for ${notional:.2f} minimum order"
-            ),
-        }
-
-    raw_size = notional / mid
-    sz_decimals = get_size_decimals(info, coin)
-    size = round_size(raw_size, sz_decimals)
-
-    if size <= 0:
-        return {
-            **trade,
-            "status": "skipped",
-            "reason": "Size rounded to zero",
-        }
-
-    try:
-        exchange.update_leverage(int(leverage), coin, True)
-    except Exception as e:
-        print(f"Leverage warning for {coin}: {e}")
-
-    is_buy = trade["action"] == "open_long"
-    resp = exchange.market_open(coin, is_buy, size)
-
-    return _parse_response(trade, resp, info, coin)
+    return staging_entry_dispatch_result(
+        entry_gateway=entry_gateway,
+        bot="intraday",
+        trade=trade,
+    )
 
 
 # ── Guardrails ──────────────────────────────────────────────────────────────
@@ -643,7 +581,7 @@ def check_daily_drawdown(
 
 # ── Main ────────────────────────────────────────────────────────────────────
 
-def main():
+def main(*, entry_gateway=None):
     print(
         "Intraday executor started at "
         f"{dt.datetime.now(dt.UTC).isoformat()}"
@@ -850,6 +788,7 @@ def main():
             trade,
             capital,
             leverage,
+            entry_gateway=entry_gateway,
         )
 
         if is_new_entry and result.get("status") != "filled":

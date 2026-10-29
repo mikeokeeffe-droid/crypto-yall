@@ -66,8 +66,77 @@ class RealExecutorOrderBoundaryTests(TestCase):
                         object(), exchange, {"hl_coin": "SOL", "action": action},
                         100.0, 1.0)
                     self.assertEqual(result["status"], "blocked")
-                    self.assertIn("authenticated atomic reservation", result["reason"])
+                    self.assertIn("gateway is not configured", result["reason"])
                     self.assertFalse(any(call[0] in ("open", "leverage") for call in exchange.calls))
+
+    def test_successful_staging_claim_still_blocks_open_and_leverage(self):
+        for filename in FILES:
+            for action in ("open_long", "open_short", "pyramid_long", "pyramid_short"):
+                with self.subTest(filename=filename, action=action):
+                    exchange = FakeExchange()
+                    requests = []
+
+                    def gateway(**request):
+                        requests.append(request)
+                        return {
+                            "reservation_claimed": True,
+                            "intent_claimed": True,
+                        }
+
+                    result = load_function(filename)(
+                        object(), exchange, {"hl_coin": "SOL", "action": action},
+                        100.0, 1.0, entry_gateway=gateway)
+                    self.assertEqual(result["status"], "blocked")
+                    self.assertTrue(result["staging_claimed"])
+                    self.assertEqual(len(requests), 1)
+                    self.assertEqual(exchange.calls, [])
+
+    def test_failed_or_malformed_staging_claim_never_reaches_exchange(self):
+        outcomes = (
+            False,
+            {"reservation_claimed": True, "intent_claimed": False},
+            {"reservation_claimed": True, "intent_claimed": True,
+             "live_order_authorized": True},
+        )
+        for filename in FILES:
+            for outcome in outcomes:
+                with self.subTest(filename=filename, outcome=outcome):
+                    exchange = FakeExchange()
+                    result = load_function(filename)(
+                        object(), exchange,
+                        {"hl_coin": "SOL", "action": "open_long"},
+                        100.0, 1.0,
+                        entry_gateway=lambda **request: outcome)
+                    self.assertEqual(result["status"], "blocked")
+                    self.assertFalse(result["staging_claimed"])
+                    self.assertEqual(exchange.calls, [])
+
+            exchange = FakeExchange()
+
+            def unavailable(**request):
+                raise ConnectionError("synthetic outage")
+
+            result = load_function(filename)(
+                object(), exchange,
+                {"hl_coin": "SOL", "action": "open_long"},
+                100.0, 1.0, entry_gateway=unavailable)
+            self.assertEqual(result["status"], "blocked")
+            self.assertIn("ConnectionError", result["reason"])
+            self.assertEqual(exchange.calls, [])
+
+    def test_partial_close_remains_independent_of_gateway(self):
+        for filename in FILES:
+            with self.subTest(filename=filename):
+                exchange = FakeExchange()
+                calls = []
+                result = load_function(filename)(
+                    object(), exchange,
+                    {"hl_coin": "SOL", "action": "close", "close_size": 0.25},
+                    100.0, 1.0,
+                    entry_gateway=lambda **request: calls.append(request))
+                self.assertEqual(result["status"], "filled")
+                self.assertEqual(calls, [])
+                self.assertEqual([call[0] for call in exchange.calls], ["close"])
 
     def test_mainnet_entries_remain_blocked(self):
         for filename in FILES:
