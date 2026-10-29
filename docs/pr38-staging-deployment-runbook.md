@@ -154,9 +154,10 @@ rollback plan.
   the process.
 - Use [`templates/pr38-staging-gateway-config.example.yaml`](templates/pr38-staging-gateway-config.example.yaml)
   only as a review checklist. It contains placeholders, is not loaded by the
-  Python gateway, and is not deployment-ready. A separately reviewed hosting
-  adapter must resolve secret references server-side and pass the values to
-  `create_staging_executor_entry_app`.
+  Python gateway, and is not deployment-ready. The callable-only
+  `staging_executor_gateway_host.py` adapter resolves injected secret
+  references and performs startup checks, but creates neither a network
+  transport nor a listener.
 - Request fields stay limited to `bot`, `coin`, and `action`. The client must
   not choose a connection, LOGIN, signing key, RPC, or issuer. A database
   permission error, identity mismatch, timeout, malformed request, or
@@ -165,8 +166,9 @@ rollback plan.
 
 ## 4. Network and service controls
 
-The application module starts no listener. Any future host integration must be
-reviewed separately and must:
+The host/client modules start no listener and make no network connection.
+Any future transport/deployment integration must be reviewed separately and
+must:
 
 - Keep the service on private networking with no public IP, public DNS, or
   public ingress. Permit only explicitly authorized staging callers through a
@@ -183,32 +185,35 @@ reviewed separately and must:
 
 ## 5. Startup checks and audit
 
-The gateway currently has no deployment adapter or startup permission-check
-hook. Before any service could be mounted, that integration must fail closed
-unless all of these checks succeed:
+`create_staging_executor_gateway_host` fails before returning a WSGI app/client
+unless it:
 
-1. Resolve all three per-bot secret references; reject missing, duplicate, or
-   weak keys and duplicate LOGINs. Never log resolved values.
-2. Open each bot's own database connection and verify that both
-   `session_user` and `current_user` equal its configured LOGIN.
-3. Run the reviewed identity/grant preflight and confirm the exact allowlisted
-   RPC capabilities, no table mutation, no intent resolution, and no
-   unauthorized public routine execution. If startup cannot prove the required
-   permissions, do not mount the route.
-4. Perform a bounded synthetic staging-only reservation/claim/release check
-   only on a designated test coin and clean it up with the same identity.
-   Never perform this check against an exchange or production DB. Do not treat
-   a failed or ambiguous cleanup as safe to proceed.
+1. Resolves all three unique signing-key and DB-password references; rejects
+   missing/empty values, weak or duplicate signing keys, duplicate passwords,
+   duplicate secret references, and duplicate/privileged LOGIN names. Secret
+   values are not included in error messages or audit records.
+2. Builds a separate DB connection factory for each bot with
+   `sslmode=verify-full`, a 3-second connection timeout, a 3-second statement
+   timeout, and a 1-second lock timeout. At startup it verifies PostgreSQL TLS
+   is active and checks `session_user` and `current_user` equal the configured
+   dedicated LOGIN.
+3. Checks effective schema/table/column/RPC privileges, LOGIN attributes,
+   membership in only the restricted executor capability role, and absence of
+   superuser, database/schema creation, mapping-table access, direct mutation,
+   intent resolution, close/owner RPCs, and unlisted public routine execution.
+4. Calls reserve/claim for that LOGIN's configured bot and verifies an
+   attempted other-bot call fails with PostgreSQL `42501`. Both probes execute
+   inside savepoints and roll back before startup completes; they leave no
+   startup reservation or intent behind. Failure aborts host creation.
 
-The app itself does not emit a complete security audit trail. The future host
-must provide an access-controlled, append-only audit sink and alerting. Record
-request ID, timestamp, verified bot identity, action, outcome/status, database
-principal, and failure category. Do not record bearer tokens, JWTs, signing
-keys, passwords, DSNs, SQL parameter values, or request authorization headers.
-Sanitize client-controlled values and restrict audit retention/read access.
-Alert on repeated authentication failures, database permission/identity
-failures, startup-preflight failures, and unexpected route access. Avoid
-logging coin values unless the approved staging policy explicitly requires it.
+The host wrapper emits a fixed allowlist of audit fields: timestamp, generated
+request ID, validated bot/action labels, status, and outcome. It never logs
+coins, request bodies, authorization headers, tokens, SQL, database endpoints,
+passwords, or signing keys. A missing or failing audit sink prevents a normal
+response from being returned. The hosting deployment must still provide an
+access-controlled append-only sink, retention policy, alerting, and protected
+operations; audit-sink availability and operational behavior must be tested
+before mounting the route.
 
 ## 6. Key/password rotation and rollback
 
@@ -276,8 +281,13 @@ database-owner approval.
 
 ## Remaining before real staging deployment
 
-- Implement and independently review a host adapter, startup permission gate,
-  private ingress/TLS policy, audit sink, monitoring, and key/password lifecycle.
+- Implement and independently review a concrete private TLS HTTP transport
+  that enforces the client's supplied request timeout, plus hosting ingress,
+  monitoring, and secret-manager integration. The adapter is callable-only and
+  intentionally does not create a listener or network transport.
+- Verify the actual secret manager, audit sink, TLS CA/hostname validation,
+  request timeout enforcement, and operational alerts in a controlled staging
+  host; tests here use injected fake services.
 - Approve and provision three real staging-only LOGIN credentials and identity
   mappings; run the preflight and per-LOGIN tests on the intended staging DB.
 - Inventory and migrate all existing callers before applying revocations that

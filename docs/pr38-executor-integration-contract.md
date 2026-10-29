@@ -79,7 +79,9 @@ restricted-LOGIN boundary and must not be used by server request handling.
 ## Acceptance evidence still missing
 
 - A real staging host/client adapter, deployed identity-to-dedicated-LOGIN
-  binding, startup permission gate, secret lifecycle, and audit/network controls.
+  binding, verified startup permission gate, secret lifecycle, and audit/network
+  controls. The new host module checks these boundaries only against injected
+  services; no real secret manager, listener, or network transport is included.
 - Independent staging verification of the currently injected boundary using
   approved staging-only identities. Fake-service tests prove the executor
   dispatch cannot submit an order even after a successful claim, not that a

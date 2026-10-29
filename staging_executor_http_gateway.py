@@ -110,6 +110,8 @@ class StagingExecutorEntryApp:
             return self._respond(start_response, 400, {"error": "invalid request"})
         if request["action"] not in ENTRY_ACTIONS:
             return self._respond(start_response, 403, {"error": "action forbidden"})
+        environ["staging.requested_bot"] = bot
+        environ["staging.requested_action"] = request["action"]
 
         authorization = environ.get("HTTP_AUTHORIZATION")
         if type(authorization) is not str:
