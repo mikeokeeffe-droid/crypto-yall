@@ -67,6 +67,19 @@ class AuthenticatedExecutorHarnessOfflineTests(unittest.TestCase):
         self.assertEqual(rpc.calls, [])
         self.assertEqual(result.exchange_calls, ())
 
+    def test_expired_token_never_calls_database_or_exchange(self):
+        rpc = RecordingRpc()
+        result = self.run_trade(
+            "intraday",
+            "open_long",
+            rpc,
+            token=signed_token(bot="intraday", expires=100),
+        )
+        self.assertEqual(result.failure, "PermissionError")
+        self.assertIsNone(result.claim)
+        self.assertEqual(rpc.calls, [])
+        self.assertEqual(result.exchange_calls, ())
+
     def test_database_outage_fails_closed_without_order_attempt(self):
         rpc = RecordingRpc(fail_at="try_reserve_bot_entry")
         result = self.run_trade("intraday", "open_short", rpc)
@@ -100,6 +113,25 @@ class AuthenticatedExecutorHarnessOfflineTests(unittest.TestCase):
                     [call[0] for call in result.exchange_calls], ["market_close"]
                 )
                 self.assertFalse(result.live_order_submitted)
+
+    def test_partial_closes_preserve_requested_size_for_all_bots(self):
+        for bot in ("aggressive", "intraday", "daily"):
+            with self.subTest(bot=bot):
+                result = execute_offline_authenticated_trade(
+                    execute_trade=load_function(FILES[("aggressive", "intraday", "daily").index(bot)]),
+                    trade={"hl_coin": "BTC", "action": "close", "close_size": 0.25},
+                    bot=bot,
+                    jwt_token="invalid-token-is-ignored-for-close",
+                    signing_keys=KEYS,
+                    issuer=ISSUER,
+                    audience=AUDIENCE,
+                    rpc=RecordingRpc(),
+                    now=100,
+                )
+                self.assertEqual(result.trade_result["status"], "filled")
+                self.assertIsNone(result.claim)
+                self.assertEqual(result.exchange_calls[0][0], "market_close")
+                self.assertEqual(result.exchange_calls[0][1:], ("BTC", 0.25))
 
 
 if __name__ == "__main__":
