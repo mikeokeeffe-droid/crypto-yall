@@ -57,7 +57,19 @@ class RealExecutorOrderBoundaryTests(TestCase):
                 self.assertEqual(result["status"], "filled")
                 self.assertEqual([call[0] for call in exchange.calls], ["close"])
 
-    def test_mainnet_undersized_entries_never_open(self):
+    def test_entries_and_pyramids_are_blocked_without_reservation_fence(self):
+        for filename in FILES:
+            for action in ("open_long", "open_short", "pyramid_long", "pyramid_short"):
+                with self.subTest(filename=filename, action=action):
+                    exchange = FakeExchange()
+                    result = load_function(filename)(
+                        object(), exchange, {"hl_coin": "SOL", "action": action},
+                        100.0, 1.0)
+                    self.assertEqual(result["status"], "blocked")
+                    self.assertIn("authenticated atomic reservation", result["reason"])
+                    self.assertFalse(any(call[0] in ("open", "leverage") for call in exchange.calls))
+
+    def test_mainnet_entries_remain_blocked(self):
         for filename in FILES:
             with self.subTest(filename=filename):
                 exchange = FakeExchange()
@@ -69,5 +81,5 @@ class RealExecutorOrderBoundaryTests(TestCase):
                     result = load_function(filename)(
                         object(), exchange, {"hl_coin": "SOL", "action": "open_long"},
                         1.0, 1.0)
-                self.assertEqual(result["status"], "skipped")
+                self.assertEqual(result["status"], "blocked")
                 self.assertFalse(any(call[0] == "open" for call in exchange.calls))

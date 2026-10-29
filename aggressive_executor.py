@@ -507,6 +507,15 @@ def execute_trade(info, exchange, trade: dict, capital: float, leverage: float) 
         )
         return _parse_response(trade, resp, info, coin)
 
+    return {
+        **trade,
+        "status": "blocked",
+        "reason": (
+            "Entry blocked: authenticated atomic reservation and durable "
+            "intent are not wired into this executor"
+        ),
+    }
+
     mid = get_mid_price(info, coin)
     # Pyramid adds use smaller size
     size_pct = PYRAMID_SIZE_PCT if trade["action"].startswith("pyramid_") else POSITION_SIZE_PCT

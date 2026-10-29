@@ -17,10 +17,11 @@ def execute_with_staging_fence(
     bot: str, store: Any, exchange_position_flat: bool,
     exchange_orders_clear: bool,
 ) -> dict:
-    """Invoke the real function only when a simulated permit is valid.
+    """Exercise entry gating with fakes without authorizing live order flow.
 
     The adapter is intentionally offline-only and rejects non-fake exchanges.
-    Do not use this as a live entry integration.
+    The real executor functions currently fail closed for every entry, so a
+    simulated permit does not make an entry eligible to submit an order.
     """
     if bot not in BOTS:
         raise ValueError("unknown bot")
@@ -30,12 +31,12 @@ def execute_with_staging_fence(
     coin = trade.get("hl_coin")
     if not isinstance(coin, str) or not coin:
         raise ValueError("invalid coin")
+    if not getattr(exchange, "is_offline_fake", False):
+        return {**trade, "status": "skipped", "reason": "staging adapter requires offline fake exchange"}
     if action == "close":
         return execute_trade(info, exchange, trade, capital, leverage)
     if action not in OPEN_ACTIONS:
         return {**trade, "status": "skipped", "reason": "unknown entry action"}
-    if not getattr(exchange, "is_offline_fake", False):
-        return {**trade, "status": "skipped", "reason": "staging adapter requires offline fake exchange"}
     permit = acquire_entry_permit(store, coin, bot)
     if permit is None:
         return {**trade, "status": "skipped", "reason": "entry reservation denied"}

@@ -442,6 +442,15 @@ def execute_trade(info, exchange, trade: dict, capital: float, leverage: float) 
         )
         return _parse_response(trade, resp, info, coin)
 
+    return {
+        **trade,
+        "status": "blocked",
+        "reason": (
+            "Entry blocked: authenticated atomic reservation and durable "
+            "intent are not wired into this executor"
+        ),
+    }
+
     mid = get_mid_price(info, coin)
     requested_notional = capital * POSITION_SIZE_PCT * leverage
     is_testnet = os.environ.get("HL_TESTNET", "true").lower() == "true"

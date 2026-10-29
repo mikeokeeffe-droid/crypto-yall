@@ -17,6 +17,7 @@ revoke all on public.bot_position_owners from bot_reconciler;
 revoke all on public.bot_entry_intents from bot_reconciler;
 revoke all on public.bot_entry_reservations from bot_reconciler;
 grant usage on schema public to bot_reconciler;
+revoke create on schema public from bot_reconciler;
 grant select on public.bot_position_owners, public.bot_entry_intents,
   public.bot_entry_reservations to bot_reconciler;
 grant execute on function public.record_bot_position_owner(text,text,uuid,text,boolean)

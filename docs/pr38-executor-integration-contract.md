@@ -1,6 +1,11 @@
 # PR #38 — executor integration contract (review-only)
 
-**Status: NOT IMPLEMENTED; NO-GO.** No live executor imports the staging fence.
+**Status: LIVE ENTRIES BLOCKED; NO-GO.** No live executor imports the staging
+fence. The three `execute_trade()` functions now reject every non-close action
+before sizing, leverage changes, or order submission. Close paths remain
+independent. This is a fail-closed stopgap, not the authenticated reservation
+and durable-intent integration required for production entries.
+
 Do not merge, deploy, enable bots or place orders from this document.
 
 ## Verified entry call sites
@@ -43,7 +48,8 @@ recovery metadata, **not** a cross-bot atomic reservation.
 ## Acceptance evidence still missing
 
 - Real executor runtime wiring and tests against their actual entry dispatch
-  (existing tests extract function ASTs or use offline adapters only).
+  (the added offline tests extract the real `execute_trade()` function ASTs;
+  they do not prove a live authenticated reservation integration).
 - Deployed gateway identity-to-dedicated-login binding, key lifecycle and
   production grants inventory.
 - Full three-bot restart, pagination, partial fill and failure-injection E2E.

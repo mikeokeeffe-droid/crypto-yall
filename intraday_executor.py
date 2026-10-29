@@ -491,6 +491,15 @@ def execute_trade(
         )
         return _parse_response(trade, resp, info, coin)
 
+    return {
+        **trade,
+        "status": "blocked",
+        "reason": (
+            "Entry blocked: authenticated atomic reservation and durable "
+            "intent are not wired into this executor"
+        ),
+    }
+
     mid = get_mid_price(info, coin)
     calculated_notional = capital * POSITION_SIZE_PCT * leverage
     test_notional = float(os.environ.get("INTRADAY_TEST_NOTIONAL", "0") or 0)

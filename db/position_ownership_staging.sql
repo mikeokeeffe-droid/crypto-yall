@@ -101,17 +101,17 @@ end;
 $$;
 
 revoke all on public.bot_position_owners from public,anon,authenticated;
+-- The legacy service-role key is not a trusted reconciler identity.
+revoke all on public.bot_position_owners from service_role;
 revoke all on function public.record_bot_position_owner(text,text,uuid,text,boolean)
  from public,anon,authenticated;
 revoke all on function public.mark_bot_position_closed(text,text,uuid,boolean,boolean)
- from public,anon,authenticated;
+ from public,anon,authenticated,service_role;
 revoke all on function public.release_closed_bot_position(text,text,uuid,boolean,boolean)
- from public,anon,authenticated;
+ from public,anon,authenticated,service_role;
 -- No routine executor grants for close/release; reconciliation is privileged.
 -- IMPORTANT: the staging migration runs as the database owner; revoke
--- EXECUTE from PUBLIC on all new functions above (already done) and
--- explicitly validate routine service_role has no close/release permission.
-revoke insert,update,delete on public.bot_position_owners from service_role;
-grant select on public.bot_position_owners to service_role;
+-- EXECUTE from untrusted roles on all new functions above and explicitly
+-- remove existing service_role grants as well as default PUBLIC grants.
 revoke execute on function public.record_bot_position_owner(text,text,uuid,text,boolean)
  from service_role;
