@@ -175,6 +175,27 @@ class GatewayPostgresIntegration(unittest.TestCase):
                 "'public.resolve_bot_entry_intent(text,text,uuid)', "
                 "'EXECUTE')").fetchone()[0])
 
+    def test_database_permission_failure_blocks_http_claim(self):
+        self.admin.execute(
+            "revoke execute on function "
+            "public.try_reserve_bot_entry(text,text,uuid,integer) "
+            "from bot_entry_executor_trial"
+        )
+        try:
+            result = self.post("intraday", "DENIED", "open_long")
+            self.assertEqual(result["status"], "503 Service Unavailable")
+            self.assertEqual(result["body"], {"error": "database unavailable"})
+            self.assertFalse(self.admin.execute(
+                "select exists (select 1 from public.bot_entry_reservations "
+                "where coin = 'DENIED')"
+            ).fetchone()[0])
+        finally:
+            self.admin.execute(
+                "grant execute on function "
+                "public.try_reserve_bot_entry(text,text,uuid,integer) "
+                "to bot_entry_executor_trial"
+            )
+
     def test_direct_postgres_rpcs_cannot_cross_bot_identity(self):
         coins = {
             "aggressive": "AGGR",

@@ -43,3 +43,7 @@ concurrent correctness.**
 ## Current status
 
 The SQL and smoke test are review artifacts. No live state migration, workflow activation, or exchange order is performed by this branch.
+
+For the staged deployment controls and remaining prerequisites, see the
+[PR #38 staging deployment-readiness runbook](pr38-staging-deployment-runbook.md)
+and its [non-runnable configuration checklist](templates/pr38-staging-gateway-config.example.yaml).

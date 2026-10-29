@@ -60,3 +60,8 @@ permissions.
 **Decision remains NO-GO.** Keep all bots OFF, do not merge, deploy, change
 credentials, or submit orders. Stop adding isolated edge-case tests unless a
 specific acceptance blocker requires them.
+
+The [staging deployment-readiness runbook](pr38-staging-deployment-runbook.md)
+and [placeholder configuration checklist](templates/pr38-staging-gateway-config.example.yaml)
+are preparation artifacts only. They do not provision real identities, add a
+host adapter/startup gate, or authorize deployment.
