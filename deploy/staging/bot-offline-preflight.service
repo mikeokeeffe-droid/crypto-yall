@@ -1,0 +1,27 @@
+# Example only. This unit validates configuration and exits; it never launches bots.
+# Do not enable/start on production.
+[Unit]
+Description=Trading bots offline configuration preflight (no orders)
+After=network.target
+
+[Service]
+Type=oneshot
+User=bot-staging
+Group=bot-staging
+WorkingDirectory=/opt/crypto-yall
+Environment=BOT_RUN_MODE=offline
+Environment=ORDER_SUBMISSION_ENABLED=false
+Environment=HL_TESTNET=true
+Environment=SERVER_LIVE_TRADING_APPROVED=false
+ExecStart=/usr/bin/python3 /opt/crypto-yall/server_staging_guard.py
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_UNIX
+IPAddressDeny=any
+
+[Install]
+WantedBy=multi-user.target
