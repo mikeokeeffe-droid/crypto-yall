@@ -4,6 +4,7 @@ Uses real transactional reservation/intent RPCs against disposable CI database.
 No exchange connections, no trading orders, no production credentials.
 """
 import concurrent.futures
+from decimal import Decimal
 import threading
 import unittest
 import uuid
@@ -117,7 +118,7 @@ class ThreeBotPostgresAcceptance(unittest.TestCase):
             self.assertTrue(conn.execute(
                 "select public.record_bot_entry_order(%s,%s,%s,%s,%s,%s,%s)",
                 (coin, "intraday", owner, None, 1793365200000,
-                 0.01, "uncertain")).fetchone()[0])
+                 Decimal("0.01"), "uncertain")).fetchone()[0])
             conn.execute(
                 "update public.bot_entry_reservations set expires_at = "
                 "now() - interval '1 second' where coin=%s", (coin,))
