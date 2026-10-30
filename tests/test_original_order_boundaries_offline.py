@@ -251,6 +251,42 @@ class PendingEntryClaimSafetyTests(unittest.TestCase):
                     len([x for x in exchange.calls if x[0] == "attempted"]), 1
                 )
 
+    def test_restart_reconciliation_retains_claim_without_proven_order(self):
+        # Execute only the recovered for-loop syntax, not the trading module.
+        # An empty or even a matching exchange snapshot is insufficient to
+        # conclude an earlier order intent is fully reconciled.
+        for bot, path in EXECUTORS.items():
+            tree = ast.parse((ROOT / path).read_text(encoding="utf-8"))
+            main = next(n for n in tree.body if isinstance(n, ast.FunctionDef)
+                        and n.name == "main")
+            recovery = [
+                n for n in ast.walk(main)
+                if isinstance(n, ast.For)
+                and isinstance(n.target, ast.Tuple)
+                and any(isinstance(x, ast.Name) and x.id == "pending_coin"
+                        for x in n.target.elts)
+            ]
+            self.assertEqual(len(recovery), 1)
+            executable = compile(ast.fix_missing_locations(
+                ast.Module(body=[recovery[0]], type_ignores=[])), path, "exec")
+            for positions, expected_ownership in (
+                ({}, False),
+                ({"SOL": {"size": 2.0}}, True),
+                ({"SOL": {"size": -2.0}}, False),
+            ):
+                with self.subTest(bot=bot, positions=positions):
+                    original = {"SOL": {"side": "long", "created_at": "unknown"}}
+                    namespace = {
+                        "pending_claims": original.copy(),
+                        "open_positions": positions,
+                        "owned_coins": set(),
+                    }
+                    exec(executable, namespace)
+                    self.assertIn("SOL", namespace["pending_claims"])
+                    self.assertEqual(
+                        "SOL" in namespace["owned_coins"], expected_ownership
+                    )
+
     def test_main_protects_uncertain_claims_and_blocks_before_execute(self):
         # Verify the actual three main() call paths use our safeguards. These
         # are syntax checks, not a simulated shared reservation across bots.
