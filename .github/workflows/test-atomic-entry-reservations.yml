@@ -235,3 +235,6 @@ jobs:
 
       - name: Test offline crash and unreconciled intent restart policy
         run: python -m unittest discover -s tests -p 'test_server_staging_crash_recovery.py' -v
+
+      - name: Test durable entry fence across fresh Python process
+        run: python -m unittest discover -s tests -p 'test_entry_intent_process_restart_postgres.py' -v
