@@ -191,5 +191,132 @@ class OriginalExecutorOrderBoundaryTests(unittest.TestCase):
                 self.assertLess(min(switch_lines), min(client_lines))
 
 
+
+class PendingEntryClaimSafetyTests(unittest.TestCase):
+    """Exercise conservative local claims without live exchange or state services."""
+
+    def test_unknown_errors_and_fills_never_auto_release_claim(self):
+        from entry_claim_safety import safe_to_release_pre_submit_skip
+
+        for status in ("unknown", "error", "filled", None, "", "pending"):
+            with self.subTest(status=status):
+                self.assertFalse(safe_to_release_pre_submit_skip({"status": status}))
+        self.assertTrue(safe_to_release_pre_submit_skip({"status": "skipped"}))
+
+    def test_all_three_bots_block_claimed_entries_but_allow_closes(self):
+        from entry_claim_safety import blocks_entry_with_pending_claim
+
+        claims = {"SOL": {"side": "long", "created_at": "2026-10-30T10:00:00Z"}}
+        for action in ("open_long", "open_short", "pyramid_long", "pyramid_short"):
+            self.assertTrue(blocks_entry_with_pending_claim(
+                {"action": action, "hl_coin": "SOL"}, claims
+            ), action)
+        self.assertFalse(blocks_entry_with_pending_claim(
+            {"action": "close", "hl_coin": "SOL"}, claims
+        ))
+        self.assertFalse(blocks_entry_with_pending_claim(
+            {"action": "open_long", "hl_coin": "ETH"}, claims
+        ))
+
+    def test_close_path_remains_usable_when_same_coin_has_pending_claim(self):
+        from entry_claim_safety import blocks_entry_with_pending_claim
+
+        for bot in EXECUTORS:
+            with self.subTest(bot=bot):
+                trade = {"hl_coin": "SOL", "action": "close", "close_size": 0.5}
+                self.assertFalse(blocks_entry_with_pending_claim(trade, {"SOL": {}}))
+                result, calls = OriginalExecutorOrderBoundaryTests().run_trade(
+                    bot, "close", close_size=0.5
+                )
+                self.assertEqual(result["status"], "simulated")
+                self.assertEqual(calls, [("close", "SOL", 0.5)])
+
+    def test_timeout_inside_original_order_sender_propagates(self):
+        # A sender exception must never enter the normal safe-to-release path.
+        for bot in EXECUTORS:
+            with self.subTest(bot=bot):
+                fn = isolated_function(EXECUTORS[bot], "execute_trade")
+                exchange = FakeExchange()
+
+                def timeout(*args):
+                    exchange.calls.append(("attempted", args))
+                    raise TimeoutError("order result not confirmed")
+
+                exchange.market_open = timeout
+                with patch.dict(os.environ, {"HL_TESTNET": "false"}, clear=True):
+                    with self.assertRaises(TimeoutError):
+                        fn(None, exchange, {"hl_coin": "SOL", "action": "open_long"},
+                           1000, 2)
+                self.assertEqual(
+                    len([x for x in exchange.calls if x[0] == "attempted"]), 1
+                )
+
+    def test_main_protects_uncertain_claims_and_blocks_before_execute(self):
+        # Verify the actual three main() call paths use our safeguards. These
+        # are syntax checks, not a simulated shared reservation across bots.
+        for bot, path in EXECUTORS.items():
+            with self.subTest(bot=bot):
+                tree = ast.parse((ROOT / path).read_text(encoding="utf-8"))
+                main = next(
+                    node for node in tree.body
+                    if isinstance(node, ast.FunctionDef) and node.name == "main"
+                )
+                pending_loops = [
+                    n for n in ast.walk(main)
+                    if isinstance(n, ast.For)
+                    and isinstance(n.target, ast.Tuple)
+                    and any(isinstance(item, ast.Name) and item.id == "pending_coin"
+                            for item in n.target.elts)
+                ]
+                self.assertEqual(len(pending_loops), 1)
+                # An exchange position snapshot cannot safely clear an
+                # unresolved claim, whether it shows the coin or not.
+                self.assertFalse(any(
+                    isinstance(n, ast.Call)
+                    and isinstance(n.func, ast.Attribute)
+                    and n.func.attr == "pop"
+                    for n in ast.walk(pending_loops[0])
+                ), "Pending claim was auto-cleared during restart recovery")
+
+                entry_loops = [
+                    n for n in ast.walk(main)
+                    if isinstance(n, ast.For)
+                    and isinstance(n.target, ast.Name)
+                    and n.target.id == "trade"
+                    and any(isinstance(c, ast.Call)
+                            and isinstance(c.func, ast.Name)
+                            and c.func.id == "execute_trade" for c in ast.walk(n))
+                ]
+                self.assertEqual(len(entry_loops), 1)
+                loop = entry_loops[0]
+                guards = [
+                    n for n in ast.walk(loop)
+                    if isinstance(n, ast.If)
+                    and isinstance(n.test, ast.Call)
+                    and isinstance(n.test.func, ast.Name)
+                    and n.test.func.id == "blocks_entry_with_pending_claim"
+                ]
+                submit_calls = [
+                    n for n in ast.walk(loop)
+                    if isinstance(n, ast.Call)
+                    and isinstance(n.func, ast.Name)
+                    and n.func.id == "execute_trade"
+                ]
+                release_checks = [
+                    n for n in ast.walk(loop)
+                    if isinstance(n, ast.Call)
+                    and isinstance(n.func, ast.Name)
+                    and n.func.id == "safe_to_release_pre_submit_skip"
+                ]
+                self.assertEqual(len(guards), 1)
+                self.assertTrue(any(isinstance(n, ast.Continue) for n in
+                                    ast.walk(guards[0].body[1] if len(guards[0].body) > 1
+                                             else guards[0].body[0])))
+                self.assertEqual(len(submit_calls), 1)
+                self.assertEqual(len(release_checks), 1)
+                self.assertLess(guards[0].lineno, submit_calls[0].lineno)
+                self.assertGreater(release_checks[0].lineno, submit_calls[0].lineno)
+
+
 if __name__ == "__main__":
     unittest.main()
