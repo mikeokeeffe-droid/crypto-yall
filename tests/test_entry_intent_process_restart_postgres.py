@@ -57,5 +57,60 @@ assert row == ("intraday", "pending"), "durable ownership changed"
                 (self.coin,)).fetchone(), ("intraday", owner, "pending"))
 
 
+    def test_timed_out_order_without_exchange_id_blocks_all_bots_after_restart(self):
+        """A timeout with no order ID must remain fenced across new processes."""
+        from decimal import Decimal
+
+        owner = uuid.uuid4()
+        with connect() as conn:
+            self.assertTrue(conn.execute(
+                "select public.try_reserve_bot_entry(%s,%s,%s,%s)",
+                (self.coin, "daily", owner, 120)).fetchone()[0])
+            self.assertTrue(conn.execute(
+                "select public.claim_bot_entry_intent(%s,%s,%s)",
+                (self.coin, "daily", owner)).fetchone()[0])
+            # The exchange call timed out: its outcome and order ID are unknown.
+            self.assertTrue(conn.execute(
+                "select public.record_bot_entry_order(%s,%s,%s,%s,%s,%s,%s)",
+                (self.coin, "daily", owner, None, 1793365200000,
+                 Decimal("0.01"), "uncertain")).fetchone()[0])
+            conn.execute(
+                "update public.bot_entry_reservations set expires_at = "
+                "now() - interval '1 second' where coin = %s", (self.coin,))
+
+        # Each candidate starts in a new Python interpreter. Even the original
+        # owner must not acquire a second reservation until reconciliation.
+        child = r"""
+import sys
+import uuid
+import psycopg
+
+bot = sys.argv[1]
+with psycopg.connect() as conn:
+    accepted = conn.execute(
+        "select public.try_reserve_bot_entry(%s,%s,%s,%s)",
+        ("BTC", bot, uuid.uuid4(), 120)).fetchone()[0]
+    intent = conn.execute(
+        "select bot,status,exchange_order_id from public.bot_entry_intents "
+        "where coin=%s", ("BTC",)).fetchone()
+assert accepted is False, f"{bot}: duplicate entry accepted after restart"
+assert intent == ("daily", "uncertain", None), f"{bot}: unknown order fence changed"
+"""
+        for bot in ("aggressive", "intraday", "daily"):
+            with self.subTest(restarted_bot=bot):
+                result = subprocess.run(
+                    [sys.executable, "-c", child, bot],
+                    env=os.environ.copy(), capture_output=True, text=True,
+                    timeout=15, check=False)
+                self.assertEqual(result.returncode, 0, result.stderr)
+
+        with connect() as conn:
+            self.assertEqual(conn.execute(
+                "select bot,token,status,exchange_order_id,requested_size "
+                "from public.bot_entry_intents where coin=%s",
+                (self.coin,)).fetchone(),
+                ("daily", owner, "uncertain", None, Decimal("0.01")))
+
+
 if __name__ == "__main__":
     unittest.main()
