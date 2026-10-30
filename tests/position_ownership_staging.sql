@@ -1,5 +1,7 @@
 -- Isolated PostgreSQL transaction checks; no production connections.
 begin;
+insert into public.bot_reconciler_identities (bot, db_login)
+values ('aggressive', session_user::name);
 do $$
 declare t uuid := '11111111-1111-4111-8111-111111111111';
 begin

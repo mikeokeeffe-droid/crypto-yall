@@ -3,6 +3,7 @@ import base64
 from concurrent.futures import ThreadPoolExecutor
 import hashlib
 import hmac
+import io
 import json
 import os
 import secrets
@@ -16,6 +17,10 @@ from psycopg import sql
 from staging_executor_gateway_contract import BOTS
 from trusted_reconciler_dispatch_staging import dispatch_staging_reconciliation
 from trusted_reconciler_postgres_transport_staging import restricted_reconciler_rpc
+from trusted_reconciler_receiver_staging import (
+    RECONCILIATION_PATH,
+    create_staging_reconciliation_receiver,
+)
 
 
 ADDRESS = "0x" + "b" * 40
@@ -95,8 +100,14 @@ class FakeHyperliquid:
 class ReconcilerPostgresEndToEndTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.login = "reconciler_e2e_" + uuid.uuid4().hex[:8]
-        cls.password = secrets.token_urlsafe(32)
+        suffix = uuid.uuid4().hex[:8]
+        cls.logins = {
+            bot: f"reconciler_e2e_{bot}_{suffix}" for bot in BOT_ORDER
+        }
+        cls.passwords = {
+            bot: secrets.token_urlsafe(32) for bot in BOT_ORDER
+        }
+        cls.login = cls.logins["daily"]
         cls.admin = psycopg.connect(
             host=os.getenv("PGHOST", "localhost"),
             port=int(os.getenv("PGPORT", "5432")),
@@ -105,43 +116,62 @@ class ReconcilerPostgresEndToEndTests(unittest.TestCase):
             password=os.getenv("PGPASSWORD", "postgres"),
             autocommit=True,
         )
-        cls.admin.execute(
-            sql.SQL("create role {} login password {}").format(
-                sql.Identifier(cls.login), sql.Literal(cls.password),
+        for bot in BOT_ORDER:
+            cls.admin.execute(
+                sql.SQL("create role {} login password {}").format(
+                    sql.Identifier(cls.logins[bot]),
+                    sql.Literal(cls.passwords[bot]),
+                )
             )
-        )
-        cls.admin.execute(
-            sql.SQL("grant bot_reconciler to {}").format(
-                sql.Identifier(cls.login),
+            cls.admin.execute(
+                sql.SQL("grant bot_reconciler to {}").format(
+                    sql.Identifier(cls.logins[bot]),
+                )
             )
-        )
-
-        def connect_reconciler():
-            return psycopg.connect(
-                host=os.getenv("PGHOST", "localhost"),
-                port=int(os.getenv("PGPORT", "5432")),
-                dbname=os.getenv("PGDATABASE", "safety_test"),
-                user=cls.login,
-                password=cls.password,
+            cls.admin.execute(
+                "insert into public.bot_reconciler_identities (bot, db_login) "
+                "values (%s, %s)",
+                (bot, cls.logins[bot]),
             )
 
-        cls.rpc = staticmethod(
-            restricted_reconciler_rpc(
-                connect_reconciler,
-                expected_login=cls.login,
+        def connect_reconciler(bot):
+            def connect():
+                return psycopg.connect(
+                    host=os.getenv("PGHOST", "localhost"),
+                    port=int(os.getenv("PGPORT", "5432")),
+                    dbname=os.getenv("PGDATABASE", "safety_test"),
+                    user=cls.logins[bot],
+                    password=cls.passwords[bot],
+                )
+
+            return connect
+
+        cls.rpcs = {
+            bot: restricted_reconciler_rpc(
+                connect_reconciler(bot),
+                expected_login=cls.logins[bot],
             )
-        )
+            for bot in BOT_ORDER
+        }
+        cls.rpc = staticmethod(cls.rpcs["daily"])
 
     @classmethod
     def tearDownClass(cls):
-        cls.admin.execute(
-            sql.SQL("revoke bot_reconciler from {}").format(
-                sql.Identifier(cls.login),
+        for bot in BOT_ORDER:
+            cls.admin.execute(
+                "delete from public.bot_reconciler_identities where bot=%s",
+                (bot,),
             )
-        )
-        cls.admin.execute(
-            sql.SQL("drop role if exists {}").format(sql.Identifier(cls.login))
-        )
+            cls.admin.execute(
+                sql.SQL("revoke bot_reconciler from {}").format(
+                    sql.Identifier(cls.logins[bot]),
+                )
+            )
+            cls.admin.execute(
+                sql.SQL("drop role if exists {}").format(
+                    sql.Identifier(cls.logins[bot]),
+                )
+            )
         cls.admin.close()
 
     def setUp(self):
@@ -175,7 +205,9 @@ class ReconcilerPostgresEndToEndTests(unittest.TestCase):
             },
             info=exchange,
             address=ADDRESS,
-            reconciler_rpc=self.rpc if reconciler_rpc is None else reconciler_rpc,
+            reconciler_rpc=(
+                self.rpcs[bot] if reconciler_rpc is None else reconciler_rpc
+            ),
             signing_keys=KEYS,
             issuer="postgres-synthetic-issuer",
             audience="postgres-synthetic-audience",
@@ -192,13 +224,67 @@ class ReconcilerPostgresEndToEndTests(unittest.TestCase):
             },
             info=exchange,
             address=ADDRESS,
-            reconciler_rpc=self.rpc,
+            reconciler_rpc=self.rpcs[bot],
             signing_keys=KEYS,
             issuer="postgres-synthetic-issuer",
             audience="postgres-synthetic-audience",
             now=100,
             clock=lambda: 100,
         )
+
+    def create_receiver(self, exchanges, audit_events):
+        def connection_factory(bot):
+            def connect():
+                return psycopg.connect(
+                    host=os.getenv("PGHOST", "localhost"),
+                    port=int(os.getenv("PGPORT", "5432")),
+                    dbname=os.getenv("PGDATABASE", "safety_test"),
+                    user=self.logins[bot],
+                    password=self.passwords[bot],
+                )
+
+            return connect
+
+        return create_staging_reconciliation_receiver(
+            signing_keys=KEYS,
+            issuer="postgres-synthetic-issuer",
+            audience="postgres-synthetic-audience",
+            info_clients=exchanges,
+            account_addresses={bot: ADDRESS for bot in BOT_ORDER},
+            connection_factories={
+                bot: connection_factory(bot) for bot in BOT_ORDER
+            },
+            expected_logins=self.logins,
+            audit_sink=audit_events.append,
+            now=lambda: 100,
+            clock=lambda: 100,
+        )
+
+    @staticmethod
+    def call_receiver(receiver, *, bot, operation, coin, token):
+        body = json.dumps({
+            "bot": bot,
+            "operation": operation,
+            "coin": coin,
+            "intent_token": token,
+        }).encode()
+        environ = {
+            "PATH_INFO": RECONCILIATION_PATH,
+            "REQUEST_METHOD": "POST",
+            "CONTENT_TYPE": "application/json",
+            "CONTENT_LENGTH": str(len(body)),
+            "HTTP_AUTHORIZATION": "Bearer " + signed_token(bot),
+            "wsgi.input": io.BytesIO(body),
+        }
+        response = {}
+
+        def start_response(status, headers):
+            response["status"] = status
+
+        response["body"] = json.loads(b"".join(
+            receiver(environ, start_response)
+        ))
+        return response
 
     def test_three_bots_handoff_final_full_or_partial_fills_idempotently(self):
         scenarios = (
@@ -357,8 +443,57 @@ class ReconcilerPostgresEndToEndTests(unittest.TestCase):
             "select 1 from public.bot_entry_reservations where coin='BTC'"
         ).fetchone())
 
+    def test_authenticated_receiver_serializes_concurrent_no_fill_releases(self):
+        token = self.create_submitted_intent("daily", "SOL", "350")
+        exchange = FakeHyperliquid(
+            coin="SOL", order_id="350", status="canceled",
+        )
+        audit_events = []
+        receiver = self.create_receiver(
+            {bot: exchange for bot in BOT_ORDER},
+            audit_events,
+        )
+        self.assertFalse(self.admin.execute(
+            "select public.try_reserve_bot_entry(%s,%s,%s,%s)",
+            ("SOL", "aggressive", str(uuid.uuid4()), 120),
+        ).fetchone()[0])
+
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            attempts = [
+                pool.submit(
+                    self.call_receiver,
+                    receiver,
+                    bot="daily",
+                    operation="reconcile_entry",
+                    coin="SOL",
+                    token=token,
+                )
+                for _ in range(2)
+            ]
+            results = [attempt.result(timeout=20) for attempt in attempts]
+
+        self.assertEqual(
+            sum(result["body"].get("confirmed") is True for result in results),
+            1,
+            results,
+        )
+        self.assertTrue(all(result["status"] in {
+            "200 OK", "409 Conflict",
+        } for result in results), results)
+        self.assertIsNone(self.admin.execute(
+            "select 1 from public.bot_entry_intents where coin='SOL'"
+        ).fetchone())
+        self.assertIsNone(self.admin.execute(
+            "select 1 from public.bot_entry_reservations where coin='SOL'"
+        ).fetchone())
+        self.assertEqual(self.admin.execute(
+            "select count(*) from public.bot_position_owners where coin='SOL'"
+        ).fetchone()[0], 0)
+        self.assertEqual(len(audit_events), 2)
+        self.assertNotIn(token, json.dumps(audit_events))
+
     def test_concurrent_reconcilers_serialize_release_handoff_and_fence(self):
-        def gated_rpc(target_function, ready, proceed):
+        def gated_rpc(target_function, ready, proceed, base_rpc):
             arrivals = 0
             arrivals_lock = Lock()
 
@@ -371,7 +506,7 @@ class ReconcilerPostgresEndToEndTests(unittest.TestCase):
                             ready.set()
                     if not proceed.wait(timeout=10):
                         raise TimeoutError("concurrent SQL transition gate timed out")
-                return self.rpc(function, params)
+                return base_rpc(function, params)
 
             return rpc
 
@@ -392,6 +527,7 @@ class ReconcilerPostgresEndToEndTests(unittest.TestCase):
             "release_resolved_bot_entry_intent",
             release_ready,
             release_proceed,
+            self.rpcs["daily"],
         )
         with ThreadPoolExecutor(max_workers=2) as pool:
             attempts = [
@@ -447,6 +583,7 @@ class ReconcilerPostgresEndToEndTests(unittest.TestCase):
             "record_bot_position_owner",
             owner_ready,
             owner_proceed,
+            self.rpcs["intraday"],
         )
         with ThreadPoolExecutor(max_workers=2) as pool:
             attempts = [
@@ -555,7 +692,7 @@ class ReconcilerPostgresEndToEndTests(unittest.TestCase):
             port=int(os.getenv("PGPORT", "5432")),
             dbname=os.getenv("PGDATABASE", "safety_test"),
             user=self.login,
-            password=self.password,
+            password=self.passwords["daily"],
         ) as conn:
             self.assertEqual(conn.execute(
                 "select session_user, current_user",
@@ -571,6 +708,60 @@ class ReconcilerPostgresEndToEndTests(unittest.TestCase):
                         "update public.bot_entry_intents set status=status "
                         "where false"
                     )
+
+    def test_reconciler_database_login_cannot_cross_bot_identity(self):
+        token = self.create_submitted_intent(
+            "daily", "NEAR", "603",
+        )
+        self.assertIsNotNone(self.rpcs["daily"](
+            "get_bot_entry_reconciliation_intent",
+            {"p_coin": "NEAR", "p_bot": "daily", "p_token": token},
+        ))
+        self.assertIsNone(self.rpcs["intraday"](
+            "get_bot_entry_reconciliation_intent",
+            {"p_coin": "NEAR", "p_bot": "daily", "p_token": token},
+        ))
+        self.assertFalse(self.rpcs["intraday"](
+            "record_bot_position_owner",
+            {
+                "p_coin": "NEAR",
+                "p_bot": "daily",
+                "p_token": token,
+                "p_exchange_order_id": "603",
+                "p_fill_verified": True,
+            },
+        ))
+        self.assertEqual(self.admin.execute(
+            "select status from public.bot_entry_intents where coin='NEAR'"
+        ).fetchone()[0], "submitted")
+        self.assertEqual(self.admin.execute(
+            "select count(*) from public.bot_position_owners where coin='NEAR'"
+        ).fetchone()[0], 0)
+
+    def test_reconciler_logins_cannot_directly_read_protected_tables(self):
+        protected_tables = (
+            "bot_entry_intents",
+            "bot_entry_reservations",
+            "bot_position_owners",
+            "bot_reconciler_identities",
+        )
+        for bot in BOT_ORDER:
+            with psycopg.connect(
+                host=os.getenv("PGHOST", "localhost"),
+                port=int(os.getenv("PGPORT", "5432")),
+                dbname=os.getenv("PGDATABASE", "safety_test"),
+                user=self.logins[bot],
+                password=self.passwords[bot],
+                autocommit=True,
+            ) as conn:
+                for table in protected_tables:
+                    with self.subTest(bot=bot, table=table):
+                        with self.assertRaises(
+                            psycopg.errors.InsufficientPrivilege
+                        ):
+                            conn.execute(
+                                f"select * from public.{table} limit 0"
+                            )
 
 
 if __name__ == "__main__":

@@ -15,6 +15,19 @@ database connection. A successful response means a reservation and durable
 intent were claimed; it is **not** order authorization, and the handler has no
 exchange-order capability.
 
+The staging reconciliation receiver is a separate WSGI callable in
+[`trusted_reconciler_receiver_staging.py`](../trusted_reconciler_receiver_staging.py);
+it also starts no listener. It accepts only
+`POST /staging/reconciliation` with `bot`, `operation`, `coin`, and
+`intent_token`, plus a bot-specific bearer JWT. Its server configuration binds
+each bot to a distinct reconciler LOGIN, restricted PostgreSQL RPC transport,
+read-only exchange client, and public account address. The existing dispatcher
+verifies JWT signature, issuer, audience, time bounds, scope, and bot subject
+before database or exchange access. The caller cannot supply a database
+credential, RPC name, exchange client/address, or evidence boolean. This is
+code-level receiving logic, **not** a deployed listener, identity provider, or
+staging service.
+
 PostgreSQL maps `aggressive`, `intraday`, and `daily` to unique LOGIN names in
 `bot_entry_executor_identities`. The RPCs compare the requested bot with
 `session_user`, which a client parameter or `SET ROLE` cannot change. The
@@ -67,7 +80,7 @@ rollback plan.
    `service_role` table access and reservation RPC execution and intentionally
    grant no replacement writer. Applying them can stop existing callers; do
    not proceed until their inventory and migration plan are approved.
-4. Create three distinct LOGIN roles. Use identifiers reserved for this
+4. Create three distinct executor LOGIN roles. Use identifiers reserved for this
    staging environment; do not use `postgres`, `service_role`,
    `bot_reconciler`, or shared app roles. Example shape (run once per bot with
    a unique role name):
@@ -102,6 +115,19 @@ rollback plan.
    `service_role`, or any executor LOGIN. The mapping is not a credential
    store. Keep write access limited to the approved database owner/migration
    process.
+   For reconciliation, insert the three distinct reconciler LOGINs into
+   `bot_reconciler_identities` using the same bot keys. Never map an executor
+   LOGIN or shared account as a reconciler identity.
+
+   ```sql
+   insert into public.bot_reconciler_identities (bot, db_login) values
+     ('aggressive', 'staging_reconciler_aggressive'),
+     ('intraday',   'staging_reconciler_intraday'),
+     ('daily',      'staging_reconciler_daily');
+   ```
+
+   This protected mapping is enforced by reconciliation SQL against
+   `session_user`; `bot_reconciler` LOGINs must not be able to read or change it.
 6. Run
    `db/entry_reservation_identity_preflight_staging.sql` using the approved
    read-only/preflight operator. It must pass without exceptions. It expects
@@ -136,6 +162,31 @@ rollback plan.
 8. Run the disposable PostgreSQL integration and SQL permission suites in
    section 7 before considering a real staging change. Capture test output and
    preflight evidence in the approved audit store.
+
+For reconciliation, provision a separate unique LOGIN per bot as well, each
+with only membership in `bot_reconciler`; do not reuse executor LOGINs,
+`service_role`, the NOLOGIN capability role itself, or a database owner. Supply
+these three principals only through server-side connection factories, and map
+each one to exactly one bot in `bot_reconciler_identities`. Position-owner SQL
+routines enforce that mapping against PostgreSQL `session_user`, including the
+intent-read routine; a JWT or caller parameter cannot substitute for it. The
+receiver checks `session_user` and `current_user`, the mapped bot, reconciler
+role membership, effective allowed RPC grants, lack of direct protected-table
+read/write privileges, and lack of executor RPC grants before it returns a
+WSGI callable. Reads use bot-scoped SECURITY DEFINER routines, not table
+SELECT grants. Run the receiver's disposable PostgreSQL integration test as
+part of this verification.
+
+The reconciliation request body is exactly:
+
+```json
+{"bot":"intraday","operation":"reconcile_entry","coin":"SOL","intent_token":"<canonical-uuid>"}
+```
+
+The bearer token is supplied only in the Authorization header. `operation`
+accepts only `reconcile_entry` or `reconcile_release`; neither an RPC name nor
+exchange-evidence assertions are accepted. The server chooses all RPCs,
+exchange clients, account addresses, keys, and per-bot database principals.
 
 ## 3. Secrets and gateway configuration
 
@@ -186,8 +237,25 @@ deployment separately and require:
 
 ## 5. Startup checks and audit
 
-`create_staging_executor_gateway_host` fails before returning a WSGI app/client
-unless it:
+`create_staging_executor_gateway_host` and
+`create_staging_reconciliation_receiver` fail before returning a WSGI callable
+unless their respective startup checks pass. The reconciler receiver:
+
+- Requires exactly three distinct bot-specific signing keys, account addresses,
+  read-only exchange clients, LOGINs, and connection factories.
+- Connects independently as each configured reconciler LOGIN and verifies the
+  authenticated PostgreSQL identity, exact bot mapping, safe role
+  attributes/membership, the documented reconciliation RPC allowlist, and
+  absence of direct DML or executor entry RPC permissions.
+- Builds each RPC transport itself from the server-supplied connection factory
+  and expected LOGIN. Request JSON has an exact field allowlist, rejects
+  duplicate fields and oversized bodies, and cannot choose RPCs, principals,
+  evidence booleans, exchange clients, or account addresses.
+- Returns no success for uncertain, stale, conflicting, or unavailable
+  evidence. Database/exchange failures return a generic non-success response;
+  callers must retry reconciliation rather than infer an order outcome.
+
+The executor host additionally:
 
 1. Resolves all three unique signing-key and DB-password references; rejects
    missing/empty values, weak or duplicate signing keys, duplicate passwords,
@@ -263,6 +331,7 @@ python -m unittest discover -s tests -p 'test_executor_gateway_postgres_integrat
 python -m unittest discover -s tests -p 'test_executor_dedicated_login_postgres.py' -v
 python -m unittest discover -s tests -p 'test_entry_reservation_identity_preflight_postgres.py' -v
 python -m unittest discover -s tests -p 'test_entry_reservation_postgres.py' -v
+python -m unittest discover -s tests -p 'test_trusted_reconciler_postgres_e2e_staging.py' -v
 ```
 
 The tests must demonstrate all three distinct LOGINs can claim their own

@@ -16,6 +16,7 @@ TABLES = (
     ("bot_entry_intents", True),
     ("bot_entry_executor_identities", False),
     ("bot_position_owners", False),
+    ("bot_reconciler_identities", False),
 )
 TABLE_PRIVILEGES = (
     "SELECT", "INSERT", "UPDATE", "DELETE", "TRUNCATE", "REFERENCES", "TRIGGER",
@@ -39,6 +40,10 @@ class EntryReservationIdentityPreflightPostgresTests(unittest.TestCase):
             bot: "preflight_" + bot + "_" + uuid.uuid4().hex[:8]
             for bot in ("aggressive", "intraday", "daily")
         }
+        cls.reconciler_logins = {
+            bot: "reconciler_preflight_" + bot + "_" + uuid.uuid4().hex[:8]
+            for bot in ("aggressive", "intraday", "daily")
+        }
         for bot, login in cls.executor_logins.items():
             cls.admin.execute(
                 sql.SQL("CREATE ROLE {} LOGIN PASSWORD {}").format(
@@ -55,6 +60,22 @@ class EntryReservationIdentityPreflightPostgresTests(unittest.TestCase):
                 "values (%s, %s)",
                 (bot, login),
             )
+        for bot, login in cls.reconciler_logins.items():
+            cls.admin.execute(
+                sql.SQL("CREATE ROLE {} LOGIN PASSWORD {}").format(
+                    sql.Identifier(login), sql.Literal(secrets.token_urlsafe(24))
+                )
+            )
+            cls.admin.execute(
+                sql.SQL("GRANT bot_reconciler TO {}").format(
+                    sql.Identifier(login)
+                )
+            )
+            cls.admin.execute(
+                "insert into public.bot_reconciler_identities (bot, db_login) "
+                "values (%s, %s)",
+                (bot, login),
+            )
 
     @classmethod
     def tearDownClass(cls):
@@ -62,10 +83,23 @@ class EntryReservationIdentityPreflightPostgresTests(unittest.TestCase):
             "delete from public.bot_entry_executor_identities where db_login = any(%s)",
             (list(cls.executor_logins.values()),),
         )
+        cls.admin.execute(
+            "delete from public.bot_reconciler_identities where db_login = any(%s)",
+            (list(cls.reconciler_logins.values()),),
+        )
         for login in cls.executor_logins.values():
             cls.admin.execute(
                 sql.SQL("REVOKE bot_entry_executor_trial FROM {}")
                 .format(sql.Identifier(login))
+            )
+            cls.admin.execute(
+                sql.SQL("DROP ROLE {}").format(sql.Identifier(login))
+            )
+        for login in cls.reconciler_logins.values():
+            cls.admin.execute(
+                sql.SQL("REVOKE bot_reconciler FROM {}").format(
+                    sql.Identifier(login)
+                )
             )
             cls.admin.execute(
                 sql.SQL("DROP ROLE {}").format(sql.Identifier(login))
@@ -109,6 +143,33 @@ class EntryReservationIdentityPreflightPostgresTests(unittest.TestCase):
             self.admin.execute(
                 "REVOKE UPDATE (status) ON public.bot_entry_intents "
                 "FROM bot_entry_executor_trial"
+            )
+
+    def test_reconciler_table_read_grant_is_rejected(self):
+        self.admin.execute(
+            "GRANT SELECT ON public.bot_entry_intents TO bot_reconciler"
+        )
+        try:
+            self.assert_preflight_rejects(
+                "reconciler LOGIN "
+            )
+        finally:
+            self.admin.execute(
+                "REVOKE SELECT ON public.bot_entry_intents FROM bot_reconciler"
+            )
+
+    def test_reconciler_column_read_grant_is_rejected(self):
+        self.admin.execute(
+            "GRANT SELECT (coin) ON public.bot_entry_intents TO bot_reconciler"
+        )
+        try:
+            self.assert_preflight_rejects(
+                "reconciler LOGIN "
+            )
+        finally:
+            self.admin.execute(
+                "REVOKE SELECT (coin) ON public.bot_entry_intents "
+                "FROM bot_reconciler"
             )
 
     def test_all_forbidden_table_privileges_are_rejected(self):

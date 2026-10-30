@@ -10,12 +10,29 @@ begin
  if not has_function_privilege('bot_reconciler',
    'public.release_closed_bot_position(text,text,uuid,boolean,boolean)', 'EXECUTE')
  then raise exception 'reconciler missing release permission'; end if;
+ if not has_function_privilege('bot_reconciler',
+   'public.is_bot_reconciler_identity(text)', 'EXECUTE')
+ then raise exception 'reconciler missing identity-check permission'; end if;
+ if has_function_privilege('anon',
+   'public.is_bot_reconciler_identity(text)', 'EXECUTE')
+    or has_function_privilege('authenticated',
+   'public.is_bot_reconciler_identity(text)', 'EXECUTE')
+    or has_function_privilege('service_role',
+   'public.is_bot_reconciler_identity(text)', 'EXECUTE') then
+   raise exception 'identity helper is exposed to untrusted role'; end if;
  if has_table_privilege('bot_reconciler','public.bot_position_owners','INSERT')
+ or has_table_privilege('bot_reconciler','public.bot_position_owners','SELECT')
+ or has_any_column_privilege('bot_reconciler','public.bot_position_owners','SELECT')
+ or has_table_privilege('bot_reconciler','public.bot_entry_intents','SELECT')
+ or has_any_column_privilege('bot_reconciler','public.bot_entry_intents','SELECT')
+ or has_table_privilege('bot_reconciler','public.bot_entry_reservations','SELECT')
+ or has_any_column_privilege('bot_reconciler','public.bot_entry_reservations','SELECT')
  or has_table_privilege('bot_reconciler','public.bot_position_owners','UPDATE')
  or has_table_privilege('bot_reconciler','public.bot_position_owners','DELETE')
  or has_table_privilege('bot_reconciler','public.bot_entry_intents','UPDATE')
  or has_table_privilege('bot_reconciler','public.bot_entry_intents','DELETE')
- then raise exception 'reconciler must not have direct mutation privileges'; end if;
+ or has_table_privilege('bot_reconciler','public.bot_reconciler_identities','SELECT')
+ then raise exception 'reconciler must not have direct table access'; end if;
  if pg_has_role('service_role','bot_reconciler','MEMBER')
  then raise exception 'routine service role must not inherit reconciler role'; end if;
 end $$;

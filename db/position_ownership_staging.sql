@@ -12,6 +12,24 @@ create table if not exists public.bot_position_owners (
   updated_at timestamptz not null default now()
 );
 
+create table if not exists public.bot_reconciler_identities (
+  bot text primary key check (bot in ('aggressive','intraday','daily')),
+  db_login name not null unique
+);
+revoke all on public.bot_reconciler_identities
+  from public, anon, authenticated, service_role;
+
+create or replace function public.is_bot_reconciler_identity(
+  p_bot text
+) returns boolean language sql security definer stable
+set search_path = pg_catalog, public
+as $$
+  select exists (
+    select 1 from public.bot_reconciler_identities
+    where bot = p_bot and db_login = session_user::name
+  )
+$$;
+
 create or replace function public.record_bot_position_owner(
   p_coin text, p_bot text, p_token uuid, p_exchange_order_id text,
   p_fill_verified boolean
@@ -24,6 +42,12 @@ begin
      or p_bot not in ('aggressive','intraday','daily')
      or p_token is null or nullif(btrim(p_exchange_order_id),'') is null
      or p_fill_verified is distinct from true then
+    return false;
+  end if;
+  if not exists (
+    select 1 from public.bot_reconciler_identities
+    where bot=p_bot and db_login=session_user::name
+  ) then
     return false;
   end if;
   perform pg_advisory_xact_lock(hashtextextended('entry:' || p_coin,0));
@@ -72,6 +96,12 @@ begin
      or p_no_open_orders is distinct from true then
     return false;
   end if;
+  if not exists (
+    select 1 from public.bot_reconciler_identities
+    where bot=p_bot and db_login=session_user::name
+  ) then
+    return false;
+  end if;
   perform pg_advisory_xact_lock(hashtextextended('entry:' || p_coin,0));
   if exists (
     select 1 from public.bot_position_owners
@@ -98,12 +128,16 @@ create or replace function public.get_bot_entry_reconciliation_intent(
 ) returns table(
   status text, exchange_order_id text,
   submitted_at_ms bigint, requested_size numeric
-) language sql security invoker stable
+) language sql security definer stable
 set search_path = pg_catalog, public
 as $$
   select i.status, i.exchange_order_id, i.submitted_at_ms, i.requested_size
   from public.bot_entry_intents i
   where i.coin = p_coin and i.bot = p_bot and i.token = p_token
+    and exists (
+      select 1 from public.bot_reconciler_identities r
+      where r.bot = p_bot and r.db_login = session_user::name
+    )
 $$;
 
 -- Only a trusted reconciler should call this after independent exchange checks.
@@ -119,6 +153,12 @@ begin
   if p_exchange_flat is distinct from true
      or p_no_open_orders is distinct from true
      or p_coin is null then return false; end if;
+  if not exists (
+    select 1 from public.bot_reconciler_identities
+    where bot=p_bot and db_login=session_user::name
+  ) then
+    return false;
+  end if;
   perform pg_advisory_xact_lock(hashtextextended('entry:' || p_coin,0));
   update public.bot_position_owners set state='closed',updated_at=now()
   where coin=p_coin and bot=p_bot and token=p_token
@@ -139,6 +179,12 @@ begin
   if p_exchange_flat is distinct from true
      or p_no_open_orders is distinct from true
      or p_coin is null then return false; end if;
+  if not exists (
+    select 1 from public.bot_reconciler_identities
+    where bot=p_bot and db_login=session_user::name
+  ) then
+    return false;
+  end if;
   perform pg_advisory_xact_lock(hashtextextended('entry:' || p_coin,0));
   delete from public.bot_position_owners
    where coin=p_coin and bot=p_bot and token=p_token and state='closed';
@@ -171,6 +217,8 @@ revoke all on function public.get_bot_entry_reconciliation_intent(text,text,uuid
 revoke all on function public.mark_bot_position_closed(text,text,uuid,boolean,boolean)
  from public,anon,authenticated,service_role;
 revoke all on function public.release_closed_bot_position(text,text,uuid,boolean,boolean)
+ from public,anon,authenticated,service_role;
+revoke all on function public.is_bot_reconciler_identity(text)
  from public,anon,authenticated,service_role;
 do $$
 begin

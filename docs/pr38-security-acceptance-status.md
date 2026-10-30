@@ -22,8 +22,8 @@ Only consider cutover after CI is green at the **final commit**, identity-to-DB-
 
 ## Latest isolated acceptance additions
 
-- Signed staging identity tests now explicitly reject Aggressive and Daily reconciliation requests before reading exchange evidence or invoking database RPCs.
-- This is a **safety fence**, not three-bot integration. Aggressive and Daily must remain unsupported by the authenticated staging reconciler until separate end-to-end authorization and exchange-evidence tests exist.
+- A callable-only reconciliation receiver now binds all three bot-specific JWT identities to server-configured exchange clients and distinct restricted reconciler LOGINs. PostgreSQL `bot_reconciler_identities` additionally binds each LOGIN to one bot for owner transitions and intent reads. Reconciler LOGINs receive no direct SELECT or DML on protected intent, reservation, ownership, or identity tables; scoped SECURITY DEFINER RPCs provide the required reads.
+- Offline receiver tests and disposable PostgreSQL tests cover request/authentication rejection, synthetic exchange evidence, effective grants, per-bot database identity isolation, and concurrent no-fill release. These remain test-environment evidence, not a staging deployment or live authorization.
 - An independent reviewer must inspect the authentication gateway implementation, actual deployed grants, and migration sequence; no such review is represented as complete here.
 
 ## Staging grant hardening (commit 9293816)
@@ -45,14 +45,15 @@ permissions.
    entry fence. The offline tests extract their function ASTs and inject fake
    exchanges; they do not prove runtime protection. Review actual call sites,
    use a safe feature-gated integration plan, and test every order-opening path.
-2. **Gateway operations and identity:** The staging request handler is a
-   callable only; it creates no listener and is not deployed or connected to
-   executors. Provision and independently review hosting, TLS/network policy,
-   issuer/key lifecycle and dedicated DB principals before any deployment.
-   The ephemeral CI PostgreSQL LOGINs are not deployed service identities.
-3. **Three-bot recovery evidence:** Capture full integration results with
-   independent credentials and exchange snapshots, partial fills, pagination,
-   concurrent entries, restart, uncertain orders, outages and audit trail.
+2. **Gateway operations and identity:** The executor and reconciliation
+   receivers are callable-only and create no listener. Provision and
+   independently review hosting, TLS/network policy, issuer/key lifecycle,
+   secret storage, audit/alerting, and dedicated staging DB principals before
+   deployment. Ephemeral CI PostgreSQL LOGINs are not deployed service identities.
+3. **Three-bot staging evidence:** Run the full receiver and recovery tests on
+   the approved isolated staging database, then capture actual identity,
+   effective-grant, exchange-evidence, and audit results. Disposable tests do
+   not prove staging permissions or operational controls.
 4. **Production migration and review:** Inventory current callers and database
    grants, prepare rollback/canary, verify actual deployed permissions and
    obtain independent security approval plus explicit user authorization.

@@ -6,7 +6,7 @@
 
 1. Provision a dedicated reconciler identity at the gateway or identity provider, with short-lived, audience-bound credentials. Never reuse Supabase `service_role` or trading executor credentials.
 2. Verify the credential's signature (or introspect it), issuer, audience, expiration, not-before, and reconciler-specific role/scope on **every** request. Reject missing, revoked, replayed, expired, wrong-audience or wrong-scope credentials. Never trust a caller-provided `authorized` boolean.
-3. Route only three allowlisted reconciler RPCs through the gateway; validate parameter types and request sizes. Independently verify exchange evidence before invoking any privileged state transition.
+3. Route only the fixed reconciliation operations through the callable receiver. Its server-side RPC transport allowlists the required intent-read, handoff, close, and release functions; callers cannot select an RPC. Validate parameter types and request sizes, and independently verify exchange evidence before invoking any privileged state transition.
 4. Bind the gateway's database connection to the separately scoped `bot_reconciler` permissions, with no direct DML on protected tables. Do not assume a Supabase service-role token becomes restricted because the application checks scopes.
 5. Keep routine executors on their own restricted reservation-RPC principal. Remove service-role direct table writes and routine RPC rights **only after** migrating and testing every caller.
 6. Configure secret storage, rotation, revocation, TLS trust, audit logging and an emergency fail-closed disable switch outside source control.
@@ -18,7 +18,9 @@
 - Review database grants against the actual deployed connection identity, not just disposable PostgreSQL roles.
 - Explicit approval for credentials, migrations, rollout and rollback; keep all bots OFF until approved.
 
-**Known blocker:** The repository's staging `authenticated_rpc(..., authorized=True)` is only a caller assertion; the HTTPS transport injects a token but does not verify the receiving service. Neither constitutes completed authentication.
+**Implementation update:** `trusted_reconciler_receiver_staging.py` now provides a callable-only WSGI receiving boundary. It verifies bot-specific JWTs through the existing dispatcher, binds each bot to server-configured exchange and restricted PostgreSQL principals, and rejects caller-supplied credentials, RPC names, or evidence assertions. The internal `authenticated_rpc(..., authorized=True)` helper is still only a caller assertion and must not be exposed as an endpoint.
+
+**Remaining blocker:** The receiver is not deployed, does not create a listener, and has no real identity provider, secret manager, TLS ingress, or staging identities. Disposable tests do not establish staging grants or operational readiness.
 
 ## Database identity preflight
 

@@ -66,6 +66,13 @@ class GatewayPostgresIntegration(unittest.TestCase):
         cls.passwords = {
             bot: secrets.token_urlsafe(36) for bot in BOTS
         }
+        cls.reconciler_logins = {
+            bot: f"gateway_reconciler_{bot}_{uuid.uuid4().hex[:8]}"
+            for bot in BOTS
+        }
+        cls.reconciler_passwords = {
+            bot: secrets.token_urlsafe(36) for bot in BOTS
+        }
         cls.admin = psycopg.connect(
             host=os.getenv("PGHOST", "localhost"),
             port=int(os.getenv("PGPORT", "5432")),
@@ -89,6 +96,23 @@ class GatewayPostgresIntegration(unittest.TestCase):
                 "values (%s, %s)",
                 (bot, login),
             )
+            reconciler_login = cls.reconciler_logins[bot]
+            cls.admin.execute(
+                sql.SQL("create role {} login password {}").format(
+                    sql.Identifier(reconciler_login),
+                    sql.Literal(cls.reconciler_passwords[bot]),
+                )
+            )
+            cls.admin.execute(
+                sql.SQL("grant bot_reconciler to {}").format(
+                    sql.Identifier(reconciler_login),
+                )
+            )
+            cls.admin.execute(
+                "insert into public.bot_reconciler_identities (bot, db_login) "
+                "values (%s, %s)",
+                (bot, reconciler_login),
+            )
 
     @classmethod
     def tearDownClass(cls):
@@ -96,7 +120,20 @@ class GatewayPostgresIntegration(unittest.TestCase):
             "delete from public.bot_entry_executor_identities where db_login = any(%s)",
             (list(cls.logins.values()),),
         )
+        cls.admin.execute(
+            "delete from public.bot_reconciler_identities where db_login = any(%s)",
+            (list(cls.reconciler_logins.values()),),
+        )
         for login in cls.logins.values():
+            cls.admin.execute(
+                sql.SQL("drop role if exists {}").format(sql.Identifier(login))
+            )
+        for login in cls.reconciler_logins.values():
+            cls.admin.execute(
+                sql.SQL("revoke bot_reconciler from {}").format(
+                    sql.Identifier(login),
+                )
+            )
             cls.admin.execute(
                 sql.SQL("drop role if exists {}").format(sql.Identifier(login))
             )
