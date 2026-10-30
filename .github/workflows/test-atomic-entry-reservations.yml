@@ -219,3 +219,6 @@ jobs:
         run: python -m unittest discover -s tests -p 'test_three_bot_postgres_acceptance.py' -v
       - name: Test competing transactions and failure cases
         run: python -m unittest discover -s tests -p 'test_entry_reservation_postgres.py' -v
+
+      - name: Test three-bot uncertain order restart matrix (offline)
+        run: python -m unittest discover -s tests -p 'test_three_bot_uncertain_order_matrix_offline.py' -v
