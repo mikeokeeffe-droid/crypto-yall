@@ -23,7 +23,7 @@ The PR includes `.github/workflows/test-atomic-entry-reservations.yml`, which st
 | Gate | Evidence | Result |
 | --- | --- | --- |
 | Independent staging DB and secrets | Staging project identifier, credential separation review (no secrets pasted) | UNVERIFIED |
-| CI success on current SHA | GitHub run URL and relevant job conclusions | UNVERIFIED |
+| CI success on a50f4f9 | Atomic entry reservations run 41054358943; offline adapter run 41054358700; code safety run 41054358960; public testnet read-only run 41054358956 — all successful | PASS (CI only) |
 | Staging SQL migration + smoke tests | Sanitized logs and reviewer | UNVERIFIED |
 | Bot identity/RPC permissions | Denial tests for anonymous, service-role and cross-bot access | UNVERIFIED |
 | Concurrency and fencing | Three-bot collision, expiry and duplicate-order tests | UNVERIFIED |
@@ -31,3 +31,14 @@ The PR includes `.github/workflows/test-atomic-entry-reservations.yml`, which st
 | Rollback/emergency stop | Documented rehearsal and independent reviewer | UNVERIFIED |
 
 **Promotion decision: NO-GO** until all gates pass and a separate, explicit production deployment decision is made. Do not auto-merge this draft PR.
+
+## Verified CI checkpoint — 30 October 2026
+
+The draft PR's commit `a50f4f9675d1ccafceb62d794576fa2775600b9a` completed the following GitHub Actions checks successfully:
+
+- [Atomic entry reservations — disposable PostgreSQL](https://github.com/mikeokeeffe-droid/crypto-yall/actions/runs/41054358943)
+- [Offline Supabase state adapter](https://github.com/mikeokeeffe-droid/crypto-yall/actions/runs/41054358700)
+- [Code Safety Check](https://github.com/mikeokeeffe-droid/crypto-yall/actions/runs/41054358960)
+- [Hyperliquid testnet public read-only check](https://github.com/mikeokeeffe-droid/crypto-yall/actions/runs/41054358956)
+
+The disposable CI database resets between runs; this does not validate independent persistent staging credentials or live order reconciliation. **Production promotion remains NO-GO**. No paid Supabase project is required for these checks.
