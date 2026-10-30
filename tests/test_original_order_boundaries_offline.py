@@ -117,7 +117,7 @@ class OriginalExecutorOrderBoundaryTests(unittest.TestCase):
         for bot in EXECUTORS:
             with self.subTest(bot=bot):
                 result, calls = self.run_trade(
-                    bot, "open_long", capital=100, leverage=1, testnet=True
+                    bot, "open_long", capital=50, leverage=1, testnet=True
                 )
                 self.assertEqual(result["status"], "simulated")
                 self.assertEqual(calls, [
