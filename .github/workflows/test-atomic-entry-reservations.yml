@@ -9,6 +9,8 @@ on:
       - 'db/position_ownership_staging.sql'
       - 'db/trusted_reconciler_role_staging.sql'
       - 'tests/**'
+      - 'server_staging_guard.py'
+      - 'deploy/staging/**'
       - 'entry_gate_staging.py'
       - 'order_reconciliation_staging.py'
       - 'supabase_entry_store_staging.py'
@@ -222,3 +224,6 @@ jobs:
 
       - name: Test three-bot uncertain order restart matrix (offline)
         run: python -m unittest discover -s tests -p 'test_three_bot_uncertain_order_matrix_offline.py' -v
+
+      - name: Test fail-closed Hetzner offline startup preflight
+        run: python -m unittest discover -s tests -p 'test_server_staging_guard.py' -v
