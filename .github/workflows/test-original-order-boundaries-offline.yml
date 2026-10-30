@@ -1,0 +1,26 @@
+name: Original bot order boundary tests (offline only)
+
+on:
+  pull_request:
+    paths:
+      - 'tests/test_original_order_boundaries_offline.py'
+      - 'aggressive_executor.py'
+      - 'intraday_executor.py'
+      - 'hyperliquid_executor.py'
+      - '.github/workflows/test-original-order-boundaries-offline.yml'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  offline-boundaries:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Exercise fake exchanges only (no secrets, no clients, no orders)
+        run: python -m unittest discover -s tests -p 'test_original_order_boundaries_offline.py' -v
