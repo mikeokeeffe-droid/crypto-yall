@@ -5,7 +5,8 @@ Unknown or unsupported statuses fail closed.
 """
 FINAL_STATUSES = frozenset(("filled", "canceled", "cancelled", "rejected", "expired"))
 
-def read_order_finality(info, address, *, coin, order_id):
+
+def read_order_status(info, address, *, coin, order_id):
     try:
         response = info.order_status(address, order_id)
     except Exception:
@@ -24,6 +25,11 @@ def read_order_finality(info, address, *, coin, order_id):
     if not isinstance(status, str):
         return None
     status = status.lower()
+    return status
+
+
+def read_order_finality(info, address, *, coin, order_id):
+    status = read_order_status(info, address, coin=coin, order_id=order_id)
     if status in FINAL_STATUSES:
         return True
     if status in ("open", "triggered"):

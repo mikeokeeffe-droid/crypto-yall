@@ -5,8 +5,14 @@ reconciler RPC transport. Candidates alone do not mutate database state.
 """
 from dataclasses import dataclass
 from trusted_reconciler_worker_staging import reconcile_entry
-from trusted_reconciler_db_adapter_staging import commit_candidate
+from trusted_reconciler_worker_staging import reconcile_unfilled_entry
+from trusted_reconciler_db_adapter_staging import (
+    commit_candidate,
+    release_resolved_no_fill,
+)
 from trusted_reconciler_release_staging import release_verified
+from hyperliquid_order_status_staging import read_order_status
+from staging_executor_gateway_contract import BOTS
 
 @dataclass(frozen=True)
 class ServiceResult:
@@ -23,20 +29,50 @@ def authenticated_rpc(rpc, *, authorized):
     return rpc
 
 def reconcile_submitted_entry(info, address, rpc, *, coin, bot, token,
-                              order_id, order_start_ms, clock):
-    if bot != "intraday":
-        return ServiceResult(False, "only intraday staging trial permitted")
-    evidence = reconcile_entry(info, address, coin=coin, order_id=order_id,
-                               order_start_ms=order_start_ms, clock=clock)
-    if evidence.action != "handoff_candidate":
+                              order_id, order_start_ms, requested_size, clock):
+    if bot not in BOTS:
+        return ServiceResult(False, "unsupported staging bot")
+    evidence = reconcile_entry(
+        info, address, coin=coin, order_id=order_id,
+        order_start_ms=order_start_ms, requested_size=requested_size,
+        clock=clock,
+    )
+    if evidence.action == "handoff_candidate":
+        result = commit_candidate(
+            rpc, evidence, coin=coin, bot=bot, token=token, order_id=order_id
+        )
+        return ServiceResult(result.committed, result.reason)
+
+    final_status = read_order_status(
+        info, address, coin=coin, order_id=order_id
+    )
+    if final_status not in {"canceled", "cancelled", "rejected", "expired"}:
         return ServiceResult(False, evidence.reason)
-    result = commit_candidate(rpc, evidence, coin=coin, bot=bot,
-                              token=token, order_id=order_id)
+    no_fill = reconcile_unfilled_entry(
+        info, address, coin=coin, order_id=order_id,
+        order_start_ms=order_start_ms, requested_size=requested_size,
+        clock=clock,
+    )
+    if no_fill.action != "resolved_no_fill_candidate":
+        return ServiceResult(False, no_fill.reason)
+    second_check = reconcile_unfilled_entry(
+        info, address, coin=coin, order_id=order_id,
+        order_start_ms=order_start_ms, requested_size=requested_size,
+        clock=clock,
+    )
+    if (second_check.action != "resolved_no_fill_candidate"
+            or read_order_status(info, address, coin=coin, order_id=order_id)
+            != final_status):
+        return ServiceResult(False, "resolution evidence changed; durable intent retained")
+    result = release_resolved_no_fill(
+        rpc, second_check, coin=coin, bot=bot, token=token,
+        order_id=order_id, final_status=final_status,
+    )
     return ServiceResult(result.committed, result.reason)
 
 def reconcile_flat_owner(info, address, rpc, *, coin, bot, token, clock):
-    if bot != "intraday":
-        return ServiceResult(False, "only intraday staging trial permitted")
+    if bot not in BOTS:
+        return ServiceResult(False, "unsupported staging bot")
     released = release_verified(info, address, rpc, coin=coin, bot=bot,
                                 token=token, clock=clock)
     return ServiceResult(released, "release confirmed" if released else "release held; owner fence retained")

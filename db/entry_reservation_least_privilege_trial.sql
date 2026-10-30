@@ -18,15 +18,21 @@ alter function public.claim_bot_entry_intent(text,text,uuid)
   security definer set search_path = pg_catalog, public;
 alter function public.release_bot_entry(text,text,uuid)
   security definer set search_path = pg_catalog, public;
+alter function public.record_bot_entry_order(text,text,uuid,text,bigint,numeric,text)
+  security definer set search_path = pg_catalog, public;
 revoke execute on function public.try_reserve_bot_entry(text,text,uuid,integer)
   from public, anon, authenticated;
 revoke execute on function public.claim_bot_entry_intent(text,text,uuid)
   from public, anon, authenticated;
 revoke execute on function public.release_bot_entry(text,text,uuid)
   from public, anon, authenticated;
+revoke execute on function public.record_bot_entry_order(text,text,uuid,text,bigint,numeric,text)
+  from public, anon, authenticated, service_role;
 grant execute on function public.try_reserve_bot_entry(text,text,uuid,integer)
   to bot_entry_executor_trial;
 grant execute on function public.claim_bot_entry_intent(text,text,uuid)
   to bot_entry_executor_trial;
 grant execute on function public.release_bot_entry(text,text,uuid)
+  to bot_entry_executor_trial;
+grant execute on function public.record_bot_entry_order(text,text,uuid,text,bigint,numeric,text)
   to bot_entry_executor_trial;

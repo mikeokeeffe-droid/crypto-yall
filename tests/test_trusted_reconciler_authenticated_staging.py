@@ -10,11 +10,12 @@ from trusted_reconciler_authenticated_staging import (
 
 KEY = b"offline-only-test-signing-key-32-bytes-or-more"
 
-def signed_token(*, scope="reconciler:position-write", exp=200, key=KEY):
+def signed_token(*, bot="intraday", scope="reconciler:position-write",
+                 exp=200, key=KEY):
     def enc(obj):
         return base64.urlsafe_b64encode(json.dumps(obj).encode()).rstrip(b"=").decode()
     head = enc({"alg": "HS256", "typ": "JWT"})
-    body = enc({"sub": "reconciler", "iss": "staging-idp",
+    body = enc({"sub": "reconciler:" + bot, "iss": "staging-idp",
                 "aud": "staging-gateway", "scope": scope,
                 "iat": 90, "nbf": 90, "exp": exp})
     signed = head + "." + body
@@ -24,7 +25,8 @@ def signed_token(*, scope="reconciler:position-write", exp=200, key=KEY):
 AUTH = dict(signing_key=KEY, issuer="staging-idp",
             audience="staging-gateway", now=100)
 ENTRY = dict(coin="SOL", bot="intraday", token="durable-token",
-             order_id=17, order_start_ms=99000, clock=lambda: 100)
+             order_id=17, order_start_ms=99000, requested_size=2,
+             clock=lambda: 100)
 OWNER = dict(coin="SOL", bot="intraday", token="durable-token",
              clock=lambda: 100)
 
@@ -70,29 +72,47 @@ class AuthenticatedStagingTests(unittest.TestCase):
                     auth_token=signed_token(scope="executor:reserve"), **AUTH, **OWNER)
             evidence.assert_not_called()
 
-    def test_signed_entry_rejects_non_intraday_bot(self):
+    def test_signed_entry_rejects_token_bound_to_another_bot(self):
         calls = []
         with patch("trusted_reconciler_service_staging.reconcile_entry") as evidence:
             for bot in ("aggressive", "daily"):
                 with self.subTest(bot=bot):
-                    result = reconcile_entry_with_token(None, None,
-                        lambda *a: calls.append(a) or True,
-                        auth_token=signed_token(), **AUTH, **{**ENTRY, "bot": bot})
-                    self.assertFalse(result.confirmed)
+                    with self.assertRaises(PermissionError):
+                        reconcile_entry_with_token(
+                            None, None, lambda *a: calls.append(a) or True,
+                            auth_token=signed_token(), **AUTH,
+                            **{**ENTRY, "bot": bot},
+                        )
             evidence.assert_not_called()
         self.assertEqual(calls, [])
 
-    def test_signed_release_rejects_non_intraday_bot(self):
+    def test_signed_release_rejects_token_bound_to_another_bot(self):
         calls = []
         with patch("trusted_reconciler_service_staging.release_verified") as evidence:
             for bot in ("aggressive", "daily"):
                 with self.subTest(bot=bot):
-                    result = reconcile_release_with_token(None, None,
-                        lambda *a: calls.append(a) or True,
-                        auth_token=signed_token(), **AUTH, **{**OWNER, "bot": bot})
-                    self.assertFalse(result.confirmed)
+                    with self.assertRaises(PermissionError):
+                        reconcile_release_with_token(
+                            None, None, lambda *a: calls.append(a) or True,
+                            auth_token=signed_token(), **AUTH,
+                            **{**OWNER, "bot": bot},
+                        )
             evidence.assert_not_called()
         self.assertEqual(calls, [])
+
+    def test_each_bot_has_a_separately_bound_reconciliation_identity(self):
+        for bot in ("aggressive", "intraday", "daily"):
+            with self.subTest(bot=bot):
+                calls = []
+                with patch("trusted_reconciler_service_staging.reconcile_entry",
+                           return_value=SimpleNamespace(action="handoff_candidate")):
+                    result = reconcile_entry_with_token(
+                        None, None, lambda name, data: calls.append(name) or True,
+                        auth_token=signed_token(bot=bot), **AUTH,
+                        **{**ENTRY, "bot": bot},
+                    )
+                self.assertTrue(result.confirmed)
+                self.assertEqual(calls, ["record_bot_position_owner"])
 
     def test_signed_release_can_only_use_verified_release_path(self):
         with patch("trusted_reconciler_service_staging.release_verified",

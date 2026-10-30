@@ -4,7 +4,7 @@ from types import SimpleNamespace
 from trusted_reconciler_service_staging import reconcile_submitted_entry, reconcile_flat_owner, authenticated_rpc, authorized_reconcile_submitted_entry, authorized_reconcile_flat_owner
 
 ARGS = dict(coin="SOL", bot="intraday", token="durable-token", order_id=17,
-            order_start_ms=99000, clock=lambda: 100)
+            order_start_ms=99000, requested_size=2, clock=lambda: 100)
 
 class ServiceTests(unittest.TestCase):
     def test_authorized_entry_reaches_verified_handoff(self):
@@ -146,13 +146,21 @@ class ServiceTests(unittest.TestCase):
         self.assertFalse(result.confirmed)
         self.assertEqual(calls, [])
 
-    def test_other_bot_rejected_before_evidence(self):
-        result = reconcile_submitted_entry(None, None, lambda *a: True,
-                   **{**ARGS, "bot": "aggressive"})
-        self.assertFalse(result.confirmed)
+    def test_all_three_bots_can_use_the_reconciler_boundary(self):
+        for bot in ("aggressive", "intraday", "daily"):
+            with self.subTest(bot=bot):
+                calls = []
+                with patch("trusted_reconciler_service_staging.reconcile_entry",
+                           return_value=SimpleNamespace(action="handoff_candidate")):
+                    result = reconcile_submitted_entry(
+                        None, None, lambda name, data: calls.append(name) or True,
+                        **{**ARGS, "bot": bot},
+                    )
+                self.assertTrue(result.confirmed)
+                self.assertEqual(calls, ["record_bot_position_owner"])
 
-    def test_entry_rejects_other_bots_without_exchange_or_rpc(self):
-        for bot in ("aggressive", "daily", "", None):
+    def test_invalid_bot_rejected_before_evidence_or_rpc(self):
+        for bot in ("", None, "unknown"):
             with self.subTest(bot=bot):
                 with patch("trusted_reconciler_service_staging.reconcile_entry") as evidence:
                     rpc_calls = []
@@ -163,8 +171,8 @@ class ServiceTests(unittest.TestCase):
                 evidence.assert_not_called()
                 self.assertEqual(rpc_calls, [])
 
-    def test_release_rejects_other_bots_without_exchange_or_rpc(self):
-        for bot in ("aggressive", "daily", "", None):
+    def test_release_accepts_each_bot_but_rejects_invalid_identity(self):
+        for bot in ("", None, "unknown"):
             with self.subTest(bot=bot):
                 with patch("trusted_reconciler_service_staging.release_verified") as release:
                     rpc_calls = []

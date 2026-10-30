@@ -92,6 +92,8 @@ begin
      or has_function_privilege('service_role',
        'public.release_bot_entry(text,text,uuid)', 'EXECUTE')
      or has_function_privilege('service_role',
+       'public.record_bot_entry_order(text,text,uuid,text,bigint,numeric,text)', 'EXECUTE')
+     or has_function_privilege('service_role',
        'public.resolve_bot_entry_intent(text,text,uuid)', 'EXECUTE')
      or has_function_privilege('service_role',
        'public.record_bot_position_owner(text,text,uuid,text,boolean)', 'EXECUTE')
@@ -99,6 +101,10 @@ begin
        'public.mark_bot_position_closed(text,text,uuid,boolean,boolean)', 'EXECUTE')
      or has_function_privilege('service_role',
        'public.release_closed_bot_position(text,text,uuid,boolean,boolean)', 'EXECUTE')
+     or has_function_privilege('service_role',
+       'public.release_resolved_bot_entry_intent(text,text,uuid,text,text,boolean,boolean,boolean)', 'EXECUTE')
+     or has_function_privilege('service_role',
+       'public.get_bot_entry_reconciliation_intent(text,text,uuid)', 'EXECUTE')
   then
     raise exception 'service_role has forbidden effective mutation privilege';
   end if;
@@ -141,10 +147,12 @@ begin
       ('public.try_reserve_bot_entry(text,text,uuid,integer)', true),
       ('public.claim_bot_entry_intent(text,text,uuid)', true),
       ('public.release_bot_entry(text,text,uuid)', true),
+      ('public.record_bot_entry_order(text,text,uuid,text,bigint,numeric,text)', true),
       ('public.resolve_bot_entry_intent(text,text,uuid)', false),
       ('public.record_bot_position_owner(text,text,uuid,text,boolean)', false),
       ('public.mark_bot_position_closed(text,text,uuid,boolean,boolean)', false),
-      ('public.release_closed_bot_position(text,text,uuid,boolean,boolean)', false)
+      ('public.release_closed_bot_position(text,text,uuid,boolean,boolean)', false),
+      ('public.get_bot_entry_reconciliation_intent(text,text,uuid)', false)
     ) as f(signature, allowed)
   loop
     v_effective := has_function_privilege(
@@ -164,7 +172,8 @@ begin
       and p.oid not in (
         to_regprocedure('public.try_reserve_bot_entry(text,text,uuid,integer)'),
         to_regprocedure('public.claim_bot_entry_intent(text,text,uuid)'),
-        to_regprocedure('public.release_bot_entry(text,text,uuid)')
+        to_regprocedure('public.release_bot_entry(text,text,uuid)'),
+        to_regprocedure('public.record_bot_entry_order(text,text,uuid,text,bigint,numeric,text)')
       )
   ) then
     raise exception 'executor has EXECUTE on an unapproved public routine';
@@ -247,10 +256,12 @@ begin
         ('public.try_reserve_bot_entry(text,text,uuid,integer)', true),
         ('public.claim_bot_entry_intent(text,text,uuid)', true),
         ('public.release_bot_entry(text,text,uuid)', true),
+        ('public.record_bot_entry_order(text,text,uuid,text,bigint,numeric,text)', true),
         ('public.resolve_bot_entry_intent(text,text,uuid)', false),
         ('public.record_bot_position_owner(text,text,uuid,text,boolean)', false),
         ('public.mark_bot_position_closed(text,text,uuid,boolean,boolean)', false),
-        ('public.release_closed_bot_position(text,text,uuid,boolean,boolean)', false)
+        ('public.release_closed_bot_position(text,text,uuid,boolean,boolean)', false),
+        ('public.get_bot_entry_reconciliation_intent(text,text,uuid)', false)
       ) as f(signature, allowed)
     loop
       v_effective := has_function_privilege(v_role_name, v_signature, 'EXECUTE');
@@ -269,7 +280,8 @@ begin
         and p.oid not in (
           to_regprocedure('public.try_reserve_bot_entry(text,text,uuid,integer)'),
           to_regprocedure('public.claim_bot_entry_intent(text,text,uuid)'),
-          to_regprocedure('public.release_bot_entry(text,text,uuid)')
+          to_regprocedure('public.release_bot_entry(text,text,uuid)'),
+          to_regprocedure('public.record_bot_entry_order(text,text,uuid,text,bigint,numeric,text)')
         )
     ) then
       raise exception 'executor login % has EXECUTE on an unapproved public routine',
@@ -284,7 +296,13 @@ begin
      or has_function_privilege('bot_reconciler',
        'public.claim_bot_entry_intent(text,text,uuid)', 'EXECUTE')
      or has_function_privilege('bot_reconciler',
+       'public.record_bot_entry_order(text,text,uuid,text,bigint,numeric,text)', 'EXECUTE')
+     or has_function_privilege('bot_reconciler',
        'public.resolve_bot_entry_intent(text,text,uuid)', 'EXECUTE')
+     or not has_function_privilege('bot_reconciler',
+       'public.release_resolved_bot_entry_intent(text,text,uuid,text,text,boolean,boolean,boolean)', 'EXECUTE')
+     or not has_function_privilege('bot_reconciler',
+       'public.get_bot_entry_reconciliation_intent(text,text,uuid)', 'EXECUTE')
      or has_table_privilege('bot_reconciler',
        'public.bot_position_owners', 'UPDATE')
   then
@@ -295,7 +313,8 @@ begin
   where p.oid in (
     to_regprocedure('public.record_bot_position_owner(text,text,uuid,text,boolean)'),
     to_regprocedure('public.mark_bot_position_closed(text,text,uuid,boolean,boolean)'),
-    to_regprocedure('public.release_closed_bot_position(text,text,uuid,boolean,boolean)')
+    to_regprocedure('public.release_closed_bot_position(text,text,uuid,boolean,boolean)'),
+    to_regprocedure('public.release_resolved_bot_entry_intent(text,text,uuid,text,text,boolean,boolean,boolean)')
   )
     and p.prosecdef
     and p.proconfig @> array['search_path=pg_catalog, public']::text[]
@@ -303,7 +322,7 @@ begin
       'anon', 'authenticated', 'service_role',
       'bot_entry_executor_trial', 'bot_reconciler'
     );
-  if v_count <> 3 then
+  if v_count <> 4 then
     raise exception 'SECURITY DEFINER routines have unsafe owner or search_path';
   end if;
   select count(*) into v_count
@@ -311,7 +330,8 @@ begin
   where p.oid in (
     to_regprocedure('public.try_reserve_bot_entry(text,text,uuid,integer)'),
     to_regprocedure('public.claim_bot_entry_intent(text,text,uuid)'),
-    to_regprocedure('public.release_bot_entry(text,text,uuid)')
+    to_regprocedure('public.release_bot_entry(text,text,uuid)'),
+    to_regprocedure('public.record_bot_entry_order(text,text,uuid,text,bigint,numeric,text)')
   )
     and p.prosecdef
     and p.proconfig @> array['search_path=pg_catalog, public']::text[]
@@ -319,7 +339,7 @@ begin
       'anon', 'authenticated', 'service_role',
       'bot_entry_executor_trial', 'bot_reconciler'
     );
-  if v_count <> 3 then
+  if v_count <> 4 then
     raise exception 'executor entry RPCs must be safe SECURITY DEFINER routines';
   end if;
 end $$;

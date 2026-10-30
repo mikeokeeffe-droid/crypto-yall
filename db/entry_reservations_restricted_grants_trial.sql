@@ -13,6 +13,8 @@ revoke execute on function public.claim_bot_entry_intent(text,text,uuid)
   from service_role;
 revoke execute on function public.release_bot_entry(text,text,uuid)
   from service_role;
+revoke execute on function public.record_bot_entry_order(text,text,uuid,text,bigint,numeric,text)
+  from service_role;
 -- Keep the trial role as the only explicitly authorized routine writer via RPC.
 -- Neither trial role nor service_role may resolve durable intents.
 revoke execute on function public.resolve_bot_entry_intent(text,text,uuid)

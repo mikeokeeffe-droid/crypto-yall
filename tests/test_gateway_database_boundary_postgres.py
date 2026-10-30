@@ -20,14 +20,15 @@ KEY = b"isolated-gateway-db-test-secret-32-bytes"
 AUTH = dict(signing_key=KEY, issuer="isolated-issuer",
             audience="isolated-reconciler", now=100)
 ENTRY = dict(coin="SOL", bot="intraday", token="00000000-0000-4000-8000-000000000001",
-             order_id=17, order_start_ms=99000, clock=lambda: 100)
+             order_id=17, order_start_ms=99000, requested_size=2,
+             clock=lambda: 100)
 
 
 def signed_token(scope="reconciler:position-write"):
     def encode(obj):
         return base64.urlsafe_b64encode(json.dumps(obj).encode()).rstrip(b"=").decode()
     header = encode({"alg": "HS256", "typ": "JWT"})
-    body = encode({"sub": "isolated-worker", "iss": AUTH["issuer"],
+    body = encode({"sub": "reconciler:intraday", "iss": AUTH["issuer"],
                    "aud": AUTH["audience"], "scope": scope,
                    "iat": 90, "nbf": 90, "exp": 200})
     message = header + "." + body

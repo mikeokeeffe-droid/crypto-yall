@@ -27,6 +27,10 @@ begin
  if not public.claim_bot_entry_intent('TRIALCOIN','intraday',tok) then
    raise exception 'trial claim failed';
  end if;
+ if not public.record_bot_entry_order(
+    'TRIALCOIN','intraday',tok,'trial-order-1',100000,1,'submitted') then
+   raise exception 'trial order identity record failed';
+ end if;
  if public.try_reserve_bot_entry('TRIALCOIN','aggressive',
     '22222222-2222-4222-8222-222222222222',120) then
    raise exception 'cross-bot reservation bypassed durable intent';

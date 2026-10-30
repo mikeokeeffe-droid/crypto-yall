@@ -141,6 +141,8 @@ select
     'public.claim_bot_entry_intent(text,text,uuid)', 'EXECUTE'),
   pg_catalog.has_function_privilege(current_user,
     'public.release_bot_entry(text,text,uuid)', 'EXECUTE'),
+  pg_catalog.has_function_privilege(current_user,
+    'public.record_bot_entry_order(text,text,uuid,text,bigint,numeric,text)', 'EXECUTE'),
   not pg_catalog.has_function_privilege(current_user,
     'public.resolve_bot_entry_intent(text,text,uuid)', 'EXECUTE'),
   not pg_catalog.has_function_privilege(current_user,
@@ -166,7 +168,9 @@ select
         pg_catalog.to_regprocedure(
           'public.claim_bot_entry_intent(text,text,uuid)'),
         pg_catalog.to_regprocedure(
-          'public.release_bot_entry(text,text,uuid)')
+          'public.release_bot_entry(text,text,uuid)'),
+        pg_catalog.to_regprocedure(
+          'public.record_bot_entry_order(text,text,uuid,text,bigint,numeric,text)')
       )
   )
 from pg_catalog.pg_roles r

@@ -9,7 +9,8 @@ from urllib.parse import urlparse
 from urllib.request import Request, urlopen
 
 _ALLOWED = frozenset({"record_bot_position_owner",
-                      "mark_bot_position_closed", "release_closed_bot_position"})
+                      "mark_bot_position_closed", "release_closed_bot_position",
+                      "release_resolved_bot_entry_intent"})
 
 class TrustedRpcTransport:
     def __init__(self, endpoint, reconciler_token, *, opener=urlopen):

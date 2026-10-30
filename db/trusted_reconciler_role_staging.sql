@@ -13,6 +13,9 @@ alter function public.mark_bot_position_closed(text,text,uuid,boolean,boolean)
   security definer set search_path = pg_catalog, public;
 alter function public.release_closed_bot_position(text,text,uuid,boolean,boolean)
   security definer set search_path = pg_catalog, public;
+alter function public.release_resolved_bot_entry_intent(
+  text,text,uuid,text,text,boolean,boolean,boolean)
+  security definer set search_path = pg_catalog, public;
 revoke all on public.bot_position_owners from bot_reconciler;
 revoke all on public.bot_entry_intents from bot_reconciler;
 revoke all on public.bot_entry_reservations from bot_reconciler;
@@ -25,4 +28,10 @@ grant execute on function public.record_bot_position_owner(text,text,uuid,text,b
 grant execute on function public.mark_bot_position_closed(text,text,uuid,boolean,boolean)
   to bot_reconciler;
 grant execute on function public.release_closed_bot_position(text,text,uuid,boolean,boolean)
+  to bot_reconciler;
+grant execute on function public.release_resolved_bot_entry_intent(
+  text,text,uuid,text,text,boolean,boolean,boolean)
+  to bot_reconciler;
+grant execute on function public.get_bot_entry_reconciliation_intent(
+  text,text,uuid)
   to bot_reconciler;

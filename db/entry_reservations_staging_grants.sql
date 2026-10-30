@@ -27,6 +27,8 @@ revoke execute on function public.claim_bot_entry_intent(text,text,uuid)
   from public, service_role;
 revoke execute on function public.release_bot_entry(text,text,uuid)
   from public, service_role;
+revoke execute on function public.record_bot_entry_order(text,text,uuid,text,bigint,numeric,text)
+  from public, service_role;
 revoke execute on function public.resolve_bot_entry_intent(text,text,uuid)
   from public, service_role;
 -- Intentionally grants no replacement writer. Reservation writes stay unavailable

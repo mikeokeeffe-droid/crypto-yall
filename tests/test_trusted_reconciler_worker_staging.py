@@ -12,18 +12,25 @@ class Info:
     def user_fills(self, address): return []
     def user_fills_by_time(self, address, start, end):
         return [{"coin": "SOL", "oid": 17, "sz": "1", "time": start, "tid": 99}]
+    def order_status(self, address, oid):
+        return {"status": "order", "order": {
+            "order": {"coin": "SOL", "oid": oid}, "status": "filled",
+        }}
 
 class WorkerTests(unittest.TestCase):
     def test_valid_entry_is_only_candidate(self):
         result = reconcile_entry(Info(), ADDRESS, coin="SOL", order_id=17,
-                                 order_start_ms=99000, clock=lambda: 100)
+                                 order_start_ms=99000, requested_size=2,
+                                 clock=lambda: 100)
         self.assertEqual(result.action, "handoff_candidate")
     def test_missing_order_identity_holds(self):
         self.assertEqual(reconcile_entry(Info(), ADDRESS, coin="SOL", order_id=None,
-                         order_start_ms=99000, clock=lambda: 100).action, "hold")
+                         order_start_ms=99000, requested_size=2,
+                         clock=lambda: 100).action, "hold")
     def test_missing_submission_timestamp_holds(self):
         self.assertEqual(reconcile_entry(Info(), ADDRESS, coin="SOL", order_id=17,
-                         order_start_ms=None, clock=lambda: 100).action, "hold")
+                         order_start_ms=None, requested_size=2,
+                         clock=lambda: 100).action, "hold")
     def test_malformed_order_identity_and_timestamp_hold_without_exchange_reads(self):
         class NoReads:
             def __getattr__(self, name):
@@ -32,12 +39,14 @@ class WorkerTests(unittest.TestCase):
             with self.subTest(order_id=order_id, start=start):
                 result = reconcile_entry(NoReads(), ADDRESS, coin="SOL",
                                          order_id=order_id,
-                                         order_start_ms=start, clock=lambda: 100)
+                                         order_start_ms=start, requested_size=2,
+                                         clock=lambda: 100)
                 self.assertEqual(result.action, "hold")
 
     def test_flat_entry_holds(self):
         self.assertEqual(reconcile_entry(Info(active=False), ADDRESS, coin="SOL", order_id=17,
-                         order_start_ms=99000, clock=lambda: 100).action, "hold")
+                         order_start_ms=99000, requested_size=2,
+                         clock=lambda: 100).action, "hold")
     def test_flat_release_is_only_candidate(self):
         self.assertEqual(reconcile_closed(Info(active=False), ADDRESS, coin="SOL",
                          clock=lambda: 100).action, "release_candidate")

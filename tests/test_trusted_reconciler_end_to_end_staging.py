@@ -16,6 +16,10 @@ class Exchange:
     def open_orders(self, address): return self.orders
     def user_fills(self, address): return self.fills
     def user_fills_by_time(self, address, start, end): return self.fills
+    def order_status(self, address, oid):
+        return {"status": "order", "order": {
+            "order": {"coin": "SOL", "oid": oid}, "status": "filled",
+        }}
 
 class IntegrationTests(unittest.TestCase):
     def test_entry_then_flat_release(self):
@@ -26,7 +30,7 @@ class IntegrationTests(unittest.TestCase):
             return True
         entry = reconcile_submitted_entry(exchange, ADDR, rpc, coin="SOL",
                      bot="intraday", token="durable-token", order_id=17,
-                     order_start_ms=99000, clock=lambda: 100)
+                     order_start_ms=99000, requested_size=2, clock=lambda: 100)
         self.assertTrue(entry.confirmed, entry.reason)
         exchange.active = False
         released = reconcile_flat_owner(exchange, ADDR, rpc, coin="SOL",
@@ -44,7 +48,7 @@ class IntegrationTests(unittest.TestCase):
         rpc = lambda *args: calls.append(args) or True
         entry = reconcile_submitted_entry(exchange, ADDR, rpc, coin="SOL",
                     bot="intraday", token="durable-token", order_id=17,
-                    order_start_ms=99000, clock=lambda: 100)
+                    order_start_ms=99000, requested_size=2, clock=lambda: 100)
         self.assertFalse(entry.confirmed)
         exchange.active = False
         release = reconcile_flat_owner(exchange, ADDR, rpc, coin="SOL",
@@ -52,21 +56,28 @@ class IntegrationTests(unittest.TestCase):
         self.assertFalse(release.confirmed)
         self.assertEqual(calls, [])
 
-    def test_other_bots_cannot_reconcile_or_mutate(self):
-        for bot in ("aggressive", "daily"):
+    def test_each_bot_can_reconcile_through_the_shared_reconciler(self):
+        for bot in ("aggressive", "intraday", "daily"):
             with self.subTest(bot=bot):
                 exchange = Exchange()
                 calls = []
-                rpc = lambda *args: calls.append(args) or True
+                def rpc(name, params):
+                    calls.append(name)
+                    return True
                 result = reconcile_submitted_entry(exchange, ADDR, rpc, coin="SOL",
                          bot=bot, token="durable-token", order_id=17,
-                         order_start_ms=99000, clock=lambda: 100)
-                self.assertFalse(result.confirmed)
-                self.assertEqual(exchange.calls, 0)
-                self.assertFalse(reconcile_flat_owner(exchange, ADDR, rpc,
+                         order_start_ms=99000, requested_size=2,
+                         clock=lambda: 100)
+                self.assertTrue(result.confirmed, result.reason)
+                exchange.active = False
+                self.assertTrue(reconcile_flat_owner(exchange, ADDR, rpc,
                          coin="SOL", bot=bot, token="durable-token",
                          clock=lambda: 100).confirmed)
-                self.assertEqual(calls, [])
+                self.assertEqual(calls, [
+                    "record_bot_position_owner",
+                    "mark_bot_position_closed",
+                    "release_closed_bot_position",
+                ])
 
     def test_incomplete_evidence_never_calls_rpc(self):
         exchange = Exchange()
@@ -75,7 +86,8 @@ class IntegrationTests(unittest.TestCase):
         result = reconcile_submitted_entry(exchange, ADDR,
                    lambda *args: calls.append(args) or True,
                    coin="SOL", bot="intraday", token="durable-token",
-                   order_id=17, order_start_ms=99000, clock=lambda: 100)
+                   order_id=17, order_start_ms=99000, requested_size=2,
+                   clock=lambda: 100)
         self.assertFalse(result.confirmed)
         self.assertEqual(calls, [])
 

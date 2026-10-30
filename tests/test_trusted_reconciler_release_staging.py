@@ -4,11 +4,11 @@ from types import SimpleNamespace
 from trusted_reconciler_release_staging import release_verified
 
 class ReleaseTests(unittest.TestCase):
-    def run_release(self, checks, rpc):
+    def run_release(self, checks, rpc, bot='intraday'):
         with patch('trusted_reconciler_release_staging.reconcile_closed',
                    side_effect=[SimpleNamespace(action=x) for x in checks]) as verify:
             result = release_verified(None, 'address', rpc, coin='SOL',
-                                      bot='intraday', token='token', clock=lambda: 1)
+                                      bot=bot, token='token', clock=lambda: 1)
         return result, verify.call_count
 
     def test_two_fresh_checks_before_release(self):
@@ -19,17 +19,21 @@ class ReleaseTests(unittest.TestCase):
         self.assertEqual(count, 2)
         self.assertEqual(calls, ['mark_bot_position_closed', 'release_closed_bot_position'])
 
-    def test_other_bots_cannot_release_at_boundary(self):
-        for bot in ('aggressive', 'daily'):
+    def test_all_supported_bots_can_release_at_boundary(self):
+        for bot in ('aggressive', 'intraday', 'daily'):
             with self.subTest(bot=bot):
                 calls = []
-                with patch('trusted_reconciler_release_staging.reconcile_closed') as verify:
-                    result = release_verified(None, 'address',
-                        lambda fn, args: calls.append(fn) or True,
-                        coin='SOL', bot=bot, token='token', clock=lambda: 1)
-                self.assertFalse(result)
-                verify.assert_not_called()
-                self.assertEqual(calls, [])
+                result, count = self.run_release(
+                    ['release_candidate', 'release_candidate'],
+                    lambda fn, args: calls.append(fn) or True,
+                    bot=bot,
+                )
+                self.assertTrue(result)
+                self.assertEqual(count, 2)
+                self.assertEqual(
+                    calls,
+                    ['mark_bot_position_closed', 'release_closed_bot_position'],
+                )
 
     def test_first_check_holds(self):
         calls = []

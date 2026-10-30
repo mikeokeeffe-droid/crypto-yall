@@ -4,6 +4,7 @@ The caller supplies a connection factory for a dedicated, independently
 provisioned LOGIN role. This module does not load credentials or change grants.
 Production use requires independent security review and executor integration.
 """
+from math import isfinite
 from uuid import UUID
 
 _ALLOWED = {
@@ -16,6 +17,10 @@ _ALLOWED = {
     "release_bot_entry": (
         "select public.release_bot_entry(%s,%s,%s)",
         ("p_coin", "p_bot", "p_token")),
+    "record_bot_entry_order": (
+        "select public.record_bot_entry_order(%s,%s,%s,%s,%s,%s,%s)",
+        ("p_coin", "p_bot", "p_token", "p_exchange_order_id",
+         "p_submitted_at_ms", "p_requested_size", "p_status")),
 }
 _BOTS = frozenset(("aggressive", "intraday", "daily"))
 
@@ -54,6 +59,20 @@ def restricted_executor_rpc(connection_factory, *, expected_login, expected_bot)
             ttl = params["p_ttl_seconds"]
             if type(ttl) is not int or not 30 <= ttl <= 600:
                 raise ValueError("invalid reservation TTL")
+        if function == "record_bot_entry_order":
+            order_id = params["p_exchange_order_id"]
+            status = params["p_status"]
+            timestamp = params["p_submitted_at_ms"]
+            requested_size = params["p_requested_size"]
+            if (type(status) is not str
+                    or status not in {"submitted", "uncertain"}
+                    or (status == "submitted"
+                        and (type(order_id) is not str or not order_id.strip()))
+                    or (order_id is not None and type(order_id) is not str)
+                    or type(timestamp) is not int or timestamp < 0
+                    or type(requested_size) not in (int, float)
+                    or not isfinite(requested_size) or requested_size <= 0):
+                raise ValueError("invalid durable order identity")
         values = tuple(params[key] for key in keys)
         try:
             with connection_factory() as conn:
