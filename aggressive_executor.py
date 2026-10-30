@@ -27,6 +27,8 @@ import copy
 
 import requests
 
+from entry_claim_safety import blocks_entry_with_pending_claim, safe_to_release_pre_submit_skip
+
 from intraday_data_loader import fetch_all_intraday, HL_SYMBOL_MAP
 from aggressive_strategy import generate_aggressive_signals, classify_aggressive_signal
 from aggressive_entry_shadow import score_entry_quality
@@ -705,7 +707,8 @@ def main():
     for pending_coin, claim in list(pending_claims.items()):
         pos = open_positions.get(pending_coin)
         if pos is None:
-            pending_claims.pop(pending_coin, None)
+            # A flat snapshot cannot establish that no order was submitted.
+            print(f"Unresolved Aggressive entry claim for {pending_coin}: reconcile before re-entry")
             continue
         claimed_side = str((claim or {}).get("side", "")).lower()
         actual_side = "long" if float(pos.get("size", 0.0) or 0.0) > 0 else "short"
@@ -716,7 +719,8 @@ def main():
                     f"from persisted pending entry claim"
                 )
             owned_coins.add(pending_coin)
-            pending_claims.pop(pending_coin, None)
+            # Do not discard an unresolved order intent on position evidence alone.
+            # Keep it blocked until order-aware exchange reconciliation.
     state["pending_entry_claims"] = pending_claims
 
     stale_owned = owned_coins - set(open_positions.keys())
@@ -785,6 +789,11 @@ def main():
 
     results = []
     for trade in trades:
+        # Entry-only guard: unresolved own claims must not be overwritten or retried.
+        # This does not replace the atomic cross-bot reservation still needed.
+        if blocks_entry_with_pending_claim(trade, state.get("pending_entry_claims", {})):
+            print(f"BLOCKED: {trade['action']} {trade['hl_coin']} has unresolved entry claim")
+            continue
         # Aggressive leverage is controlled by repository/environment variables.
         # Mid-cap / volatile assets use the normal setting; large caps use the max setting.
         # Hyperliquid may apply a lower market-specific cap where required.
@@ -807,7 +816,9 @@ def main():
 
         result = execute_trade(info, exchange, trade, capital, leverage)
 
-        if is_new_entry and result.get("status") != "filled":
+        # Only locally skipped requests prove no exchange order was sent.
+        # Errors, unknowns and timeouts keep the claim until reconciliation.
+        if is_new_entry and safe_to_release_pre_submit_skip(result):
             state.setdefault("pending_entry_claims", {}).pop(trade["hl_coin"], None)
             save_state(state)
 
