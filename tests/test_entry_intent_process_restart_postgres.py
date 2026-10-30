@@ -112,5 +112,101 @@ assert intent == ("daily", "uncertain", None), f"{bot}: unknown order fence chan
                 ("daily", owner, "uncertain", None, Decimal("0.01")))
 
 
+    def test_committed_claim_lost_response_and_database_outage(self):
+        """Ambiguous commit + simulated outage must not clear a durable intent."""
+        from shared_entry_gate_staging import inspect_entry
+
+        class CommittedClaimTimeoutStore:
+            def reserve(self, coin, bot, token):
+                with connect() as conn:
+                    return conn.execute(
+                        "select public.try_reserve_bot_entry(%s,%s,%s,%s)",
+                        (coin, bot, token, 120)).fetchone()[0]
+
+            def claim_intent(self, coin, bot, token):
+                with connect() as conn:
+                    committed = conn.execute(
+                        "select public.claim_bot_entry_intent(%s,%s,%s)",
+                        (coin, bot, token)).fetchone()[0]
+                if committed:
+                    raise TimeoutError("claim committed but acknowledgement lost")
+                return False
+
+        def inspect(store, bot):
+            return inspect_entry(
+                store, bot=bot,
+                trade={"hl_coin": self.coin, "action": "open_long"},
+                exchange_position_flat=True, exchange_orders_clear=True)
+
+        # The claim is genuinely committed to disposable PostgreSQL; the bot
+        # receives only a timeout and must never mistake it for permission.
+        first = inspect(CommittedClaimTimeoutStore(), "intraday")
+        self.assertFalse(first.simulated_allowed)
+        self.assertFalse(first.live_order_submitted)
+        with connect() as conn:
+            row = conn.execute(
+                "select bot,token,status from public.bot_entry_intents "
+                "where coin=%s", (self.coin,)).fetchone()
+            self.assertEqual(row[0], "intraday")
+            self.assertEqual(row[2], "pending")
+            conn.execute(
+                "update public.bot_entry_reservations set expires_at = "
+                "now() - interval '1 second' where coin=%s", (self.coin,))
+
+        class UnavailableStore:
+            def reserve(self, coin, bot, token):
+                raise ConnectionError("simulated PostgreSQL outage")
+
+            def claim_intent(self, coin, bot, token):
+                raise AssertionError("claim must not run without a reservation")
+
+        for bot in ("aggressive", "intraday", "daily"):
+            with self.subTest(bot=bot, stage="database unavailable"):
+                denied = inspect(UnavailableStore(), bot)
+                self.assertFalse(denied.simulated_allowed)
+                self.assertFalse(denied.live_order_submitted)
+
+        # After reconnection, independent new interpreters must consult the
+        # persistent fence, not infer that an expired reservation is safe.
+        child = r"""
+import sys
+import psycopg
+from shared_entry_gate_staging import inspect_entry
+
+class Store:
+    def reserve(self, coin, bot, token):
+        with psycopg.connect() as conn:
+            return conn.execute(
+                "select public.try_reserve_bot_entry(%s,%s,%s,%s)",
+                (coin, bot, token, 120)).fetchone()[0]
+
+    def claim_intent(self, coin, bot, token):
+        with psycopg.connect() as conn:
+            return conn.execute(
+                "select public.claim_bot_entry_intent(%s,%s,%s)",
+                (coin, bot, token)).fetchone()[0]
+
+decision = inspect_entry(
+    Store(), bot=sys.argv[1],
+    trade={"hl_coin": "BTC", "action": "open_long"},
+    exchange_position_flat=True, exchange_orders_clear=True)
+assert not decision.simulated_allowed, "entry allowed after DB recovery"
+assert not decision.live_order_submitted, "live order submitted"
+"""
+        for bot in ("aggressive", "intraday", "daily"):
+            with self.subTest(bot=bot, stage="fresh process after recovery"):
+                result = subprocess.run(
+                    [sys.executable, "-c", child, bot],
+                    env=os.environ.copy(), capture_output=True, text=True,
+                    timeout=15, check=False)
+                self.assertEqual(result.returncode, 0, result.stderr)
+
+        with connect() as conn:
+            self.assertEqual(conn.execute(
+                "select bot,token,status from public.bot_entry_intents "
+                "where coin=%s", (self.coin,)).fetchone(), row)
+
+
+
 if __name__ == "__main__":
     unittest.main()
