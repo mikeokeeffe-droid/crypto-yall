@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - 'tests/test_original_order_boundaries_offline.py'
+      - 'entry_claim_safety.py'
       - 'aggressive_executor.py'
       - 'intraday_executor.py'
       - 'hyperliquid_executor.py'
