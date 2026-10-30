@@ -10,6 +10,7 @@ on:
       - 'db/trusted_reconciler_role_staging.sql'
       - 'tests/**'
       - 'server_staging_guard.py'
+      - 'server_staging_control.py'
       - 'deploy/staging/**'
       - 'entry_gate_staging.py'
       - 'order_reconciliation_staging.py'
@@ -227,3 +228,6 @@ jobs:
 
       - name: Test fail-closed Hetzner offline startup preflight
         run: python -m unittest discover -s tests -p 'test_server_staging_guard.py' -v
+
+      - name: Test offline three-bot server stop and restart controls
+        run: python -m unittest discover -s tests -p 'test_server_staging_control.py' -v
