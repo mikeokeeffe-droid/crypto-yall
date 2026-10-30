@@ -63,8 +63,10 @@ specific acceptance blocker requires them.
 
 The [staging deployment-readiness runbook](pr38-staging-deployment-runbook.md)
 and [placeholder configuration checklist](templates/pr38-staging-gateway-config.example.yaml)
-are preparation artifacts only. The draft now includes a callable-only host
-adapter with startup LOGIN/grant/mapping checks, injected secret resolution,
-bounded client requests, and redacted audit events. It has not been deployed,
-connected to a real secret manager, or provided a network transport/listener;
-no real identities are provisioned and deployment is not authorized.
+are preparation artifacts only. The draft now includes a callable-only host adapter with startup
+LOGIN/grant/mapping checks, injected secret resolution, a TLS-verifying HTTPS
+client restricted to explicitly allowlisted private destinations, bounded
+requests/responses, and redacted audit events. The HTTPS transport has only
+offline mocked-network tests. It has not been deployed or connected to a real
+secret manager; no real identities or destination allowlist are configured and
+deployment is not authorized.

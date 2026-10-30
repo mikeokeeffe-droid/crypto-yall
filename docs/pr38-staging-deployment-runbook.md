@@ -156,8 +156,9 @@ rollback plan.
   only as a review checklist. It contains placeholders, is not loaded by the
   Python gateway, and is not deployment-ready. The callable-only
   `staging_executor_gateway_host.py` adapter resolves injected secret
-  references and performs startup checks, but creates neither a network
-  transport nor a listener.
+  references and performs startup checks. Its HTTPS client requires an exact
+  allowlisted origin mapped to approved private IP addresses, verifies TLS
+  certificates and hostnames, and creates no listener.
 - Request fields stay limited to `bot`, `coin`, and `action`. The client must
   not choose a connection, LOGIN, signing key, RPC, or issuer. A database
   permission error, identity mismatch, timeout, malformed request, or
@@ -166,9 +167,9 @@ rollback plan.
 
 ## 4. Network and service controls
 
-The host/client modules start no listener and make no network connection.
-Any future transport/deployment integration must be reviewed separately and
-must:
+The host starts no listener. A configured HTTPS client makes requests only to
+its exact allowlisted staging origin and pinned private addresses. Review the
+deployment separately and require:
 
 - Keep the service on private networking with no public IP, public DNS, or
   public ingress. Permit only explicitly authorized staging callers through a
@@ -281,10 +282,10 @@ database-owner approval.
 
 ## Remaining before real staging deployment
 
-- Implement and independently review a concrete private TLS HTTP transport
-  that enforces the client's supplied request timeout, plus hosting ingress,
-  monitoring, and secret-manager integration. The adapter is callable-only and
-  intentionally does not create a listener or network transport.
+- Independently review the HTTPS transport configuration and approve the
+  endpoint-to-private-IP allowlist and staging CA trust. Hosting ingress,
+  monitoring, and secret-manager integration remain outstanding. The adapter
+  is callable-only and intentionally does not create a listener.
 - Verify the actual secret manager, audit sink, TLS CA/hostname validation,
   request timeout enforcement, and operational alerts in a controlled staging
   host; tests here use injected fake services.

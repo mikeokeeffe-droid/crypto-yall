@@ -2,7 +2,9 @@
 
 **Status: LIVE ENTRIES BLOCKED; NO-GO.** Each executor's real `execute_trade()`
 dispatch accepts an optional, injected staging gateway callable. The default is
-`None`; no network client or credentials are loaded. If injected, the callable
+`None`; no network client or credentials are loaded by executor entrypoints. A
+host-created client can use the staging-only HTTPS transport with an explicit
+private destination allowlist and per-bot signing keys. If injected, the callable
 may authenticate and claim a staging reservation/intent, but the executor
 unconditionally returns `blocked` and contains no `market_open` or leverage
 change path. The close/partial-close branch runs before the gateway and remains
@@ -51,11 +53,10 @@ restricted-LOGIN boundary and must not be used by server request handling.
 
 ## Required production integration contract
 
-1. Implement and independently review a real gateway client/host adapter that
-   authenticates to the WSGI boundary with bot-specific credentials and uses a
-   dedicated **executor** database principal. The current callable is only an
-   injected interface; production main entrypoints leave it unset. No successful
-   staging claim authorizes an order in this milestone.
+1. Independently review and configure the HTTPS gateway client/host adapter
+   with approved private destination addresses, staging CA trust, and
+   bot-specific credentials. Production main entrypoints leave the callable
+   unset. No successful staging claim authorizes an order in this milestone.
 2. Before any separately approved live order path, atomically acquire a
    per-coin reservation and durable pending intent. Reject absent/mismatched
    tokens, stale leases, DB outages and ambiguous responses. Never fall back to
@@ -78,10 +79,10 @@ restricted-LOGIN boundary and must not be used by server request handling.
 
 ## Acceptance evidence still missing
 
-- A real staging host/client adapter, deployed identity-to-dedicated-LOGIN
-  binding, verified startup permission gate, secret lifecycle, and audit/network
-  controls. The new host module checks these boundaries only against injected
-  services; no real secret manager, listener, or network transport is included.
+- A deployed identity-to-dedicated-LOGIN binding, verified startup permission
+  gate, secret lifecycle, and audit/network controls. The HTTPS transport is
+  implemented but has only mocked transport/DNS/TLS tests; no real staging
+  secret manager, listener, or gateway endpoint is configured.
 - Independent staging verification of the currently injected boundary using
   approved staging-only identities. Fake-service tests prove the executor
   dispatch cannot submit an order even after a successful claim, not that a
