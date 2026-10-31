@@ -375,7 +375,7 @@
     }
   },
   "date_utc": "2026-10-31",
-  "generated_at": "2026-10-31T15:08:21.692157+00:00",
+  "generated_at": "2026-10-31T16:08:21.054700+00:00",
   "report_errors": [],
   "reporting_only": true,
   "schema_version": 2,
@@ -384,12 +384,12 @@
     "bots": {
       "aggressive": {
         "all_time": {
-          "average_loss_pct": -1.4034,
+          "average_loss_pct": -1.3955,
           "average_win_pct": 2.1554,
-          "closed_trades": 191,
-          "cumulative_gross_return_pct": -61.6339,
-          "losses": 133,
-          "win_rate_pct": 30.37,
+          "closed_trades": 192,
+          "cumulative_gross_return_pct": -61.99,
+          "losses": 134,
+          "win_rate_pct": 30.21,
           "wins": 58
         },
         "closed_trades": [
@@ -2684,26 +2684,28 @@
             "gross_return_pct": -0.8061,
             "outcome": "loss",
             "ticker": "SOL-USD"
-          }
-        ],
-        "open_positions": {
-          "SUI": {
+          },
+          {
             "asset": "SUI",
             "blocked_live_reason": "mid-cap allow_short=False",
-            "current_price": 0.89747,
             "entry_price": 0.89875,
             "entry_time": "2026-10-31T06:30:00",
-            "ticker": "SUI20947-USD",
-            "unrealized_gross_return_pct": 0.1424
+            "exit_action": "flat",
+            "exit_price": 0.90195,
+            "exit_time": "2026-10-31T15:30:00",
+            "gross_return_pct": -0.3561,
+            "outcome": "loss",
+            "ticker": "SUI20947-USD"
           }
-        },
+        ],
+        "open_positions": {},
         "today": {
-          "average_loss_pct": -1.257,
+          "average_loss_pct": -0.9567,
           "average_win_pct": 0.0801,
-          "closed_trades": 3,
-          "cumulative_gross_return_pct": -2.4339,
-          "losses": 2,
-          "win_rate_pct": 33.33,
+          "closed_trades": 4,
+          "cumulative_gross_return_pct": -2.79,
+          "losses": 3,
+          "win_rate_pct": 25.0,
           "wins": 1
         }
       },
@@ -3743,38 +3745,38 @@
           "AVAX": {
             "asset": "AVAX",
             "blocked_live_reason": "mid-cap allow_short=False",
-            "current_price": 8.4874,
+            "current_price": 8.5473,
             "entry_price": 8.5049,
             "entry_time": "2026-10-31T13:00:00",
             "ticker": "AVAX-USD",
-            "unrealized_gross_return_pct": 0.2058
+            "unrealized_gross_return_pct": -0.4985
           },
           "ONDO": {
             "asset": "ONDO",
             "blocked_live_reason": "mid-cap allow_short=False",
-            "current_price": 0.40779,
+            "current_price": 0.4124,
             "entry_price": 0.41292,
             "entry_time": "2026-10-31T12:00:00",
             "ticker": "ONDO-USD",
-            "unrealized_gross_return_pct": 1.2424
+            "unrealized_gross_return_pct": 0.1259
           },
           "SUI": {
             "asset": "SUI",
             "blocked_live_reason": "mid-cap allow_short=False",
-            "current_price": 0.89747,
+            "current_price": 0.90195,
             "entry_price": 0.89527,
             "entry_time": "2026-10-31T10:00:00",
             "ticker": "SUI20947-USD",
-            "unrealized_gross_return_pct": -0.2457
+            "unrealized_gross_return_pct": -0.7461
           },
           "XRP": {
             "asset": "XRP",
             "blocked_live_reason": "mid-cap allow_short=False",
-            "current_price": 1.249,
+            "current_price": 1.2527,
             "entry_price": 1.2473,
             "entry_time": "2026-10-31T05:00:00",
             "ticker": "XRP-USD",
-            "unrealized_gross_return_pct": -0.1363
+            "unrealized_gross_return_pct": -0.4329
           }
         },
         "today": {
@@ -4617,6 +4619,6 @@
     "errors": [],
     "scope": "Shadow-only fresh short signals for SOL/AVAX/LINK/SUI/XRP/ONDO that live trading blocks because mid-cap allow_short=False.",
     "tracking_started_at": "2026-09-10T22:03:23.796957+00:00",
-    "updated_at": "2026-10-31T15:08:21.692157+00:00"
+    "updated_at": "2026-10-31T16:08:21.054700+00:00"
   }
 }
