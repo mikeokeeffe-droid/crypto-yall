@@ -375,7 +375,7 @@
     }
   },
   "date_utc": "2026-10-31",
-  "generated_at": "2026-10-31T04:08:19.187434+00:00",
+  "generated_at": "2026-10-31T05:08:22.314918+00:00",
   "report_errors": [],
   "reporting_only": true,
   "schema_version": 2,
@@ -4224,7 +4224,7 @@
             "win_rate_pct": 12.5,
             "wins": 3
           },
-          "btc_confirmed_short_now": true,
+          "btc_confirmed_short_now": false,
           "closed_trades": [
             {
               "asset": "AVAX",
@@ -4534,6 +4534,6 @@
     "errors": [],
     "scope": "Shadow-only fresh short signals for SOL/AVAX/LINK/SUI/XRP/ONDO that live trading blocks because mid-cap allow_short=False.",
     "tracking_started_at": "2026-09-10T22:03:23.796957+00:00",
-    "updated_at": "2026-10-31T04:08:19.187434+00:00"
+    "updated_at": "2026-10-31T05:08:22.314918+00:00"
   }
 }
