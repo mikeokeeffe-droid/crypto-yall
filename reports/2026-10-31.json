@@ -375,7 +375,7 @@
     }
   },
   "date_utc": "2026-10-31",
-  "generated_at": "2026-10-31T10:08:18.976332+00:00",
+  "generated_at": "2026-10-31T11:08:11.179363+00:00",
   "report_errors": [],
   "reporting_only": true,
   "schema_version": 2,
@@ -385,12 +385,12 @@
       "aggressive": {
         "all_time": {
           "average_loss_pct": -1.4079,
-          "average_win_pct": 2.1918,
-          "closed_trades": 189,
-          "cumulative_gross_return_pct": -60.9079,
+          "average_win_pct": 2.1554,
+          "closed_trades": 190,
+          "cumulative_gross_return_pct": -60.8278,
           "losses": 132,
-          "win_rate_pct": 30.16,
-          "wins": 57
+          "win_rate_pct": 30.53,
+          "wins": 58
         },
         "closed_trades": [
           {
@@ -2660,45 +2660,48 @@
             "gross_return_pct": -1.7079,
             "outcome": "loss",
             "ticker": "ONDO-USD"
+          },
+          {
+            "asset": "XRP",
+            "blocked_live_reason": "mid-cap allow_short=False",
+            "entry_price": 1.2486,
+            "entry_time": "2026-10-31T06:30:00",
+            "exit_action": "cover_short",
+            "exit_price": 1.2476,
+            "exit_time": "2026-10-31T10:30:00",
+            "gross_return_pct": 0.0801,
+            "outcome": "win",
+            "ticker": "XRP-USD"
           }
         ],
         "open_positions": {
           "SOL": {
             "asset": "SOL",
             "blocked_live_reason": "mid-cap allow_short=False",
-            "current_price": 95.459,
+            "current_price": 95.541,
             "entry_price": 95.271,
             "entry_time": "2026-10-31T08:30:00",
             "ticker": "SOL-USD",
-            "unrealized_gross_return_pct": -0.1973
+            "unrealized_gross_return_pct": -0.2834
           },
           "SUI": {
             "asset": "SUI",
             "blocked_live_reason": "mid-cap allow_short=False",
-            "current_price": 0.89702,
+            "current_price": 0.89527,
             "entry_price": 0.89875,
             "entry_time": "2026-10-31T06:30:00",
             "ticker": "SUI20947-USD",
-            "unrealized_gross_return_pct": 0.1925
-          },
-          "XRP": {
-            "asset": "XRP",
-            "blocked_live_reason": "mid-cap allow_short=False",
-            "current_price": 1.2481,
-            "entry_price": 1.2486,
-            "entry_time": "2026-10-31T06:30:00",
-            "ticker": "XRP-USD",
-            "unrealized_gross_return_pct": 0.04
+            "unrealized_gross_return_pct": 0.3872
           }
         },
         "today": {
           "average_loss_pct": -1.7079,
-          "average_win_pct": null,
-          "closed_trades": 1,
-          "cumulative_gross_return_pct": -1.7079,
+          "average_win_pct": 0.0801,
+          "closed_trades": 2,
+          "cumulative_gross_return_pct": -1.6278,
           "losses": 1,
-          "win_rate_pct": 0.0,
-          "wins": 0
+          "win_rate_pct": 50.0,
+          "wins": 1
         }
       },
       "intraday": {
@@ -3734,14 +3737,23 @@
           }
         ],
         "open_positions": {
+          "SUI": {
+            "asset": "SUI",
+            "blocked_live_reason": "mid-cap allow_short=False",
+            "current_price": 0.89527,
+            "entry_price": 0.89527,
+            "entry_time": "2026-10-31T10:00:00",
+            "ticker": "SUI20947-USD",
+            "unrealized_gross_return_pct": 0.0
+          },
           "XRP": {
             "asset": "XRP",
             "blocked_live_reason": "mid-cap allow_short=False",
-            "current_price": 1.2481,
+            "current_price": 1.2476,
             "entry_price": 1.2473,
             "entry_time": "2026-10-31T05:00:00",
             "ticker": "XRP-USD",
-            "unrealized_gross_return_pct": -0.0641
+            "unrealized_gross_return_pct": -0.0241
           }
         },
         "today": {
@@ -4584,6 +4596,6 @@
     "errors": [],
     "scope": "Shadow-only fresh short signals for SOL/AVAX/LINK/SUI/XRP/ONDO that live trading blocks because mid-cap allow_short=False.",
     "tracking_started_at": "2026-09-10T22:03:23.796957+00:00",
-    "updated_at": "2026-10-31T10:08:18.976332+00:00"
+    "updated_at": "2026-10-31T11:08:11.179363+00:00"
   }
 }
