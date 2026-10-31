@@ -375,7 +375,7 @@
     }
   },
   "date_utc": "2026-10-31",
-  "generated_at": "2026-10-31T01:08:07.193063+00:00",
+  "generated_at": "2026-10-31T02:08:16.264088+00:00",
   "report_errors": [],
   "reporting_only": true,
   "schema_version": 2,
@@ -3685,11 +3685,11 @@
           "SOL": {
             "asset": "SOL",
             "blocked_live_reason": "mid-cap allow_short=False",
-            "current_price": 96.687,
+            "current_price": 96.589,
             "entry_price": 97.532,
             "entry_time": "2026-10-29T21:00:00",
             "ticker": "SOL-USD",
-            "unrealized_gross_return_pct": 0.8664
+            "unrealized_gross_return_pct": 0.9669
           }
         },
         "today": {
@@ -4532,6 +4532,6 @@
     "errors": [],
     "scope": "Shadow-only fresh short signals for SOL/AVAX/LINK/SUI/XRP/ONDO that live trading blocks because mid-cap allow_short=False.",
     "tracking_started_at": "2026-09-10T22:03:23.796957+00:00",
-    "updated_at": "2026-10-31T01:08:07.193063+00:00"
+    "updated_at": "2026-10-31T02:08:16.264088+00:00"
   }
 }
