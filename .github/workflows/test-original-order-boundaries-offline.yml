@@ -6,6 +6,8 @@ on:
       - 'tests/test_original_order_boundaries_offline.py'
       - 'tests/test_position_increase_claim_invariant_offline.py'
       - 'entry_claim_safety.py'
+      - 'shared_entry_admission.py'
+      - 'tests/test_shared_entry_admission_offline.py'
       - 'aggressive_executor.py'
       - 'intraday_executor.py'
       - 'hyperliquid_executor.py'
@@ -28,3 +30,4 @@ jobs:
         run: |
           python -m unittest discover -s tests -p 'test_original_order_boundaries_offline.py' -v
           python -m unittest discover -s tests -p 'test_position_increase_claim_invariant_offline.py' -v
+          python -m unittest discover -s tests -p 'test_shared_entry_admission_offline.py' -v
