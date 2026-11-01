@@ -375,7 +375,7 @@
     }
   },
   "date_utc": "2026-11-01",
-  "generated_at": "2026-11-01T14:08:25.027640+00:00",
+  "generated_at": "2026-11-01T15:08:18.909736+00:00",
   "report_errors": [],
   "reporting_only": true,
   "schema_version": 2,
@@ -3793,20 +3793,20 @@
           "SOL": {
             "asset": "SOL",
             "blocked_live_reason": "mid-cap allow_short=False",
-            "current_price": 94.933,
+            "current_price": 94.98,
             "entry_price": 95.843,
             "entry_time": "2026-10-31T16:00:00",
             "ticker": "SOL-USD",
-            "unrealized_gross_return_pct": 0.9495
+            "unrealized_gross_return_pct": 0.9004
           },
           "XRP": {
             "asset": "XRP",
             "blocked_live_reason": "mid-cap allow_short=False",
-            "current_price": 1.2531,
+            "current_price": 1.2532,
             "entry_price": 1.2473,
             "entry_time": "2026-10-31T05:00:00",
             "ticker": "XRP-USD",
-            "unrealized_gross_return_pct": -0.465
+            "unrealized_gross_return_pct": -0.473
           }
         },
         "today": {
@@ -3833,7 +3833,7 @@
             "win_rate_pct": 20.0,
             "wins": 8
           },
-          "btc_confirmed_short_now": false,
+          "btc_confirmed_short_now": true,
           "closed_trades": [
             {
               "asset": "AVAX",
@@ -4316,7 +4316,7 @@
               "ticker": "SUI20947-USD"
             }
           ],
-          "dual_short_confirmed_now": false,
+          "dual_short_confirmed_now": true,
           "eth_confirmed_short_now": true,
           "open_positions": {},
           "today": {
@@ -4649,6 +4649,6 @@
     "errors": [],
     "scope": "Shadow-only fresh short signals for SOL/AVAX/LINK/SUI/XRP/ONDO that live trading blocks because mid-cap allow_short=False.",
     "tracking_started_at": "2026-09-10T22:03:23.796957+00:00",
-    "updated_at": "2026-11-01T14:08:25.027640+00:00"
+    "updated_at": "2026-11-01T15:08:18.909736+00:00"
   }
 }
