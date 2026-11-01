@@ -375,7 +375,7 @@
     }
   },
   "date_utc": "2026-11-01",
-  "generated_at": "2026-11-01T06:08:21.703248+00:00",
+  "generated_at": "2026-11-01T07:08:15.729591+00:00",
   "report_errors": [],
   "reporting_only": true,
   "schema_version": 2,
@@ -2702,11 +2702,11 @@
           "XRP": {
             "asset": "XRP",
             "blocked_live_reason": "mid-cap allow_short=False",
-            "current_price": 1.2546,
+            "current_price": 1.2535,
             "entry_price": 1.2556,
             "entry_time": "2026-11-01T00:30:00",
             "ticker": "XRP-USD",
-            "unrealized_gross_return_pct": 0.0796
+            "unrealized_gross_return_pct": 0.1673
           }
         },
         "today": {
@@ -2721,12 +2721,12 @@
       },
       "intraday": {
         "all_time": {
-          "average_loss_pct": -2.4291,
+          "average_loss_pct": -2.3828,
           "average_win_pct": 2.9974,
-          "closed_trades": 86,
-          "cumulative_gross_return_pct": -13.5493,
-          "losses": 50,
-          "win_rate_pct": 41.86,
+          "closed_trades": 87,
+          "cumulative_gross_return_pct": -13.6171,
+          "losses": 51,
+          "win_rate_pct": 41.38,
           "wins": 36
         },
         "closed_trades": [
@@ -3761,52 +3761,55 @@
             "gross_return_pct": -1.7484,
             "outcome": "loss",
             "ticker": "AVAX-USD"
+          },
+          {
+            "asset": "ONDO",
+            "blocked_live_reason": "mid-cap allow_short=False",
+            "entry_price": 0.41292,
+            "entry_time": "2026-10-31T12:00:00",
+            "exit_action": "cover_short",
+            "exit_price": 0.4132,
+            "exit_time": "2026-11-01T06:00:00",
+            "gross_return_pct": -0.0678,
+            "outcome": "loss",
+            "ticker": "ONDO-USD"
           }
         ],
         "open_positions": {
-          "ONDO": {
-            "asset": "ONDO",
-            "blocked_live_reason": "mid-cap allow_short=False",
-            "current_price": 0.41358,
-            "entry_price": 0.41292,
-            "entry_time": "2026-10-31T12:00:00",
-            "ticker": "ONDO-USD",
-            "unrealized_gross_return_pct": -0.1598
-          },
           "SOL": {
             "asset": "SOL",
             "blocked_live_reason": "mid-cap allow_short=False",
-            "current_price": 95.676,
+            "current_price": 95.598,
             "entry_price": 95.843,
             "entry_time": "2026-10-31T16:00:00",
             "ticker": "SOL-USD",
-            "unrealized_gross_return_pct": 0.1742
+            "unrealized_gross_return_pct": 0.2556
           },
           "SUI": {
             "asset": "SUI",
             "blocked_live_reason": "mid-cap allow_short=False",
-            "current_price": 0.90535,
+            "current_price": 0.90414,
             "entry_price": 0.89527,
             "entry_time": "2026-10-31T10:00:00",
             "ticker": "SUI20947-USD",
-            "unrealized_gross_return_pct": -1.1259
+            "unrealized_gross_return_pct": -0.9908
           },
           "XRP": {
             "asset": "XRP",
             "blocked_live_reason": "mid-cap allow_short=False",
-            "current_price": 1.2546,
+            "current_price": 1.2535,
             "entry_price": 1.2473,
             "entry_time": "2026-10-31T05:00:00",
             "ticker": "XRP-USD",
-            "unrealized_gross_return_pct": -0.5853
+            "unrealized_gross_return_pct": -0.4971
           }
         },
         "today": {
-          "average_loss_pct": -1.7484,
+          "average_loss_pct": -0.9081,
           "average_win_pct": null,
-          "closed_trades": 1,
-          "cumulative_gross_return_pct": -1.7484,
-          "losses": 1,
+          "closed_trades": 2,
+          "cumulative_gross_return_pct": -1.8162,
+          "losses": 2,
           "win_rate_pct": 0.0,
           "wins": 0
         }
@@ -4641,6 +4644,6 @@
     "errors": [],
     "scope": "Shadow-only fresh short signals for SOL/AVAX/LINK/SUI/XRP/ONDO that live trading blocks because mid-cap allow_short=False.",
     "tracking_started_at": "2026-09-10T22:03:23.796957+00:00",
-    "updated_at": "2026-11-01T06:08:21.703248+00:00"
+    "updated_at": "2026-11-01T07:08:15.729591+00:00"
   }
 }
