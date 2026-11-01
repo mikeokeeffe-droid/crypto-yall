@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - 'tests/test_original_order_boundaries_offline.py'
+      - 'tests/test_position_increase_claim_invariant_offline.py'
       - 'entry_claim_safety.py'
       - 'aggressive_executor.py'
       - 'intraday_executor.py'
@@ -24,4 +25,6 @@ jobs:
         with:
           python-version: '3.12'
       - name: Exercise fake exchanges only (no secrets, no clients, no orders)
-        run: python -m unittest discover -s tests -p 'test_original_order_boundaries_offline.py' -v
+        run: |
+          python -m unittest discover -s tests -p 'test_original_order_boundaries_offline.py' -v
+          python -m unittest discover -s tests -p 'test_position_increase_claim_invariant_offline.py' -v
