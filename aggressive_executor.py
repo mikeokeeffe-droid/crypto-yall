@@ -805,8 +805,8 @@ def main():
         # Persist ownership intent BEFORE a new external order is submitted.
         # If Hyperliquid fills but a later Gist write fails, the next run can
         # safely recover this bot's ownership instead of orphaning the position.
-        is_new_entry = trade.get("action") in ("open_long", "open_short")
-        if is_new_entry:
+        is_increase = trade.get("action") in ("open_long", "open_short", "pyramid_long", "pyramid_short")
+        if is_increase:
             state.setdefault("pending_entry_claims", {})[trade["hl_coin"]] = {
                 "side": trade.get("side"),
                 "created_at": dt.datetime.now(dt.UTC).isoformat(),
@@ -818,7 +818,7 @@ def main():
 
         # Only locally skipped requests prove no exchange order was sent.
         # Errors, unknowns and timeouts keep the claim until reconciliation.
-        if is_new_entry and safe_to_release_pre_submit_skip(result):
+        if is_increase and safe_to_release_pre_submit_skip(result):
             state.setdefault("pending_entry_claims", {}).pop(trade["hl_coin"], None)
             save_state(state)
 
@@ -1063,6 +1063,10 @@ def main():
                 state.setdefault("peak_return_pct", {}).pop(coin, None)
             elif result["action"].startswith("pyramid_"):
                 pyramid_state[coin] = pyramid_state.get(coin, 0) + 1
+                # Only a confirmed fill clears the durable pyramid intent.
+                state.setdefault("pending_entry_claims", {}).pop(coin, None)
+                state["pyramid_state"] = pyramid_state
+                save_state(state)
             else:
                 owned_coins.add(coin)
                 state.setdefault("pending_entry_claims", {}).pop(coin, None)
