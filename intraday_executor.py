@@ -742,34 +742,21 @@ def main():
                 f"{skipped_assets}"
             )
 
-    # Ownership tracking: only manage positions this bot opened.
-    # Recover a confirmed exchange position from a pre-order ownership claim
-    # if a prior run filled but failed before its post-fill Gist save.
+    # Ownership tracking: only manage positions previously recorded as owned.
+    # Pending entry claims require independent order-aware verification.
     owned_coins = set(
         state.get("owned_coins", [])
     )
     pending_claims = state.get("pending_entry_claims", {}) or {}
-    for pending_coin, claim in list(pending_claims.items()):
-        pos = open_positions.get(pending_coin)
-        if pos is None:
-            # A flat snapshot cannot establish that no order was submitted.
-            print(f"Unresolved Intraday entry claim for {pending_coin}: reconcile before re-entry")
-            continue
-        claimed_side = str((claim or {}).get("side", "")).lower()
-        actual_side = (
-            "long"
-            if float(pos.get("size", 0.0) or 0.0) > 0
-            else "short"
+    for pending_coin, _claim in list(pending_claims.items()):
+        # A same-side exchange position is NOT evidence that this bot placed
+        # the matching order; another bot may have opened that position.
+        # Preserve the unresolved claim and previously recorded ownership,
+        # but never adopt new ownership without order-specific reconciliation.
+        print(
+            f"Unresolved Intraday entry claim for {pending_coin}: "
+            "independent order/fill ownership verification required"
         )
-        if claimed_side == actual_side:
-            if pending_coin not in owned_coins:
-                print(
-                    f"Recovered Intraday ownership for {pending_coin} "
-                    f"from persisted pending entry claim"
-                )
-            owned_coins.add(pending_coin)
-            # Do not discard an unresolved order intent on position evidence alone.
-            # Keep it blocked until order-aware exchange reconciliation.
     state["pending_entry_claims"] = pending_claims
 
     stale_owned = (
