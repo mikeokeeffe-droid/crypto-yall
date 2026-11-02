@@ -85,6 +85,46 @@ class ReconciliationPermissionBoundaryTests(unittest.TestCase):
                         ).fetchone(), (bot, "pending"),
                     )
 
+    def test_bot_logins_cannot_forge_order_evidence_or_ownership(self):
+        # Each account must be unable to update even its own claim.
+        for bot, coin in zip(BOTS, ("SOL", "BTC", "ETH")):
+            with self.subTest(bot=bot):
+                claim = self.claim(bot, coin)
+                with self.admin() as admin:
+                    before = admin.execute(
+                        "select bot,token,status,exchange_order_id,"
+                        "submitted_at_ms,requested_size,fence_token "
+                        "from public.bot_entry_intents where coin=%s",
+                        (coin,),
+                    ).fetchone()
+                with self.bot_connection(bot) as conn:
+                    with self.assertRaises(InsufficientPrivilege):
+                        conn.execute(
+                            "update public.bot_entry_intents "
+                            "set exchange_order_id='forged',requested_size=999 "
+                            "where coin=%s", (coin,),
+                        )
+                    with self.assertRaises(InsufficientPrivilege):
+                        conn.execute(
+                            "select public.record_bot_entry_order("
+                            "%s,%s,%s,%s,%s,%s,%s)",
+                            (coin, bot, uuid.UUID(claim.intent_id),
+                             "forged", 123456, 999, "submitted"),
+                        )
+                    with self.assertRaises(InsufficientPrivilege):
+                        conn.execute(
+                            "update public.bot_entry_intents "
+                            "set status='filled' where coin=%s", (coin,),
+                        )
+                with self.admin() as admin:
+                    after = admin.execute(
+                        "select bot,token,status,exchange_order_id,"
+                        "submitted_at_ms,requested_size,fence_token "
+                        "from public.bot_entry_intents where coin=%s",
+                        (coin,),
+                    ).fetchone()
+                self.assertEqual(after, before)
+
     def test_untrusted_roles_have_no_release_privileges(self):
         identities = BOTS + ("bot_entry_executor_trial", "service_role",
                              "anon", "authenticated")
