@@ -11,7 +11,7 @@ def scenario():
                   submitted_at_ms=100_000, requested_size="2")
     flat = dict(account="test-account", coin="SOL", fresh=True,
                 complete=True, open_orders=[])
-    before = dict(flat, capture_id="pre", observed_at_ms=99_000,
+    before = dict(flat, bot="daily", token="claim-1", capture_id="pre", observed_at_ms=99_000,
                   position_size="0")
     fill = dict(account="test-account", coin="SOL", order_id="123",
                 side="long", fill_id="fill1", size="2", time_ms=100_100)
@@ -96,6 +96,18 @@ class FilledRecoveryInspectionTests(unittest.TestCase):
                 self.setUp()
                 self.reader.baseline.update(changes)
                 self.assertEqual(self.review().status, "hold")
+
+    def test_pre_submit_baseline_must_belong_to_exact_bot_and_claim(self):
+        for changes in (
+            {"bot": "intraday"},
+            {"token": "other-claim"},
+            {"coin": "BTC"},
+        ):
+            with self.subTest(changes=changes):
+                self.setUp()
+                self.reader.baseline.update(changes)
+                self.assertEqual(self.review().status, "hold")
+                self.assertEqual(self.exchange.order_reads, 0)
 
     def test_incomplete_or_foreign_fill_blocks(self):
         for changes in (
