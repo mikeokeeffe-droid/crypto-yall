@@ -12,6 +12,13 @@ BOTS = ("daily", "intraday", "aggressive")
 @unittest.skipUnless(os.getenv("ISOLATED_POSTGRES_CI") == "1" and
                      os.getenv("PGDATABASE") == "safety_test", "disposable CI only")
 class DedicatedLoginAdmissionTests(unittest.TestCase):
+    def setUp(self):
+        # Disposable database only: isolate each test from previous test claims.
+        with psycopg.connect(host="localhost", port=5432, dbname="safety_test",
+                             user="postgres", password=os.environ["PGPASSWORD"],
+                             autocommit=True) as admin:
+            admin.execute("truncate public.bot_entry_intents, public.bot_entry_reservations")
+
     def factory(self, bot):
         def connect():
             return psycopg.connect(host="localhost", port=5432, dbname="safety_test",
