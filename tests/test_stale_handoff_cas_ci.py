@@ -59,31 +59,44 @@ class StaleHandoffCompareAndSwapTests(unittest.TestCase):
         self.assertTrue(decision.accepted, decision.reason)
         return decision
 
-    def pretend_exchange_outcome_unknown(self, coin):
-        # CI-only state setup by the disposable database administrator.
+    def pretend_exchange_outcome_unknown(self, coin, claim):
+        # CI-admin records SYNTHETIC order metadata, never submits an order.
+        # The original bot roles still cannot invoke this RPC in CI.
         with self.admin() as db:
-            self.assertEqual(db.execute(
-                "update public.bot_entry_intents set status='uncertain' "
-                "where coin=%s and status='pending' returning token",
-                (coin,),
-            ).rowcount, 1)
+            row = db.execute(
+                "select bot,token from public.bot_entry_intents "
+                "where coin=%s and status='pending'", (coin,),
+            ).fetchone()
+            self.assertIsNotNone(row)
+            self.assertEqual(row[1], uuid.UUID(claim.intent_id))
+            recorded = db.execute(
+                "select public.record_bot_entry_order(%s,%s,%s,%s,%s,%s,%s)",
+                (coin, row[0], row[1], "ci-order-" + claim.intent_id,
+                 90_000, 2, "uncertain"),
+            ).fetchone()[0]
+            self.assertTrue(recorded)
 
-    def simulated_cas(self, *, bot, coin, claim):
-        # Simulates only PostgreSQL's atomic conditional row update.
-        # It DOES NOT authenticate fills or authorize a live owner handoff.
+    def simulated_cas(self, *, bot, coin, claim, order_id=None,
+                      submitted_at_ms=90_000, requested_size=2):
+        # CI-superuser simulates PostgreSQL's conditional atomic update ONLY.
+        # Exchange evidence is NOT authenticated; there is no trusted service.
+        order_id = ("ci-order-" + claim.intent_id
+                    if order_id is None else order_id)
         with self.admin() as db:
             changed = db.execute(
                 "update public.bot_entry_intents set status='filled' "
                 "where coin=%s and bot=%s and token=%s "
                 "and fence_token=%s and status='uncertain' "
-                "returning coin",
-                (coin, bot, uuid.UUID(claim.intent_id), claim.fence_token),
+                "and exchange_order_id=%s and submitted_at_ms=%s "
+                "and requested_size=%s returning coin",
+                (coin, bot, uuid.UUID(claim.intent_id), claim.fence_token,
+                 order_id, submitted_at_ms, requested_size),
             ).fetchone()
             return changed == (coin,)
 
     def test_exact_generation_only_one_transition(self):
         old = self.claim("daily")
-        self.pretend_exchange_outcome_unknown("SOL")
+        self.pretend_exchange_outcome_unknown("SOL", old)
         self.assertTrue(self.simulated_cas(bot="daily", coin="SOL", claim=old))
         self.assertFalse(self.simulated_cas(bot="daily", coin="SOL", claim=old))
         with self.admin() as db:
@@ -94,14 +107,14 @@ class StaleHandoffCompareAndSwapTests(unittest.TestCase):
 
     def test_old_claim_cannot_change_newer_generation_on_same_coin(self):
         old = self.claim("daily")
-        self.pretend_exchange_outcome_unknown("SOL")
+        self.pretend_exchange_outcome_unknown("SOL", old)
         with self.admin() as db:
             # Pretend a DIFFERENT, fully authorized offline reconcile has
             # completed. This cleanup only happens in a disposable CI DB.
             db.execute("delete from public.bot_entry_intents where coin='SOL'")
             db.execute("delete from public.bot_entry_reservations where coin='SOL'")
         new = self.claim("intraday")
-        self.pretend_exchange_outcome_unknown("SOL")
+        self.pretend_exchange_outcome_unknown("SOL", new)
         self.assertGreater(new.fence_token, old.fence_token)
         self.assertFalse(self.simulated_cas(bot="daily", coin="SOL", claim=old))
         self.assertFalse(self.simulated_cas(bot="intraday", coin="BTC", claim=new))
@@ -111,9 +124,35 @@ class StaleHandoffCompareAndSwapTests(unittest.TestCase):
                 "where coin='SOL'"
             ).fetchone(), ("intraday", "uncertain", new.fence_token))
 
+    def test_wrong_order_metadata_cannot_handoff_correct_fence(self):
+        claim = self.claim("daily", "XRP")
+        self.pretend_exchange_outcome_unknown("XRP", claim)
+        for overrides in (
+            {"order_id": "foreign-order"},
+            {"submitted_at_ms": 89_999},
+            {"submitted_at_ms": 90_001},
+            {"requested_size": 1},
+            {"requested_size": 3},
+        ):
+            with self.subTest(overrides=overrides):
+                self.assertFalse(self.simulated_cas(
+                    bot="daily", coin="XRP", claim=claim, **overrides
+                ))
+        with self.admin() as db:
+            self.assertEqual(
+                db.execute(
+                    "select status,exchange_order_id,submitted_at_ms,requested_size "
+                    "from public.bot_entry_intents where coin='XRP'"
+                ).fetchone(),
+                ("uncertain", "ci-order-" + claim.intent_id, 90_000, 2),
+            )
+        self.assertTrue(self.simulated_cas(
+            bot="daily", coin="XRP", claim=claim
+        ))
+
     def test_simultaneous_duplicate_workers_get_one_cas_winner(self):
         claim = self.claim("aggressive", "ETH")
-        self.pretend_exchange_outcome_unknown("ETH")
+        self.pretend_exchange_outcome_unknown("ETH", claim)
         go = Barrier(2)
 
         def worker(_):
@@ -129,7 +168,7 @@ class StaleHandoffCompareAndSwapTests(unittest.TestCase):
 
     def test_filled_intent_stays_a_fence_after_reservation_expires(self):
         claim = self.claim("daily", "AVAX")
-        self.pretend_exchange_outcome_unknown("AVAX")
+        self.pretend_exchange_outcome_unknown("AVAX", claim)
         self.assertTrue(self.simulated_cas(
             bot="daily", coin="AVAX", claim=claim
         ))
@@ -159,8 +198,8 @@ class StaleHandoffCompareAndSwapTests(unittest.TestCase):
             ).fetchone(), ("filled",))
 
     def test_executor_logins_cannot_run_simulated_handoff_update(self):
-        self.claim("daily", "LINK")
-        self.pretend_exchange_outcome_unknown("LINK")
+        claim = self.claim("daily", "LINK")
+        self.pretend_exchange_outcome_unknown("LINK", claim)
         with psycopg.connect(
             host="localhost", port=5432, dbname="safety_test",
             user="entry_login_daily",
