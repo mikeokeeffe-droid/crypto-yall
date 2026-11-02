@@ -71,3 +71,37 @@ def review_final_no_fill(*, coin, order_id, submitted_at_ms,
         "two fresh complete snapshots and final no-fill rejection; "
         "trusted reconciler review and authorized DB transition still required",
     )
+
+
+def review_persisted_entry_no_fill(*, intent, expected_bot, expected_coin,
+                                   expected_token, order, first, second):
+    """Read-only review of evidence bound to one persisted unresolved intent.
+
+    The caller must independently authenticate the intent's origin and exchange
+    snapshots. Matching caller-supplied fields is NOT authentication. Even a
+    successful result is only a manual-review candidate, NEVER unlock approval.
+    """
+    hold = lambda why: ReviewDecision("hold", why)
+    if (type(intent) is not dict
+            or expected_bot not in ("aggressive", "intraday", "daily")
+            or type(expected_coin) is not str
+            or type(expected_token) is not str or not expected_token):
+        return hold("missing trusted intent context")
+    if (intent.get("bot") != expected_bot
+            or intent.get("coin") != expected_coin
+            or intent.get("token") != expected_token):
+        return hold("persisted intent identity does not match")
+    if intent.get("status") not in ("submitted", "uncertain"):
+        return hold("unresolved submitted intent required")
+    order_id = intent.get("exchange_order_id")
+    timestamp = intent.get("submitted_at_ms")
+    size = intent.get("requested_size")
+    if (type(order_id) is not str or not order_id.strip()
+            or type(timestamp) is not int or timestamp < 0
+            or type(size) not in (int, float)
+            or not isfinite(size) or size <= 0):
+        return hold("durable order details incomplete")
+    return review_final_no_fill(
+        coin=expected_coin, order_id=order_id, submitted_at_ms=timestamp,
+        order=order, first=first, second=second,
+    )
