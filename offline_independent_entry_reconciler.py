@@ -58,10 +58,18 @@ def inspect_unresolved_entry(*, intent_reader, exchange_reader, bot, coin,
             account=account, coin=coin)
         second = exchange_reader.capture_position_orders_fills(
             account=account, coin=coin)
+        confirmed_order = exchange_reader.read_order(
+            account=account, order_id=intent["exchange_order_id"])
         latest_intent = intent_reader.read_intent(
             bot=bot, coin=coin, token=token)
     except Exception:
         return hold("independent evidence read failed")
+
+    # Two matching reads reject observed changes to identity, status or fills.
+    # This does not authenticate the upstream exchange connection.
+    if (type(order) is not dict or type(confirmed_order) is not dict
+            or confirmed_order != order):
+        return hold("exchange order changed during evidence review")
 
     # Re-read to avoid reviewing an intent that was observably modified while
     # evidence was retrieved; this is not a transactional snapshot or fence.
