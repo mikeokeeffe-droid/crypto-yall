@@ -375,7 +375,7 @@
     }
   },
   "date_utc": "2026-11-02",
-  "generated_at": "2026-11-02T07:08:22.597552+00:00",
+  "generated_at": "2026-11-02T08:08:32.233707+00:00",
   "report_errors": [],
   "reporting_only": true,
   "schema_version": 2,
@@ -2710,7 +2710,17 @@
             "ticker": "XRP-USD"
           }
         ],
-        "open_positions": {},
+        "open_positions": {
+          "SUI": {
+            "asset": "SUI",
+            "blocked_live_reason": "mid-cap allow_short=False",
+            "current_price": 0.892,
+            "entry_price": 0.892,
+            "entry_time": "2026-11-02T07:30:00",
+            "ticker": "SUI20947-USD",
+            "unrealized_gross_return_pct": 0.0
+          }
+        },
         "today": {
           "average_loss_pct": null,
           "average_win_pct": null,
@@ -3817,20 +3827,20 @@
           "AVAX": {
             "asset": "AVAX",
             "blocked_live_reason": "mid-cap allow_short=False",
-            "current_price": 8.5663,
+            "current_price": 8.569,
             "entry_price": 8.687,
             "entry_time": "2026-11-01T20:00:00",
             "ticker": "AVAX-USD",
-            "unrealized_gross_return_pct": 1.3894
+            "unrealized_gross_return_pct": 1.3584
           },
           "XRP": {
             "asset": "XRP",
             "blocked_live_reason": "mid-cap allow_short=False",
-            "current_price": 1.2501,
+            "current_price": 1.25,
             "entry_price": 1.2473,
             "entry_time": "2026-10-31T05:00:00",
             "ticker": "XRP-USD",
-            "unrealized_gross_return_pct": -0.2245
+            "unrealized_gross_return_pct": -0.2165
           }
         },
         "today": {
@@ -4673,6 +4683,6 @@
     "errors": [],
     "scope": "Shadow-only fresh short signals for SOL/AVAX/LINK/SUI/XRP/ONDO that live trading blocks because mid-cap allow_short=False.",
     "tracking_started_at": "2026-09-10T22:03:23.796957+00:00",
-    "updated_at": "2026-11-02T07:08:22.597552+00:00"
+    "updated_at": "2026-11-02T08:08:32.233707+00:00"
   }
 }
