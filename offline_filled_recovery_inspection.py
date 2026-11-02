@@ -8,6 +8,8 @@ order was sent. A current exchange query cannot reconstruct past flatness.
 The provided fields and freshness flags are assertions, not proven facts.
 Even a handoff_candidate cannot update owned_coins, database rows, or
 Hyperliquid; a separately reviewed atomic/fenced handoff is still required.
+The fence number in these synthetic snapshots is merely identity-binding
+evidence; checking it here cannot prevent a stale worker at a write boundary.
 """
 from dataclasses import dataclass
 
@@ -21,7 +23,8 @@ class FilledRecoveryReview:
 
 
 def inspect_possible_filled_recovery(*, intent_reader, exchange_reader,
-                                     bot, coin, token, account, now_ms):
+                                     bot, coin, token, expected_fence_token,
+                                     account, now_ms):
     """Return 'hold' or 'handoff_candidate' from injected read-only evidence.
 
     Check original durable intent and recorded pre-submit capture; fetch order
@@ -36,6 +39,8 @@ def inspect_possible_filled_recovery(*, intent_reader, exchange_reader,
             or type(coin) is not str or not coin.isascii()
             or not coin.isalnum() or coin != coin.upper()
             or type(token) is not str or not token
+            or type(expected_fence_token) is not int
+            or expected_fence_token <= 0
             or type(account) is not str or not account.strip()
             or type(now_ms) is not int or now_ms <= 0):
         return hold("invalid ownership recovery context")
@@ -44,6 +49,8 @@ def inspect_possible_filled_recovery(*, intent_reader, exchange_reader,
         if type(original) is not dict or any((
                 original.get("bot") != bot, original.get("coin") != coin,
                 original.get("token") != token,
+                type(original.get("fence_token")) is not int,
+                original.get("fence_token") != expected_fence_token,
                 original.get("status") not in ("submitted", "uncertain"),
                 original.get("action") not in ("open_long", "open_short"),
                 type(original.get("exchange_order_id")) is not str,
@@ -59,6 +66,8 @@ def inspect_possible_filled_recovery(*, intent_reader, exchange_reader,
         # evidence of ownership, even on the same exchange account.
         if (baseline.get("bot") != bot
                 or baseline.get("token") != token
+                or type(baseline.get("fence_token")) is not int
+                or baseline.get("fence_token") != expected_fence_token
                 or baseline.get("coin") != coin
                 or baseline.get("account") != account):
             return hold("pre-submit capture is not bound to the claimed entry")
