@@ -699,28 +699,19 @@ def main():
         if skipped:
             print(f"Skipping unavailable assets on this env: {skipped}")
 
-    # Ownership tracking with stale-position reconciliation.
-    # Recover any entry that filled on Hyperliquid after we persisted a
-    # pre-order claim but before the post-fill state save completed.
+    # Ownership tracking: do not infer ownership from an unresolved pre-order
+    # claim, even when the shared exchange position has the claimed side.
     owned_coins = set(state.get("owned_coins", []))
     pending_claims = state.get("pending_entry_claims", {}) or {}
-    for pending_coin, claim in list(pending_claims.items()):
-        pos = open_positions.get(pending_coin)
-        if pos is None:
-            # A flat snapshot cannot establish that no order was submitted.
-            print(f"Unresolved Aggressive entry claim for {pending_coin}: reconcile before re-entry")
-            continue
-        claimed_side = str((claim or {}).get("side", "")).lower()
-        actual_side = "long" if float(pos.get("size", 0.0) or 0.0) > 0 else "short"
-        if claimed_side == actual_side:
-            if pending_coin not in owned_coins:
-                print(
-                    f"Recovered Aggressive ownership for {pending_coin} "
-                    f"from persisted pending entry claim"
-                )
-            owned_coins.add(pending_coin)
-            # Do not discard an unresolved order intent on position evidence alone.
-            # Keep it blocked until order-aware exchange reconciliation.
+    for pending_coin, _claim in list(pending_claims.items()):
+        # A same-side exchange position is NOT evidence that this bot placed
+        # the matching order; another bot may have opened that position.
+        # Preserve the unresolved claim and previously recorded ownership,
+        # but never adopt new ownership without order-specific reconciliation.
+        print(
+            f"Unresolved Aggressive entry claim for {pending_coin}: "
+            "independent order/fill ownership verification required"
+        )
     state["pending_entry_claims"] = pending_claims
 
     stale_owned = owned_coins - set(open_positions.keys())
