@@ -138,6 +138,32 @@ class ReadOnlyReconcilerLoginTests(unittest.TestCase):
                 ("pending",),
             )
 
+    def test_reviewer_has_no_claim_or_unlock_rpc_permissions(self):
+        # Query effective grants; no writes, exchange API, or order actions.
+        rpc_signatures = (
+            "public.try_reserve_bot_entry(text,text,uuid,integer)",
+            "public.claim_bot_entry_intent(text,text,uuid)",
+            "public.record_bot_entry_order(text,text,uuid,text,bigint,numeric,text)",
+            "public.release_bot_entry(text,text,uuid)",
+            "public.resolve_bot_entry_intent(text,text,uuid)",
+        )
+        with self.reviewer() as db:
+            for signature in rpc_signatures:
+                with self.subTest(function=signature):
+                    self.assertFalse(db.execute(
+                        "select has_function_privilege(current_user,%s,'EXECUTE')",
+                        (signature,),
+                    ).fetchone()[0])
+            for target in ("public.bot_entry_intents",
+                           "public.bot_entry_reservations",
+                           "public.bot_entry_executor_identities"):
+                with self.subTest(table=target):
+                    for privilege in ("INSERT", "UPDATE", "DELETE", "TRUNCATE"):
+                        self.assertFalse(db.execute(
+                            "select has_table_privilege(current_user,%s,%s)",
+                            (target, privilege),
+                        ).fetchone()[0])
+
     def test_separate_identity_cannot_impersonate_executor_or_admin(self):
         with self.reviewer() as db:
             for role in ("entry_login_daily", "postgres", "bot_entry_executor_trial"):
