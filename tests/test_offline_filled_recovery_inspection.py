@@ -6,12 +6,12 @@ from offline_filled_recovery_inspection import inspect_possible_filled_recovery
 
 
 def scenario():
-    intent = dict(bot="daily", coin="SOL", token="claim-1", status="uncertain",
+    intent = dict(bot="daily", coin="SOL", token="claim-1", fence_token=42, status="uncertain",
                   action="open_long", exchange_order_id="123",
                   submitted_at_ms=100_000, requested_size="2")
     flat = dict(account="test-account", coin="SOL", fresh=True,
                 complete=True, open_orders=[])
-    before = dict(flat, bot="daily", token="claim-1", capture_id="pre", observed_at_ms=99_000,
+    before = dict(flat, bot="daily", token="claim-1", fence_token=42, capture_id="pre", observed_at_ms=99_000,
                   position_size="0")
     fill = dict(account="test-account", coin="SOL", order_id="123",
                 side="long", fill_id="fill1", size="2", time_ms=100_100)
@@ -67,7 +67,7 @@ class FilledRecoveryInspectionTests(unittest.TestCase):
     def review(self, **kwargs):
         args = dict(
             intent_reader=self.reader, exchange_reader=self.exchange,
-            bot="daily", coin="SOL", token="claim-1",
+            bot="daily", coin="SOL", token="claim-1", expected_fence_token=42,
             account="test-account", now_ms=103_000,
         )
         return inspect_possible_filled_recovery(**dict(args, **kwargs))
@@ -108,6 +108,20 @@ class FilledRecoveryInspectionTests(unittest.TestCase):
                 self.reader.baseline.update(changes)
                 self.assertEqual(self.review().status, "hold")
                 self.assertEqual(self.exchange.order_reads, 0)
+
+    def test_stale_or_mismatched_fence_blocks(self):
+        for invalid in (0, -1, 43, None, True):
+            with self.subTest(invalid=invalid):
+                self.setUp()
+                self.reader.intent["fence_token"] = invalid
+                self.assertEqual(self.review().status, "hold")
+                self.assertEqual(self.exchange.order_reads, 0)
+        self.setUp()
+        self.reader.baseline["fence_token"] = 41
+        self.assertEqual(self.review().status, "hold")
+        self.assertEqual(self.exchange.order_reads, 0)
+        self.setUp()
+        self.assertEqual(self.review(expected_fence_token=41).status, "hold")
 
     def test_incomplete_or_foreign_fill_blocks(self):
         for changes in (
