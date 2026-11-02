@@ -54,6 +54,14 @@ def inspect_possible_filled_recovery(*, intent_reader, exchange_reader,
             bot=bot, coin=coin, token=token)
         if type(baseline) is not dict:
             return hold("recorded pre-submit baseline absent")
+        # The pre-order capture must be persisted against this exact claim.
+        # A flat capture borrowed from a different bot or entry cannot be
+        # evidence of ownership, even on the same exchange account.
+        if (baseline.get("bot") != bot
+                or baseline.get("token") != token
+                or baseline.get("coin") != coin
+                or baseline.get("account") != account):
+            return hold("pre-submit capture is not bound to the claimed entry")
     except Exception:
         return hold("durable entry/baseline read failed")
 
