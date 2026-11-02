@@ -125,6 +125,24 @@ class ReconciliationPermissionBoundaryTests(unittest.TestCase):
                     ).fetchone()
                 self.assertEqual(after, before)
 
+    def test_bot_login_cannot_assume_admin_or_other_bot_role(self):
+        # PostgreSQL must reject role switching; SQL session identity is
+        # never supplied by an executor's self-declared bot name.
+        for bot in BOTS:
+            with self.subTest(bot=bot):
+                with self.bot_connection(bot) as conn:
+                    for target in ("postgres", "service_role",
+                                   "entry_login_" + next(x for x in BOTS if x != bot)):
+                        with self.subTest(target=target):
+                            with self.assertRaises(InsufficientPrivilege):
+                                conn.execute("set role " + target)
+                    identity = conn.execute(
+                        "select session_user,current_user"
+                    ).fetchone()
+                    self.assertEqual(identity, (
+                        "entry_login_" + bot, "entry_login_" + bot
+                    ))
+
     def test_untrusted_roles_have_no_release_privileges(self):
         identities = BOTS + ("bot_entry_executor_trial", "service_role",
                              "anon", "authenticated")
