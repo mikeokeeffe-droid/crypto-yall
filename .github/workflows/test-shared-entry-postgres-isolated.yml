@@ -9,6 +9,7 @@ on:
       - 'tests/test_reconciliation_permission_boundary_ci.py'
       - 'tests/test_stale_handoff_cas_ci.py'
       - 'db/restricted_entry_logins_ci_only.sql'
+      - 'tests/test_readonly_reconciler_login_ci.py'
       - 'restricted_shared_entry_postgres_ci.py'
       - '.github/workflows/test-shared-entry-postgres-isolated.yml'
   workflow_dispatch:
@@ -62,3 +63,4 @@ jobs:
           python -m unittest discover -s tests -p 'test_uncertain_order_lifecycle_ci.py' -v
           python -m unittest discover -s tests -p 'test_reconciliation_permission_boundary_ci.py' -v
           python -m unittest discover -s tests -p 'test_stale_handoff_cas_ci.py' -v
+          python -m unittest discover -s tests -p 'test_readonly_reconciler_login_ci.py' -v
