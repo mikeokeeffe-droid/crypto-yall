@@ -77,7 +77,7 @@ class FilledRecoveryInspectionTests(unittest.TestCase):
         self.assertEqual(result.status, "handoff_candidate")
         self.assertEqual(self.reader.intent_reads, 2)
         self.assertEqual(self.reader.baseline_reads, 2)
-        self.assertEqual(self.exchange.order_reads, 1)
+        self.assertEqual(self.exchange.order_reads, 2)
         self.assertEqual(self.exchange.capture_reads, 2)
 
     def test_missing_pre_submit_capture_blocks_without_exchange_access(self):
@@ -158,6 +158,40 @@ class FilledRecoveryInspectionTests(unittest.TestCase):
                     value["capture_id"] = "another-baseline"
                 return value
         self.reader = Changing(self.reader.intent, self.reader.baseline)
+        self.assertEqual(self.review().status, "hold")
+
+    def test_second_order_read_mismatch_blocks_handoff(self):
+        for field, changed in (
+            ("order_id", "wrong-order"),
+            ("account", "other-account"),
+            ("status", "canceled"),
+            ("filled_size", "1"),
+            ("final", False),
+            ("side", "short"),
+        ):
+            with self.subTest(field=field):
+                self.setUp()
+                original = self.exchange.read_order
+
+                def changed_order(**kwargs):
+                    result = original(**kwargs)
+                    if self.exchange.order_reads == 2:
+                        result[field] = changed
+                    return result
+
+                self.exchange.read_order = changed_order
+                self.assertEqual(self.review().status, "hold")
+                self.assertEqual(self.exchange.order_reads, 2)
+
+    def test_second_order_read_error_blocks_handoff(self):
+        original = self.exchange.read_order
+
+        def failed_second_read(**kwargs):
+            if self.exchange.order_reads == 1:
+                raise TimeoutError("exchange unavailable on second read")
+            return original(**kwargs)
+
+        self.exchange.read_order = failed_second_read
         self.assertEqual(self.review().status, "hold")
 
     def test_timeout_fails_closed(self):
