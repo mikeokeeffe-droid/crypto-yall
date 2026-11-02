@@ -39,7 +39,7 @@ class IndependentReconcilerTests(unittest.TestCase):
     def test_valid_fake_evidence_is_review_candidate_only(self):
         self.assertEqual(self.review().status,"review_candidate")
         self.assertEqual(self.reader.reads,2)
-        self.assertEqual(self.exchange.calls,3)
+        self.assertEqual(self.exchange.calls,4)
     def test_mismatched_intent_prevents_any_exchange_reads(self):
         self.reader.intent["token"]="wrong"
         self.assertEqual(self.review().status,"hold")
@@ -59,6 +59,44 @@ class IndependentReconcilerTests(unittest.TestCase):
             if changed=="account": self.exchange.order["account"]="other-account"
             else: self.exchange.second["capture_id"]="first"
             self.assertEqual(self.review().status,"hold")
+    def test_changed_exchange_order_on_second_read_blocks(self):
+        for field, changed in (
+            ("order_id", "different-order"),
+            ("account", "other-account"),
+            ("status", "filled"),
+            ("filled_size", 0.01),
+            ("final", False),
+        ):
+            with self.subTest(field=field):
+                self.setUp()
+                original_read = self.exchange.read_order
+                reads = [0]
+
+                def changing_order(**kwargs):
+                    result = original_read(**kwargs)
+                    reads[0] += 1
+                    if reads[0] == 2:
+                        result[field] = changed
+                    return result
+
+                self.exchange.read_order = changing_order
+                self.assertEqual(self.review().status, "hold")
+                self.assertEqual(reads[0], 2)
+
+    def test_second_order_read_timeout_blocks(self):
+        original_read = self.exchange.read_order
+        reads = [0]
+
+        def timeout_on_second(**kwargs):
+            reads[0] += 1
+            if reads[0] == 2:
+                raise TimeoutError("unconfirmed exchange order")
+            return original_read(**kwargs)
+
+        self.exchange.read_order = timeout_on_second
+        self.assertEqual(self.review().status, "hold")
+        self.assertEqual(reads[0], 2)
+
     def test_intent_changed_during_reads_blocks(self):
         class Changing(IntentReader):
             def read_intent(self, **kwargs):
