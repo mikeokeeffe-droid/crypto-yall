@@ -7,6 +7,8 @@ on:
       - 'tests/test_position_increase_claim_invariant_offline.py'
       - 'entry_claim_safety.py'
       - 'entry_reconciliation_review_offline.py'
+      - 'offline_independent_entry_reconciler.py'
+      - 'tests/test_offline_independent_entry_reconciler.py'
       - 'tests/test_entry_reconciliation_review_offline.py'
       - 'tests/test_persisted_intent_reconciliation_offline.py'
       - 'shared_entry_admission.py'
@@ -36,3 +38,4 @@ jobs:
           python -m unittest discover -s tests -p 'test_shared_entry_admission_offline.py' -v
           python -m unittest discover -s tests -p 'test_entry_reconciliation_review_offline.py' -v
           python -m unittest discover -s tests -p 'test_persisted_intent_reconciliation_offline.py' -v
+          python -m unittest discover -s tests -p 'test_offline_independent_entry_reconciler.py' -v
