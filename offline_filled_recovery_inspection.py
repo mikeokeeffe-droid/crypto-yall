@@ -81,11 +81,19 @@ def inspect_possible_filled_recovery(*, intent_reader, exchange_reader,
             account=account, coin=coin)
         second = exchange_reader.capture_position_orders_fills(
             account=account, coin=coin)
+        confirmed_order = exchange_reader.read_order(
+            account=account, order_id=original["exchange_order_id"])
         newest = intent_reader.read_intent(bot=bot, coin=coin, token=token)
         baseline_again = intent_reader.read_pre_submit_capture(
             bot=bot, coin=coin, token=token)
     except Exception:
         return hold("exchange or durable evidence read failed")
+    # A second order read must agree exactly with the first, including
+    # account, identity, final status, and filled size. These are supplied
+    # evidence only, not independently authenticated exchange receipts.
+    if (type(order) is not dict or type(confirmed_order) is not dict
+            or confirmed_order != order):
+        return hold("exchange order changed during ownership review")
     if (type(newest) is not dict or newest != original
             or type(baseline_again) is not dict or baseline_again != baseline):
         return hold("durable entry or pre-submit baseline changed during review")
