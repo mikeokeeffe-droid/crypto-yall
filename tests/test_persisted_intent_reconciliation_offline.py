@@ -6,7 +6,7 @@ class PersistedIntentReviewTests(unittest.TestCase):
     def case(self):
         intent=dict(bot="daily",coin="SOL",token="claim-1",status="uncertain",
                     exchange_order_id="12345",submitted_at_ms=1000,requested_size=0.2)
-        order=dict(coin="SOL",order_id="12345",final=True,status="rejected",
+        order=dict(account="0xaccount1",coin="SOL",order_id="12345",final=True,status="rejected",
                    complete=True,filled_size=0)
         a=dict(account="0xaccount1",capture_id="capture-1",coin="SOL",fresh=True,complete=True,fills_complete=True,
                observed_at_ms=2000,position_size=0,open_orders=[],fills=[])
