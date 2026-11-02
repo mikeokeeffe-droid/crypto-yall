@@ -74,7 +74,7 @@ def review_final_no_fill(*, coin, order_id, submitted_at_ms,
 
 
 def review_persisted_entry_no_fill(*, intent, expected_bot, expected_coin,
-                                   expected_token, order, first, second):
+                                   expected_token, expected_account, order, first, second):
     """Read-only review of evidence bound to one persisted unresolved intent.
 
     The caller must independently authenticate the intent's origin and exchange
@@ -85,7 +85,8 @@ def review_persisted_entry_no_fill(*, intent, expected_bot, expected_coin,
     if (type(intent) is not dict
             or expected_bot not in ("aggressive", "intraday", "daily")
             or type(expected_coin) is not str
-            or type(expected_token) is not str or not expected_token):
+            or type(expected_token) is not str or not expected_token
+            or type(expected_account) is not str or not expected_account.strip()):
         return hold("missing trusted intent context")
     if (intent.get("bot") != expected_bot
             or intent.get("coin") != expected_coin
@@ -101,6 +102,23 @@ def review_persisted_entry_no_fill(*, intent, expected_bot, expected_coin,
             or type(size) not in (int, float)
             or not isfinite(size) or size <= 0):
         return hold("durable order details incomplete")
+    # Account and capture fields are *claims* supplied by an upstream source.
+    # A separately authenticated reviewer must verify their provenance.
+    # Different capture IDs prevent accidental use of a cached snapshot twice;
+    # they cannot alone prove independent retrieval or a completed pagination.
+    if (type(order) is not dict or order.get("account") != expected_account
+            or type(first) is not dict or type(second) is not dict):
+        return hold("exchange account identity is missing or mismatched")
+    captures = []
+    for observation in (first, second):
+        if observation.get("account") != expected_account:
+            return hold("snapshot belongs to a different exchange account")
+        capture_id = observation.get("capture_id")
+        if type(capture_id) is not str or not capture_id.strip():
+            return hold("independent capture identifier missing")
+        captures.append(capture_id)
+    if captures[0] == captures[1]:
+        return hold("replayed exchange capture")
     return review_final_no_fill(
         coin=expected_coin, order_id=order_id, submitted_at_ms=timestamp,
         order=order, first=first, second=second,
