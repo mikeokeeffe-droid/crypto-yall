@@ -164,6 +164,35 @@ class ReadOnlyReconcilerLoginTests(unittest.TestCase):
                             (target, privilege),
                         ).fetchone()[0])
 
+    def test_reviewer_cannot_invoke_executor_claim_rpcs(self):
+        # Test actual database denials, not only the grant catalog.
+        # A read-only reconciler knowing a bot label cannot acquire a lock.
+        attempted = (
+            ("select public.try_reserve_bot_entry(%s,%s,%s,%s)",
+             ("BTC", "daily", uuid.uuid4(), 120)),
+            ("select public.claim_bot_entry_intent(%s,%s,%s)",
+             ("BTC", "daily", uuid.uuid4())),
+        )
+        with self.reviewer() as db:
+            for sql, params in attempted:
+                with self.subTest(sql=sql):
+                    with self.assertRaises(InsufficientPrivilege):
+                        db.execute(sql, params)
+        with self.admin() as db:
+            # Failed calls may not add an unowned reservation or intent.
+            self.assertEqual(db.execute(
+                "select count(*) from public.bot_entry_intents "
+                "where coin='BTC'"
+            ).fetchone()[0], 0)
+            self.assertEqual(db.execute(
+                "select count(*) from public.bot_entry_reservations "
+                "where coin='BTC'"
+            ).fetchone()[0], 0)
+            self.assertEqual(db.execute(
+                "select bot,status from public.bot_entry_intents "
+                "where coin='SOL'"
+            ).fetchone(), ("daily", "pending"))
+
     def test_separate_identity_cannot_impersonate_executor_or_admin(self):
         with self.reviewer() as db:
             for role in ("entry_login_daily", "postgres", "bot_entry_executor_trial"):
