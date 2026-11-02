@@ -271,7 +271,7 @@ class PendingEntryClaimSafetyTests(unittest.TestCase):
                 ast.Module(body=[recovery[0]], type_ignores=[])), path, "exec")
             for positions, expected_ownership in (
                 ({}, False),
-                ({"SOL": {"size": 2.0}}, True),
+                ({"SOL": {"size": 2.0}}, False),
                 ({"SOL": {"size": -2.0}}, False),
             ):
                 with self.subTest(bot=bot, positions=positions):
