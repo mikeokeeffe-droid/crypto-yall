@@ -17,6 +17,8 @@ on:
       - 'tests/test_offline_hyperliquid_wire_review.py'
       - 'offline_hyperliquid_fill_window_audit.py'
       - 'tests/test_offline_hyperliquid_fill_window_audit.py'
+      - 'offline_hyperliquid_retention_gate.py'
+      - 'tests/test_offline_hyperliquid_retention_gate.py'
       - 'offline_filled_ownership_review.py'
       - 'tests/test_offline_filled_ownership_review.py'
       - 'offline_filled_recovery_inspection.py'
@@ -59,3 +61,4 @@ jobs:
           python -m unittest discover -s tests -p 'test_offline_filled_paginated_recovery.py' -v
           python -m unittest discover -s tests -p 'test_offline_hyperliquid_wire_review.py' -v
           python -m unittest discover -s tests -p 'test_offline_hyperliquid_fill_window_audit.py' -v
+          python -m unittest discover -s tests -p 'test_offline_hyperliquid_retention_gate.py' -v
