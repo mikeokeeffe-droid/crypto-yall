@@ -26,8 +26,8 @@ def inspect_synthetic_order_pipeline_offline(*, order_bytes, fills_bytes,
         return PipelineReview("hold", reason)
     if type(http_envelopes) is not tuple or len(http_envelopes) != 2:
         return hold("both HTTP envelopes required")
-    for envelope in http_envelopes:
-        if type(envelope) is not dict:
+    for envelope, body in zip(http_envelopes, (order_bytes, fills_bytes)):
+        if type(body) is not bytes or type(envelope) is not dict:
             return hold("invalid HTTP envelope")
         try:
             review = inspect_http_envelope_offline(**envelope)
@@ -35,9 +35,11 @@ def inspect_synthetic_order_pipeline_offline(*, order_bytes, fills_bytes,
             return hold("invalid HTTP envelope arguments")
         if review.status != "review_only":
             return hold("HTTP envelope failed policy")
+        if type(envelope.get("body_bytes")) is not int or envelope["body_bytes"] != len(body):
+            return hold("HTTP response length does not match supplied bytes")
     if type(capture_times) is not tuple or len(capture_times) != 2:
         return hold("both capture timelines required")
-    for timeline in capture_times:
+    for timeline, envelope in zip(capture_times, http_envelopes):
         if type(timeline) is not dict:
             return hold("invalid capture timeline")
         try:
@@ -46,6 +48,9 @@ def inspect_synthetic_order_pipeline_offline(*, order_bytes, fills_bytes,
             return hold("invalid capture timing arguments")
         if review.status != "review_only":
             return hold("capture timing failed policy")
+        if (timeline["response_received_ms"] - timeline["query_started_ms"]
+                != envelope["elapsed_ms"]):
+            return hold("capture duration contradicts HTTP elapsed time")
     order_json = inspect_json_payload_offline(raw=order_bytes, kind="orderStatus")
     fills_json = inspect_json_payload_offline(raw=fills_bytes, kind="userFillsByTime")
     if order_json.status != "parsed_untrusted" or fills_json.status != "parsed_untrusted":
