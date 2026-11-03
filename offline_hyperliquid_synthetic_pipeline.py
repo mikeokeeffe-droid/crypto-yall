@@ -85,8 +85,7 @@ def inspect_synthetic_order_pipeline_offline(*, order_bytes, fills_bytes,
     )
     if impact.status != "review_only":
         return hold("account-level state ambiguous")
-    return PipelineReview(
-        "review_only",
-        "synthetic pipeline passes structural checks only; no provenance, "
-        "retention proof, ownership release or trading permission",
-    )
+    # Caller-provided booleans cannot authenticate an account snapshot.
+    # Preserve structural review details above, but fail closed at the
+    # aggregate pipeline boundary until independently verified evidence exists.
+    return hold("synthetic account and open-order claims are not independently verified")
