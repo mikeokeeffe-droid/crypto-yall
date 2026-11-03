@@ -50,8 +50,8 @@ def inspect_account_order_impact_offline(*, target_oid, target_coin,
                 or _positive(raw_size) is None):
             return hold("malformed or duplicated account fill")
         tids.add(tid)
-        if coin == target_coin and oid != target_oid:
-            return hold("other order affects target coin; account position ambiguous")
+        if oid != target_oid:
+            return hold("other account order observed; full account state ambiguous")
         if oid == target_oid:
             if coin != target_coin:
                 return hold("target order fill has conflicting coin")
