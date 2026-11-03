@@ -34,6 +34,15 @@ def fixture(**changes):
                 capture_times=(timeline, timeline),
                 open_orders_known_empty=True, position_snapshot_verified=True)
     args.update(changes)
+    # Keep metadata consistent when testing semantic parser failures; otherwise
+    # a length mismatch would HOLD before the intended branch is exercised.
+    if "http_envelopes" not in changes:
+        args["http_envelopes"] = tuple(
+            dict(envelope, body_bytes=len(body))
+            for envelope, body in zip(
+                args["http_envelopes"], (args["order_bytes"], args["fills_bytes"])
+            )
+        )
     return inspect_synthetic_order_pipeline_offline(**args)
 
 class SyntheticPipelineTests(unittest.TestCase):
@@ -93,6 +102,19 @@ class SyntheticPipelineTests(unittest.TestCase):
                   "side": "A", "dir": "Close Long", "hash": "0x"+"c"*64,
                   "sz": "1", "px": "100"}]
         self.assertEqual(fixture(fills_bytes=json.dumps(fills).encode()).status, "hold")
+
+    def test_other_coin_account_fill_holds_even_with_valid_envelope(self):
+        fills = [
+            {"coin": "SOL", "oid": 123, "tid": 1, "time": 151,
+             "side": "B", "dir": "Open Long", "hash": "0x" + "b"*64,
+             "sz": "2", "px": "100"},
+            {"coin": "BTC", "oid": 999, "tid": 2, "time": 152,
+             "side": "A", "dir": "Close Long", "hash": "0x" + "c"*64,
+             "sz": "1", "px": "100"},
+        ]
+        result = fixture(fills_bytes=json.dumps(fills).encode())
+        self.assertEqual(result.status, "hold")
+        self.assertIn("account-level", result.reason)
 
 if __name__ == "__main__":
     unittest.main()
