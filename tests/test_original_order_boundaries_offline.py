@@ -354,5 +354,41 @@ class PendingEntryClaimSafetyTests(unittest.TestCase):
                 self.assertGreater(release_checks[0].lineno, submit_calls[0].lineno)
 
 
+
+class OriginalResponseParserCharacterizationTests(unittest.TestCase):
+    """Document actual parser behavior, including gaps; do not certify it safe."""
+
+    def parse(self, response):
+        fn = isolated_function("hyperliquid_executor.py", "_parse_response")
+        return fn({"action": "open_long", "hl_coin": "SOL"},
+                  response, None, "SOL")
+
+    def test_resting_and_unknown_status_do_not_count_as_filled(self):
+        for response in (
+            {"status": "ok", "response": {"data": {"statuses": [{"resting": {"oid": 5}}]}}},
+            {"status": "ok", "response": {"data": {"statuses": []}}},
+            {"status": "ok", "response": {"data": {"statuses": [{"unknown": True}]}}},
+        ):
+            with self.subTest(response=response):
+                self.assertEqual(self.parse(response)["status"], "unknown")
+
+    def test_malformed_response_is_not_treated_as_filled(self):
+        for response in (None, {}, [], {"status": "ok"},
+                         {"status": "ok", "response": {"data": {"statuses": None}}},
+                         {"status": "ok", "response": {"data": {"statuses": [{"filled": {}}]}}}):
+            with self.subTest(response=repr(response)):
+                self.assertNotEqual(self.parse(response)["status"], "filled")
+
+    def test_current_parser_accepts_unverified_fill_receipt_known_gap(self):
+        # Characterize the current behavior, not a safety assertion.
+        # This fake response has no authenticated provenance or validated
+        # positive fill amount. Do not connect this parser to fence release.
+        response = {"status": "ok", "response": {"data": {
+            "statuses": [{"filled": {"totalSz": "-1", "avgPx": "NaN"}}]}}}
+        result = self.parse(response)
+        self.assertEqual(result["status"], "filled")
+        self.assertEqual(result["fill_size"], -1.0)
+        self.assertTrue(result["fill_price"] != result["fill_price"])
+
 if __name__ == "__main__":
     unittest.main()
