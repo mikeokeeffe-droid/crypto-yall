@@ -116,5 +116,37 @@ class SyntheticPipelineTests(unittest.TestCase):
         self.assertEqual(result.status, "hold")
         self.assertIn("account-level", result.reason)
 
+    def test_order_and_fill_requests_cannot_switch_accounts(self):
+        wrong_account = "0x" + "f" * 40
+        result = fixture(order_request={
+            "type": "orderStatus", "user": wrong_account, "oid": 123})
+        self.assertEqual(result.status, "hold")
+        self.assertIn("order/fill", result.reason)
+        result = fixture(fills_request={
+            "type": "userFillsByTime", "user": wrong_account,
+            "startTime": 100, "endTime": 200, "aggregateByTime": False})
+        self.assertEqual(result.status, "hold")
+        self.assertIn("order/fill", result.reason)
+
+    def test_order_id_and_fill_window_cannot_be_replayed(self):
+        result = fixture(order_request={
+            "type": "orderStatus", "user": ACCOUNT, "oid": 999})
+        self.assertEqual(result.status, "hold")
+        self.assertIn("order/fill", result.reason)
+        result = fixture(fills_request={
+            "type": "userFillsByTime", "user": ACCOUNT,
+            "startTime": 101, "endTime": 200, "aggregateByTime": False})
+        self.assertEqual(result.status, "hold")
+        self.assertIn("order/fill", result.reason)
+
+    def test_capture_and_http_claims_cannot_be_swapped(self):
+        timeline = dict(query_started_ms=100000, response_received_ms=100099,
+                        review_now_ms=100200)
+        normal = dict(query_started_ms=100000, response_received_ms=100100,
+                      review_now_ms=100200)
+        result = fixture(capture_times=(timeline, normal))
+        self.assertEqual(result.status, "hold")
+        self.assertIn("duration", result.reason)
+
 if __name__ == "__main__":
     unittest.main()
