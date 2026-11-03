@@ -51,12 +51,11 @@ def audit_fill_windows_offline(*, account, start_ms, end_ms, windows,
             if tid in seen:
                 return hold("duplicate trade id across windows")
             seen[tid] = record
-        if hi == end_ms:
-            # End of requested *window*, not proof of exchange retention.
-            return WindowAudit(
-                "parsed_untrusted",
-                "time windows covered synthetically; exchange history completeness unverified",
-                tuple(seen.values()),
-            )
         expected = hi + 1
-    return hold("requested history window not exhausted")
+    if expected != end_ms + 1:
+        return hold("requested history window not exhausted")
+    return WindowAudit(
+        "parsed_untrusted",
+        "time windows covered synthetically; exchange history completeness unverified",
+        tuple(seen.values()),
+    )
