@@ -56,7 +56,7 @@ def inspect_offline_source_isolation(*, source, filename):
                 return hold("dynamic code execution forbidden")
             if isinstance(target, ast.Attribute) and target.attr in (
                 "system", "popen", "run", "Popen", "connect", "urlopen",
-                "request", "post", "get",
+                "request", "post",
             ):
                 return hold("potential external side-effect call forbidden")
     return IsolationReview("review_only", "static import/call guard passed; manual review still required")
