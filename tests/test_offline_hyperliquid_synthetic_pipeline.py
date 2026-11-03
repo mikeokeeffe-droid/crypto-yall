@@ -48,8 +48,8 @@ def fixture(**changes):
 class SyntheticPipelineTests(unittest.TestCase):
     def test_complete_fake_fixture_never_authorizes(self):
         result = fixture()
-        self.assertEqual(result.status, "review_only")
-        self.assertIn("no provenance", result.reason)
+        self.assertEqual(result.status, "hold")
+        self.assertIn("not independently verified", result.reason)
         self.assertNotIn("authorized", result.status)
 
     def test_unverified_account_state_holds(self):
@@ -74,7 +74,8 @@ class SyntheticPipelineTests(unittest.TestCase):
 
     def test_body_length_and_capture_duration_mismatch_hold(self):
         valid_order = fixture()
-        self.assertEqual(valid_order.status, "review_only")
+        self.assertEqual(valid_order.status, "hold")
+        self.assertIn("not independently verified", valid_order.reason)
         bad = dict(status_code=200, elapsed_ms=100, body_bytes=1,
                    redirect_count=0, tls_verified=True,
                    expected_url=URL, final_url=URL)
