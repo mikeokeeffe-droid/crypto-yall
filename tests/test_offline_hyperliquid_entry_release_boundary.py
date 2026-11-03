@@ -103,5 +103,23 @@ class EntryReleaseBoundaryTests(unittest.TestCase):
                 self.assertIs(result.allow_entry, False)
                 self.assertIs(result.release_fence, False)
 
+    def test_all_review_statuses_are_non_authorizing(self):
+        """A future upstream label must never silently become a release token."""
+        for status in ("hold", "review_only", "approved", "success",
+                       "filled", "complete", "authorized", "release", "", None,
+                       1, True, ["review_only"], {"status": "review_only"}):
+            with self.subTest(status=repr(status)):
+                upstream = type("SyntheticReview", (), {"status": status})()
+                result = inspect_synthetic_entry_release_offline(
+                    pipeline_review=upstream,
+                    claimed_open_orders_empty=True,
+                    claimed_position_verified=True,
+                    claimed_history_complete=True,
+                    claimed_source_authenticated=True,
+                )
+                self.assertEqual(result.status, "hold")
+                self.assertIs(result.allow_entry, False)
+                self.assertIs(result.release_fence, False)
+
 if __name__ == "__main__":
     unittest.main()
