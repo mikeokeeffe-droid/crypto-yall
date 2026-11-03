@@ -10,6 +10,8 @@ on:
       - 'offline_independent_entry_reconciler.py'
       - 'offline_exchange_page_review.py'
       - 'tests/test_offline_exchange_page_review.py'
+      - 'offline_paginated_exchange_evidence.py'
+      - 'tests/test_offline_paginated_exchange_evidence.py'
       - 'offline_filled_ownership_review.py'
       - 'tests/test_offline_filled_ownership_review.py'
       - 'offline_filled_recovery_inspection.py'
@@ -48,3 +50,4 @@ jobs:
           python -m unittest discover -s tests -p 'test_offline_filled_ownership_review.py' -v
           python -m unittest discover -s tests -p 'test_offline_filled_recovery_inspection.py' -v
           python -m unittest discover -s tests -p 'test_offline_exchange_page_review.py' -v
+          python -m unittest discover -s tests -p 'test_offline_paginated_exchange_evidence.py' -v
