@@ -2,6 +2,7 @@
 import json
 import unittest
 from offline_hyperliquid_synthetic_pipeline import inspect_synthetic_order_pipeline_offline
+from offline_hyperliquid_entry_release_boundary import inspect_synthetic_entry_release_offline
 
 ACCOUNT = "0x" + "a" * 40
 URL = "https://api.hyperliquid.xyz/info"
@@ -51,6 +52,20 @@ class SyntheticPipelineTests(unittest.TestCase):
         self.assertEqual(result.status, "hold")
         self.assertIn("not independently verified", result.reason)
         self.assertNotIn("authorized", result.status)
+
+    def test_full_pipeline_cannot_release_fence_even_with_all_positive_claims(self):
+        upstream = fixture()
+        result = inspect_synthetic_entry_release_offline(
+            pipeline_review=upstream,
+            claimed_open_orders_empty=True,
+            claimed_position_verified=True,
+            claimed_history_complete=True,
+            claimed_source_authenticated=True,
+        )
+        self.assertEqual(upstream.status, "hold")
+        self.assertEqual(result.status, "hold")
+        self.assertIs(result.allow_entry, False)
+        self.assertIs(result.release_fence, False)
 
     def test_unverified_account_state_holds(self):
         self.assertEqual(fixture(open_orders_known_empty=False).status, "hold")
