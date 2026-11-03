@@ -18,9 +18,15 @@ def inspect_synthetic_entry_release_offline(*, pipeline_review,
                                              claimed_position_verified,
                                              claimed_history_complete,
                                              claimed_source_authenticated):
-    if getattr(pipeline_review, "status", None) not in ("hold", "review_only"):
+    # Treat hostile/malformed review objects as unknown, never as approval.
+    # Reading an attribute may execute caller-supplied code and raise.
+    try:
+        upstream_status = getattr(pipeline_review, "status", None)
+    except Exception:
+        upstream_status = None
+    if type(upstream_status) is not str or upstream_status not in ("hold", "review_only"):
         reason = "unknown or invalid upstream review"
-    elif getattr(pipeline_review, "status", None) == "hold":
+    elif upstream_status == "hold":
         reason = "upstream evidence is on hold"
     elif any(type(value) is not bool for value in (
         claimed_open_orders_empty, claimed_position_verified,
