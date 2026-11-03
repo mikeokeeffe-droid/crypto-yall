@@ -15,20 +15,22 @@ def fixture(**changes):
     fills = [{"coin": "SOL", "oid": 123, "tid": i, "time": 150+i,
               "side": "B", "dir": "Open Long", "hash": "0x" + "b"*64,
               "sz": "1", "px": "100"} for i in (1, 2)]
-    envelope = dict(status_code=200, elapsed_ms=100, body_bytes=500,
+    order_bytes = json.dumps(order).encode()
+    fills_bytes = json.dumps(fills).encode()
+    envelope = dict(status_code=200, elapsed_ms=100, body_bytes=len(order_bytes),
                     redirect_count=0, tls_verified=True,
                     expected_url=URL, final_url=URL)
     timeline = dict(query_started_ms=100000, response_received_ms=100100,
                     review_now_ms=100200)
-    args = dict(order_bytes=json.dumps(order).encode(),
-                fills_bytes=json.dumps(fills).encode(),
+    args = dict(order_bytes=order_bytes,
+                fills_bytes=fills_bytes,
                 order_request={"type": "orderStatus", "user": ACCOUNT, "oid": 123},
                 fills_request={"type": "userFillsByTime", "user": ACCOUNT,
                                "startTime": 100, "endTime": 200,
                                "aggregateByTime": False},
                 account=ACCOUNT, coin="SOL", oid=123, direction="long",
                 size="2", submitted_at_ms=100, start_ms=100, end_ms=200,
-                http_envelopes=(envelope, envelope),
+                http_envelopes=(envelope, dict(envelope, body_bytes=len(fills_bytes))),
                 capture_times=(timeline, timeline),
                 open_orders_known_empty=True, position_snapshot_verified=True)
     args.update(changes)
@@ -60,6 +62,19 @@ class SyntheticPipelineTests(unittest.TestCase):
                  review_now_ms=200000),
             dict(query_started_ms=100000, response_received_ms=100100,
                  review_now_ms=100200))).status, "hold")
+
+    def test_body_length_and_capture_duration_mismatch_hold(self):
+        valid_order = fixture()
+        self.assertEqual(valid_order.status, "review_only")
+        bad = dict(status_code=200, elapsed_ms=100, body_bytes=1,
+                   redirect_count=0, tls_verified=True,
+                   expected_url=URL, final_url=URL)
+        self.assertEqual(fixture(http_envelopes=(bad, bad)).status, "hold")
+        slow = dict(query_started_ms=100000, response_received_ms=100101,
+                    review_now_ms=100200)
+        normal = dict(query_started_ms=100000, response_received_ms=100100,
+                      review_now_ms=100200)
+        self.assertEqual(fixture(capture_times=(slow, normal)).status, "hold")
 
     def test_rejected_order_cannot_be_relabelled_filled(self):
         order = {"status": "order", "order": {
