@@ -21,6 +21,8 @@ on:
       - 'tests/test_offline_hyperliquid_retention_gate.py'
       - 'offline_hyperliquid_readonly_boundary.py'
       - 'tests/test_offline_hyperliquid_readonly_boundary.py'
+      - 'offline_hyperliquid_transport_plan.py'
+      - 'tests/test_offline_hyperliquid_transport_plan.py'
       - 'offline_filled_ownership_review.py'
       - 'tests/test_offline_filled_ownership_review.py'
       - 'offline_filled_recovery_inspection.py'
@@ -65,3 +67,4 @@ jobs:
           python -m unittest discover -s tests -p 'test_offline_hyperliquid_fill_window_audit.py' -v
           python -m unittest discover -s tests -p 'test_offline_hyperliquid_retention_gate.py' -v
           python -m unittest discover -s tests -p 'test_offline_hyperliquid_readonly_boundary.py' -v
+          python -m unittest discover -s tests -p 'test_offline_hyperliquid_transport_plan.py' -v
