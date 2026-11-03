@@ -81,5 +81,27 @@ class EntryReleaseBoundaryTests(unittest.TestCase):
         self.assertEqual(result.__dict__["allow_entry"], False)
         self.assertEqual(result.__dict__["release_fence"], False)
 
+    def test_hostile_upstream_status_access_fails_closed(self):
+        class ExplodingStatus:
+            @property
+            def status(self):
+                raise RuntimeError("malformed synthetic review")
+
+        class UnhashableStatus:
+            status = ["review_only"]
+
+        for upstream in (ExplodingStatus(), UnhashableStatus()):
+            with self.subTest(upstream=type(upstream).__name__):
+                result = inspect_synthetic_entry_release_offline(
+                    pipeline_review=upstream,
+                    claimed_open_orders_empty=True,
+                    claimed_position_verified=True,
+                    claimed_history_complete=True,
+                    claimed_source_authenticated=True,
+                )
+                self.assertEqual(result.status, "hold")
+                self.assertIs(result.allow_entry, False)
+                self.assertIs(result.release_fence, False)
+
 if __name__ == "__main__":
     unittest.main()
