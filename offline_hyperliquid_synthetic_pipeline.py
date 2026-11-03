@@ -66,8 +66,14 @@ def inspect_synthetic_order_pipeline_offline(*, order_bytes, fills_bytes,
     )
     if cross.status != "review_only":
         return hold("order/fill evidence inconsistent or incomplete")
+    # Use the parsed order status, never manufacture a filled state.
+    if (type(order.records) is not tuple or len(order.records) != 1
+            or type(order.records[0]) is not tuple
+            or len(order.records[0]) != 4):
+        return hold("missing parsed terminal order state")
+    parsed_order_status = order.records[0][1]
     impact = inspect_account_order_impact_offline(
-        target_oid=oid, target_coin=coin, order_status="filled",
+        target_oid=oid, target_coin=coin, order_status=parsed_order_status,
         requested_size=size, fills=fills.records,
         open_orders_known_empty=open_orders_known_empty,
         position_snapshot_verified=position_snapshot_verified,
