@@ -101,5 +101,49 @@ class SharedEntryAdmissionTests(unittest.TestCase):
         self.assertEqual(len(backend.claims), 1)
 
 
+    def test_malformed_coordinator_replies_never_grant_entry(self):
+        request_id = str(uuid.uuid4())
+        good = FakeAtomicCoordinator().claim_intent(
+            bot="daily", coin="SOL", action="open_long", request_id=request_id)
+        invalid = (
+            None, [], "claimed", True, 1,
+            dict(good, fence_token=True),
+            dict(good, fence_token=1.0),
+            dict(good, intent_id=None),
+            dict(good, intent_id=True),
+            dict(good, intent_id=str(uuid.uuid4()).upper()),
+            dict(good, action="open_short"),
+            dict(good, status=True),
+        )
+        for proof in invalid:
+            with self.subTest(proof=repr(proof)):
+                class Fake:
+                    def claim_intent(self, **kwargs):
+                        return proof
+                decision = claim_shared_entry(
+                    Fake(), bot="daily", coin="SOL",
+                    action="open_long", request_id=request_id)
+                self.assertIs(decision.accepted, False)
+                self.assertEqual(decision.intent_id, "")
+                self.assertEqual(decision.fence_token, 0)
+
+    def test_timeout_after_fake_commit_never_approves_or_retries(self):
+        class CommitThenTimeout:
+            def __init__(self):
+                self.calls = 0
+                self.persisted = False
+            def claim_intent(self, **kwargs):
+                self.calls += 1
+                self.persisted = True
+                raise TimeoutError("response lost after durable write")
+        backend = CommitThenTimeout()
+        result = claim_shared_entry(
+            backend, bot="intraday", coin="ETH",
+            action="open_short", request_id=str(uuid.uuid4()))
+        self.assertTrue(backend.persisted)
+        self.assertEqual(backend.calls, 1)
+        self.assertIs(result.accepted, False)
+        self.assertEqual(result.reason, "coordinator_result_uncertain")
+
 if __name__ == "__main__":
     unittest.main()
