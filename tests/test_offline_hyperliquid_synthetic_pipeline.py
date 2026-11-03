@@ -61,6 +61,15 @@ class SyntheticPipelineTests(unittest.TestCase):
             dict(query_started_ms=100000, response_received_ms=100100,
                  review_now_ms=100200))).status, "hold")
 
+    def test_rejected_order_cannot_be_relabelled_filled(self):
+        order = {"status": "order", "order": {
+            "status": "rejected", "statusTimestamp": 200,
+            "order": {"oid": 123, "coin": "SOL", "side": "B",
+                      "reduceOnly": False, "timestamp": 100,
+                      "origSz": "2", "limitPx": "100"}}}
+        result = fixture(order_bytes=json.dumps(order).encode())
+        self.assertEqual(result.status, "hold")
+
     def test_other_order_same_coin_holds(self):
         fills = [{"coin": "SOL", "oid": 123, "tid": 1, "time": 151,
                   "side": "B", "dir": "Open Long", "hash": "0x"+"b"*64,
