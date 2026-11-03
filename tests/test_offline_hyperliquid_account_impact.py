@@ -44,10 +44,9 @@ class AccountImpactTests(unittest.TestCase):
         self.assertEqual(inspect(fills=(
             ("SOL", 123, 1, 150, "B", "Open Long", "3"),)).status, "hold")
 
-    def test_other_coin_fill_does_not_prove_account_flatness(self):
+    def test_other_coin_fill_also_holds_account_review(self):
         result = inspect(fills=(TARGET, ("BTC", 999, 2, 151, "B", "Open Long", "1")))
-        self.assertEqual(result.status, "review_only")
-        self.assertIn("unverified", result.reason)
+        self.assertEqual(result.status, "hold")
 
 
 if __name__ == "__main__":
