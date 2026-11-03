@@ -42,5 +42,44 @@ class EntryReleaseBoundaryTests(unittest.TestCase):
         )
         self.assertEqual(result.status, "hold")
 
+    def test_forged_success_labels_and_truthy_claims_never_authorize(self):
+        """Future refactors must not accidentally accept a claimed approval."""
+        class ForgedReview:
+            status = "approved"
+            allow_entry = True
+            release_fence = True
+
+        for upstream in (
+            ForgedReview(),
+            {"status": "review_only", "allow_entry": True},
+            PipelineReview("success", "synthetic"),
+            PipelineReview("release_fence", "synthetic"),
+            PipelineReview("review_only", "synthetic"),
+        ):
+            for suspicious in (1, "true", [], None):
+                with self.subTest(upstream=repr(upstream), claim=repr(suspicious)):
+                    result = inspect_synthetic_entry_release_offline(
+                        pipeline_review=upstream,
+                        claimed_open_orders_empty=suspicious,
+                        claimed_position_verified=True,
+                        claimed_history_complete=True,
+                        claimed_source_authenticated=True,
+                    )
+                    self.assertEqual(result.status, "hold")
+                    self.assertIs(result.allow_entry, False)
+                    self.assertIs(result.release_fence, False)
+
+    def test_result_flags_are_explicitly_false_even_for_all_positive_claims(self):
+        result = inspect_synthetic_entry_release_offline(
+            pipeline_review=PipelineReview("review_only", "all synthetic checks passed"),
+            claimed_open_orders_empty=True,
+            claimed_position_verified=True,
+            claimed_history_complete=True,
+            claimed_source_authenticated=True,
+        )
+        self.assertEqual(result.status, "hold")
+        self.assertEqual(result.__dict__["allow_entry"], False)
+        self.assertEqual(result.__dict__["release_fence"], False)
+
 if __name__ == "__main__":
     unittest.main()
