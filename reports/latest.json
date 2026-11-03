@@ -375,7 +375,7 @@
     }
   },
   "date_utc": "2026-11-03",
-  "generated_at": "2026-11-03T22:08:22.122521+00:00",
+  "generated_at": "2026-11-03T23:08:13.023915+00:00",
   "report_errors": [],
   "reporting_only": true,
   "schema_version": 2,
@@ -4394,7 +4394,7 @@
             }
           ],
           "dual_short_confirmed_now": false,
-          "eth_confirmed_short_now": false,
+          "eth_confirmed_short_now": true,
           "open_positions": {},
           "today": {
             "average_loss_pct": null,
@@ -4726,6 +4726,6 @@
     "errors": [],
     "scope": "Shadow-only fresh short signals for SOL/AVAX/LINK/SUI/XRP/ONDO that live trading blocks because mid-cap allow_short=False.",
     "tracking_started_at": "2026-09-10T22:03:23.796957+00:00",
-    "updated_at": "2026-11-03T22:08:22.122521+00:00"
+    "updated_at": "2026-11-03T23:08:13.023915+00:00"
   }
 }
