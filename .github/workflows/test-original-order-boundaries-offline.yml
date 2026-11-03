@@ -29,6 +29,8 @@ on:
       - 'tests/test_offline_hyperliquid_capture_provenance.py'
       - 'offline_hyperliquid_http_envelope.py'
       - 'tests/test_offline_hyperliquid_http_envelope.py'
+      - 'offline_hyperliquid_json_boundary.py'
+      - 'tests/test_offline_hyperliquid_json_boundary.py'
       - 'offline_filled_ownership_review.py'
       - 'tests/test_offline_filled_ownership_review.py'
       - 'offline_filled_recovery_inspection.py'
@@ -77,3 +79,4 @@ jobs:
           python -m unittest discover -s tests -p 'test_offline_hyperliquid_scoped_fixture_review.py' -v
           python -m unittest discover -s tests -p 'test_offline_hyperliquid_capture_provenance.py' -v
           python -m unittest discover -s tests -p 'test_offline_hyperliquid_http_envelope.py' -v
+          python -m unittest discover -s tests -p 'test_offline_hyperliquid_json_boundary.py' -v
