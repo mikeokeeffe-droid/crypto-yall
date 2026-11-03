@@ -43,6 +43,8 @@ on:
       - 'tests/test_offline_hyperliquid_synthetic_pipeline.py'
       - 'offline_hyperliquid_entry_release_boundary.py'
       - 'tests/test_offline_hyperliquid_entry_release_boundary.py'
+      - 'offline_hyperliquid_isolation_guard.py'
+      - 'tests/test_offline_hyperliquid_isolation_guard.py'
       - 'offline_filled_ownership_review.py'
       - 'tests/test_offline_filled_ownership_review.py'
       - 'offline_filled_recovery_inspection.py'
@@ -98,3 +100,4 @@ jobs:
           python -m unittest discover -s tests -p 'test_offline_hyperliquid_account_impact.py' -v
           python -m unittest discover -s tests -p 'test_offline_hyperliquid_synthetic_pipeline.py' -v
           python -m unittest discover -s tests -p 'test_offline_hyperliquid_entry_release_boundary.py' -v
+          python -m unittest discover -s tests -p 'test_offline_hyperliquid_isolation_guard.py' -v
