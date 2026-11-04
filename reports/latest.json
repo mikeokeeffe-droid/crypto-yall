@@ -374,8 +374,8 @@
       "trading_fees": 0
     }
   },
-  "date_utc": "2026-11-03",
-  "generated_at": "2026-11-03T23:08:13.023915+00:00",
+  "date_utc": "2026-11-04",
+  "generated_at": "2026-11-04T00:08:20.804411+00:00",
   "report_errors": [],
   "reporting_only": true,
   "schema_version": 2,
@@ -2748,13 +2748,13 @@
         ],
         "open_positions": {},
         "today": {
-          "average_loss_pct": -1.1651,
-          "average_win_pct": 1.7926,
-          "closed_trades": 2,
-          "cumulative_gross_return_pct": 0.6275,
-          "losses": 1,
-          "win_rate_pct": 50.0,
-          "wins": 1
+          "average_loss_pct": null,
+          "average_win_pct": null,
+          "closed_trades": 0,
+          "cumulative_gross_return_pct": 0,
+          "losses": 0,
+          "win_rate_pct": null,
+          "wins": 0
         }
       },
       "intraday": {
@@ -3887,13 +3887,13 @@
         ],
         "open_positions": {},
         "today": {
-          "average_loss_pct": -2.798,
-          "average_win_pct": 0.5125,
-          "closed_trades": 3,
-          "cumulative_gross_return_pct": -1.773,
-          "losses": 1,
-          "win_rate_pct": 66.67,
-          "wins": 2
+          "average_loss_pct": null,
+          "average_win_pct": null,
+          "closed_trades": 0,
+          "cumulative_gross_return_pct": 0,
+          "losses": 0,
+          "win_rate_pct": null,
+          "wins": 0
         }
       }
     },
@@ -4726,6 +4726,6 @@
     "errors": [],
     "scope": "Shadow-only fresh short signals for SOL/AVAX/LINK/SUI/XRP/ONDO that live trading blocks because mid-cap allow_short=False.",
     "tracking_started_at": "2026-09-10T22:03:23.796957+00:00",
-    "updated_at": "2026-11-03T23:08:13.023915+00:00"
+    "updated_at": "2026-11-04T00:08:20.804411+00:00"
   }
 }
