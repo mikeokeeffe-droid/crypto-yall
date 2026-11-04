@@ -5,6 +5,7 @@ on:
     paths:
       - 'tests/test_original_order_boundaries_offline.py'
       - 'tests/test_position_increase_claim_invariant_offline.py'
+      - 'tests/test_original_kill_switch_exit_audit_offline.py'
       - 'entry_claim_safety.py'
       - 'entry_reconciliation_review_offline.py'
       - 'offline_independent_entry_reconciler.py'
@@ -92,6 +93,7 @@ jobs:
         run: |
           python -m unittest discover -s tests -p 'test_original_order_boundaries_offline.py' -v
           python -m unittest discover -s tests -p 'test_position_increase_claim_invariant_offline.py' -v
+          python -m unittest discover -s tests -p 'test_original_kill_switch_exit_audit_offline.py' -v
           python -m unittest discover -s tests -p 'test_shared_entry_admission_offline.py' -v
           python -m unittest discover -s tests -p 'test_offline_three_bot_simulation.py' -v
           python -m unittest discover -s tests -p 'test_entry_reconciliation_review_offline.py' -v
