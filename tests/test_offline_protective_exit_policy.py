@@ -35,5 +35,32 @@ class ProtectiveExitReviewTests(unittest.TestCase):
         self.assertEqual(result.status, "review_only")
         self.assertFalse(result.submit_authorized)
 
+    def test_pinned_close_identity_mismatch_holds(self):
+        from offline_protective_exit_policy import review_pinned_close_identity_offline
+        pinned = dict(bot="daily", account="0xSyntheticAccount", coin="SOL", side="long")
+        matching = review_pinned_close_identity_offline(
+            intended=pinned, observed=dict(pinned))
+        self.assertEqual(matching.status, "review_only")
+        self.assertFalse(matching.submit_authorized)
+        for changed in (
+            {"bot": "intraday"}, {"account": "0xOtherAccount"},
+            {"coin": "ETH"}, {"side": "short"},
+            {"side": "flat"}, {"account": None},
+            {"coin": "sol"}, {"extra": "field"},
+        ):
+            with self.subTest(changed=changed):
+                result = review_pinned_close_identity_offline(
+                    intended=pinned, observed=dict(pinned, **changed))
+                self.assertEqual(result.status, "hold")
+                self.assertFalse(result.submit_authorized)
+
+    def test_pinned_close_identity_cannot_authenticate_caller_claims(self):
+        from offline_protective_exit_policy import review_pinned_close_identity_offline
+        fake = dict(bot="aggressive", account="0xUnverified", coin="BTC", side="short")
+        result = review_pinned_close_identity_offline(
+            intended=fake, observed=dict(fake))
+        self.assertEqual(result.status, "review_only")
+        self.assertFalse(result.submit_authorized)
+
 if __name__ == "__main__":
     unittest.main()
