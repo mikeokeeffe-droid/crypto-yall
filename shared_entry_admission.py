@@ -31,9 +31,10 @@ def claim_shared_entry(backend, *, bot: str, coin: str, action: str,
     authenticated identity or exchange execution. Production must validate the
     backend implementation, SQL grants, reconciler and order boundary.
     """
-    if bot not in BOTS or action not in ENTRY_ACTIONS:
+    if (type(bot) is not str or type(action) is not str
+            or bot not in BOTS or action not in ENTRY_ACTIONS):
         return ClaimDecision(False, "invalid_bot_or_entry_action")
-    if not isinstance(coin, str) or not coin or not coin.isascii() or not coin.isalnum() or coin != coin.upper():
+    if type(coin) is not str or not coin or not coin.isascii() or not coin.isalnum() or coin != coin.upper():
         return ClaimDecision(False, "invalid_coin")
     try:
         request_uuid = str(uuid.UUID(request_id))
@@ -52,7 +53,7 @@ def claim_shared_entry(backend, *, bot: str, coin: str, action: str,
         # treating a timeout as a clear/released lock.
         return ClaimDecision(False, "coordinator_result_uncertain")
 
-    if type(reply) is not dict or reply.get("status") != "claimed":
+    if type(reply) is not dict or type(reply.get("status")) is not str or reply["status"] != "claimed":
         return ClaimDecision(False, "not_claimed")
     if any(reply.get(k) != v for k, v in
            (("bot", bot), ("coin", coin), ("action", action),
