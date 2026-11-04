@@ -66,5 +66,44 @@ class ThreeBotSimulationTests(unittest.TestCase):
         self.assertEqual(len(exchange.submissions), 3)
         self.assertEqual(set(coordinator.claims), {"SOL", "ETH", "BTC"})
 
+    def test_fake_exchange_timeout_keeps_reservation_and_blocks_other_bots(self):
+        class LostFakeOrderResponse(FakeExchange):
+            def submit_fake(self, **kwargs):
+                super().submit_fake(**kwargs)
+                raise TimeoutError("synthetic exchange accepted then response lost")
+
+        coordinator, exchange = FakeSharedCoordinator(), LostFakeOrderResponse()
+        with self.assertRaises(TimeoutError):
+            simulate_entry(
+                coordinator, exchange, bot="daily", coin="LINK",
+                action="open_long", request_id=str(uuid.uuid4()))
+        self.assertEqual(len(exchange.submissions), 1)
+        original = dict(coordinator.claims["LINK"])
+        for bot, action in (("intraday", "open_short"),
+                            ("aggressive", "pyramid_long")):
+            result = simulate_entry(
+                coordinator, exchange, bot=bot, coin="LINK",
+                action=action, request_id=str(uuid.uuid4()))
+            self.assertFalse(result.accepted)
+        self.assertEqual(len(exchange.submissions), 1)
+        self.assertEqual(coordinator.claims["LINK"], original)
+
+    def test_fake_exchange_rejection_never_automatically_releases_claim(self):
+        class RejectingFakeExchange(FakeExchange):
+            def submit_fake(self, **kwargs):
+                raise ValueError("synthetic order rejected")
+
+        coordinator, exchange = FakeSharedCoordinator(), RejectingFakeExchange()
+        with self.assertRaises(ValueError):
+            simulate_entry(
+                coordinator, exchange, bot="aggressive", coin="AVAX",
+                action="open_short", request_id=str(uuid.uuid4()))
+        self.assertIn("AVAX", coordinator.claims)
+        second = simulate_entry(
+            coordinator, exchange, bot="intraday", coin="AVAX",
+            action="open_long", request_id=str(uuid.uuid4()))
+        self.assertFalse(second.accepted)
+        self.assertEqual(exchange.submissions, [])
+
 if __name__ == "__main__":
     unittest.main()
