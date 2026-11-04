@@ -47,5 +47,36 @@ class StrictParserTests(unittest.TestCase):
         self.assertEqual(inspect_market_order_response_offline(
             response=good, requested_size="1").status, "hold")
 
+    def test_conflicting_fields_and_partial_fills_remain_untrusted(self):
+        good = {"oid": 123, "totalSz": "0.5", "avgPx": "100"}
+        partial = inspect_market_order_response_offline(
+            response=response(good), expected_oid=123, requested_size="2")
+        self.assertEqual(partial.status, "parsed_untrusted")
+        self.assertNotIn("authorized", partial.status)
+        self.assertFalse(hasattr(partial, "allow_entry"))
+        for statuses in (
+            [{"filled": good, "error": "conflicting"}],
+            [{"filled": good}, {"error": "conflicting"}],
+            [{"filled": good}, {"resting": {"oid": 123}}],
+            [{"error": "rejected"}],
+        ):
+            with self.subTest(statuses=statuses):
+                raw = {"status": "ok", "response": {"type": "order",
+                       "data": {"statuses": statuses}}}
+                self.assertEqual(
+                    inspect_market_order_response_offline(response=raw).status,
+                    "hold")
+
+    def test_overfill_and_nonfinite_requested_size_hold(self):
+        raw = response({"oid": 123, "totalSz": "1.01", "avgPx": "100"})
+        for requested in ("1", "NaN", "Infinity", "0", "-1", True, None):
+            with self.subTest(requested=requested):
+                # None means 'unspecified' in the parser interface and cannot
+                # establish order-intent size; test only explicit bad values.
+                if requested is None:
+                    continue
+                self.assertEqual(inspect_market_order_response_offline(
+                    response=raw, requested_size=requested).status, "hold")
+
 if __name__ == "__main__":
     unittest.main()
