@@ -145,5 +145,27 @@ class SharedEntryAdmissionTests(unittest.TestCase):
         self.assertIs(result.accepted, False)
         self.assertEqual(result.reason, "coordinator_result_uncertain")
 
+    def test_invalid_input_types_do_not_call_coordinator(self):
+        class Spy:
+            calls = 0
+            def claim_intent(self, **kwargs):
+                self.calls += 1
+                raise AssertionError("invalid inputs must not reach backend")
+        valid = dict(bot="daily", coin="SOL", action="open_long",
+                     request_id=str(uuid.uuid4()))
+        for key, values in (
+            ("bot", (None, [], {}, True)),
+            ("action", (None, [], {}, True)),
+            ("coin", (None, [], {}, True, "sol", "")),
+            ("request_id", (None, [], {}, True, "invalid")),
+        ):
+            for value in values:
+                with self.subTest(key=key, value=repr(value)):
+                    backend = Spy()
+                    decision = claim_shared_entry(
+                        backend, **dict(valid, **{key: value}))
+                    self.assertIs(decision.accepted, False)
+                    self.assertEqual(backend.calls, 0)
+
 if __name__ == "__main__":
     unittest.main()
