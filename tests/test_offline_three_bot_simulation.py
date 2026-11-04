@@ -105,5 +105,39 @@ class ThreeBotSimulationTests(unittest.TestCase):
         self.assertFalse(second.accepted)
         self.assertEqual(exchange.submissions, [])
 
+    def test_protective_close_is_not_a_new_entry_claim(self):
+        from entry_claim_safety import blocks_entry_with_pending_claim
+        coordinator, exchange = FakeSharedCoordinator(), FakeExchange()
+        coordinator.lose_confirmation_for.add("SOL")
+        uncertain = simulate_entry(
+            coordinator, exchange, bot="daily", coin="SOL",
+            action="open_long", request_id=str(uuid.uuid4()))
+        self.assertFalse(uncertain.accepted)
+        pending = {"SOL": coordinator.claims["SOL"]}
+        # A close must bypass the *entry lock*, not bypass other order safety
+        # checks such as position ownership, reduce-only and kill-switch logic.
+        for bot in ("daily", "intraday", "aggressive"):
+            with self.subTest(bot=bot):
+                self.assertFalse(blocks_entry_with_pending_claim(
+                    {"action": "close", "hl_coin": "SOL"}, pending))
+                self.assertTrue(blocks_entry_with_pending_claim(
+                    {"action": "open_short", "hl_coin": "SOL"}, pending))
+        self.assertEqual(exchange.submissions, [])
+        self.assertIn("SOL", coordinator.claims)
+
+    def test_coordinator_outage_blocks_entry_but_not_entry_gate_close(self):
+        from entry_claim_safety import blocks_entry_with_pending_claim
+        class Down:
+            def claim_intent(self, **kwargs):
+                raise ConnectionError("fake coordinator down")
+        exchange = FakeExchange()
+        denied = simulate_entry(
+            Down(), exchange, bot="intraday", coin="BTC",
+            action="open_long", request_id=str(uuid.uuid4()))
+        self.assertFalse(denied.accepted)
+        self.assertEqual(exchange.submissions, [])
+        self.assertFalse(blocks_entry_with_pending_claim(
+            {"action": "close", "hl_coin": "BTC"}, {"BTC": {"unresolved": True}}))
+
 if __name__ == "__main__":
     unittest.main()
