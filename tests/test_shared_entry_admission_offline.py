@@ -255,5 +255,56 @@ class SharedEntryAdmissionTests(unittest.TestCase):
                 self.assertFalse(decision.accepted)
                 self.assertEqual(decision.fence_token, 0)
 
+    def test_restart_with_new_request_id_cannot_replace_uncertain_claim(self):
+        class PersistentFake(FakeAtomicCoordinator):
+            def claim_intent(self, **kwargs):
+                reply = super().claim_intent(**kwargs)
+                if reply.get("status") == "claimed":
+                    raise TimeoutError("durable reservation committed before timeout")
+                return reply
+
+        backend = PersistentFake()
+        original_id = str(uuid.uuid4())
+        first = claim_shared_entry(
+            backend, bot="daily", coin="AVAX", action="open_long",
+            request_id=original_id)
+        self.assertFalse(first.accepted)
+        self.assertEqual(first.reason, "coordinator_result_uncertain")
+        original = dict(backend.claims["AVAX"])
+
+        # A new process has no trusted local success response. New request IDs
+        # must not displace the existing shared unresolved intent.
+        for bot, action in (
+            ("daily", "open_long"),
+            ("intraday", "open_short"),
+            ("aggressive", "pyramid_long"),
+        ):
+            with self.subTest(bot=bot):
+                attempt = claim_shared_entry(
+                    backend, bot=bot, coin="AVAX", action=action,
+                    request_id=str(uuid.uuid4()))
+                self.assertFalse(attempt.accepted)
+                self.assertEqual(backend.claims["AVAX"], original)
+        self.assertEqual(len(backend.claims), 1)
+
+    def test_other_coin_can_be_reserved_after_uncertain_first_coin(self):
+        class OneLostResponse(FakeAtomicCoordinator):
+            def claim_intent(self, **kwargs):
+                reply = super().claim_intent(**kwargs)
+                if kwargs["coin"] == "SOL" and reply.get("status") == "claimed":
+                    raise TimeoutError("lost SOL response")
+                return reply
+
+        backend = OneLostResponse()
+        uncertain = claim_shared_entry(
+            backend, bot="daily", coin="SOL", action="open_long",
+            request_id=str(uuid.uuid4()))
+        other = claim_shared_entry(
+            backend, bot="intraday", coin="ETH", action="open_short",
+            request_id=str(uuid.uuid4()))
+        self.assertFalse(uncertain.accepted)
+        self.assertTrue(other.accepted)
+        self.assertEqual(set(backend.claims), {"SOL", "ETH"})
+
 if __name__ == "__main__":
     unittest.main()
