@@ -34,5 +34,41 @@ class OrderOwnershipClaimTests(unittest.TestCase):
                 self.assertEqual(inspect_claimed_order_ownership_offline(
                     intent=PINNED, claim=claim).status, "hold")
 
+    def test_similar_looking_accounts_and_identifiers_never_prove_ownership(self):
+        variants = (
+            ("account", "0xABC"),
+            ("account", " 0xabc"),
+            ("account", "0xabc "),
+            ("account", "0xabc\\n"),
+            ("coin", "SОL"),  # Cyrillic capital O, not ASCII O
+            ("coin", "SOL-PERP"),
+            ("direction", "LONG"),
+            ("oid", 42.0),
+        )
+        for key, value in variants:
+            with self.subTest(key=key, value=repr(value)):
+                claim = dict(PINNED, **{key: value})
+                review = inspect_claimed_order_ownership_offline(
+                    intent=PINNED, claim=claim)
+                self.assertEqual(review.status, "hold")
+
+    def test_malformed_pinned_intent_cannot_be_rescued_by_matching_claim(self):
+        invalid = (
+            dict(PINNED, account=""),
+            dict(PINNED, account=" 0xabc"),
+            dict(PINNED, coin=""),
+            dict(PINNED, coin="sol"),
+            dict(PINNED, direction="close"),
+            dict(PINNED, direction=["long"]),
+            dict(PINNED, oid=True),
+            dict(PINNED, oid=0),
+        )
+        for intent in invalid:
+            with self.subTest(intent=repr(intent)):
+                review = inspect_claimed_order_ownership_offline(
+                    intent=intent, claim=dict(intent))
+                self.assertEqual(review.status, "hold")
+                self.assertIn("invalid", review.reason)
+
 if __name__ == "__main__":
     unittest.main()
