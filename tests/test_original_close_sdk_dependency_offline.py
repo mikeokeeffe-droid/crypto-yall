@@ -4,7 +4,6 @@ This does not inspect the installed SDK implementation or authorize trades.
 A passing test only records the version that requires independent review.
 """
 from pathlib import Path
-import re
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
