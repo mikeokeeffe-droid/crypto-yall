@@ -47,5 +47,38 @@ class StaleClaimTests(unittest.TestCase):
                 self.assertEqual(review.status, "hold")
                 self.assertFalse(review.allow_new_entry)
 
+    def test_freshness_claim_does_not_unlock_old_unresolved_intent(self):
+        from offline_hyperliquid_evidence_freshness import (
+            inspect_evidence_freshness_offline)
+        freshness = inspect_evidence_freshness_offline(
+            query_started_ms=999_990, response_received_ms=999_995,
+            review_now_ms=1_000_000)
+        self.assertEqual(freshness.status, "review_only")
+        review = inspect_stale_claim_offline(
+            claim=CLAIM, now_ms=1_000_000, ttl_ms=1000,
+            claimed_order_absent=True, claimed_flat_position=True)
+        self.assertEqual(review.status, "hold")
+        self.assertFalse(review.release_claim)
+        self.assertFalse(review.allow_new_entry)
+
+    def test_partial_history_claim_does_not_unlock_old_intent(self):
+        from offline_hyperliquid_partial_coverage import (
+            inspect_partial_fill_coverage_offline)
+        class SyntheticArchive:
+            status = "review_only"
+        coverage = inspect_partial_fill_coverage_offline(
+            requested_size="1", observed_fill_sizes=("1",),
+            required_start_ms=1000, required_end_ms=2000,
+            queried_start_ms=1000, queried_end_ms=2000,
+            archive_review=SyntheticArchive(), saturated=False,
+            missing_windows=False, order_status="filled")
+        self.assertEqual(coverage.status, "review_only")
+        review = inspect_stale_claim_offline(
+            claim=CLAIM, now_ms=1_000_000, ttl_ms=1000,
+            claimed_order_absent=False, claimed_flat_position=True)
+        self.assertEqual(review.status, "hold")
+        self.assertFalse(review.release_claim)
+        self.assertFalse(review.allow_new_entry)
+
 if __name__ == "__main__":
     unittest.main()
