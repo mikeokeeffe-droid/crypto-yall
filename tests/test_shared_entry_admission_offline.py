@@ -167,5 +167,48 @@ class SharedEntryAdmissionTests(unittest.TestCase):
                     self.assertIs(decision.accepted, False)
                     self.assertEqual(backend.calls, 0)
 
+    def test_three_bots_opposing_actions_one_shared_coin(self):
+        backend = FakeAtomicCoordinator()
+        gate = threading.Barrier(3)
+        outcomes = []
+        lock = threading.Lock()
+        scenarios = (
+            ("daily", "open_long"),
+            ("intraday", "open_short"),
+            ("aggressive", "pyramid_long"),
+        )
+
+        def worker(bot, action):
+            gate.wait()
+            decision = claim_shared_entry(
+                backend, bot=bot, coin="SOL", action=action,
+                request_id=str(uuid.uuid4()))
+            with lock:
+                outcomes.append((bot, decision))
+
+        threads = [threading.Thread(target=worker, args=item)
+                   for item in scenarios]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join(timeout=3)
+            self.assertFalse(thread.is_alive())
+        self.assertEqual(len(outcomes), 3)
+        self.assertEqual(sum(decision.accepted for _, decision in outcomes), 1)
+        self.assertEqual(len(backend.claims), 1)
+        self.assertEqual(set(backend.claims), {"SOL"})
+
+    def test_separate_coins_do_not_share_fake_reservation(self):
+        backend = FakeAtomicCoordinator()
+        outcomes = [
+            claim_shared_entry(
+                backend, bot=bot, coin=coin, action="open_long",
+                request_id=str(uuid.uuid4()))
+            for bot, coin in (
+                ("daily", "SOL"), ("intraday", "ETH"), ("aggressive", "BTC"))
+        ]
+        self.assertTrue(all(decision.accepted for decision in outcomes))
+        self.assertEqual(set(backend.claims), {"SOL", "ETH", "BTC"})
+
 if __name__ == "__main__":
     unittest.main()
