@@ -66,6 +66,8 @@ on:
       - 'tests/test_offline_independent_entry_reconciler.py'
       - 'tests/test_entry_reconciliation_review_offline.py'
       - 'tests/test_persisted_intent_reconciliation_offline.py'
+      - 'offline_three_bot_simulation.py'
+      - 'tests/test_offline_three_bot_simulation.py'
       - 'shared_entry_admission.py'
       - 'tests/test_shared_entry_admission_offline.py'
       - 'aggressive_executor.py'
@@ -91,6 +93,7 @@ jobs:
           python -m unittest discover -s tests -p 'test_original_order_boundaries_offline.py' -v
           python -m unittest discover -s tests -p 'test_position_increase_claim_invariant_offline.py' -v
           python -m unittest discover -s tests -p 'test_shared_entry_admission_offline.py' -v
+          python -m unittest discover -s tests -p 'test_offline_three_bot_simulation.py' -v
           python -m unittest discover -s tests -p 'test_entry_reconciliation_review_offline.py' -v
           python -m unittest discover -s tests -p 'test_persisted_intent_reconciliation_offline.py' -v
           python -m unittest discover -s tests -p 'test_offline_independent_entry_reconciler.py' -v
