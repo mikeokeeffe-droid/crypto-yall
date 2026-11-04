@@ -12,7 +12,7 @@ class CloseSdkDependencyTests(unittest.TestCase):
     def test_hyperliquid_sdk_version_is_pinned_for_close_review(self):
         lines = (ROOT / "requirements.txt").read_text(encoding="utf-8").splitlines()
         pins = [line.strip() for line in lines
-                if re.match(r"^hyperliquid-python-sdk(?:[=<>!~]|\\[)", line.strip())]
+                if line.strip().startswith("hyperliquid-python-sdk")]
         self.assertEqual(pins, ["hyperliquid-python-sdk==0.24.0"],
                          "SDK version changed; re-audit market_close reduce-only behavior")
 
