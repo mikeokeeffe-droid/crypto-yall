@@ -375,7 +375,7 @@
     }
   },
   "date_utc": "2026-11-04",
-  "generated_at": "2026-11-04T11:08:14.212378+00:00",
+  "generated_at": "2026-11-04T12:08:16.889664+00:00",
   "report_errors": [],
   "reporting_only": true,
   "schema_version": 2,
@@ -2795,12 +2795,12 @@
       },
       "intraday": {
         "all_time": {
-          "average_loss_pct": -2.3811,
+          "average_loss_pct": -2.364,
           "average_win_pct": 2.7351,
-          "closed_trades": 96,
-          "cumulative_gross_return_pct": -23.9365,
-          "losses": 56,
-          "win_rate_pct": 41.67,
+          "closed_trades": 97,
+          "cumulative_gross_return_pct": -25.3405,
+          "losses": 57,
+          "win_rate_pct": 41.24,
           "wins": 40
         },
         "closed_trades": [
@@ -3955,25 +3955,27 @@
             "gross_return_pct": -1.8495,
             "outcome": "loss",
             "ticker": "XRP-USD"
-          }
-        ],
-        "open_positions": {
-          "SOL": {
+          },
+          {
             "asset": "SOL",
             "blocked_live_reason": "mid-cap allow_short=False",
-            "current_price": 93.611,
             "entry_price": 92.305,
             "entry_time": "2026-11-04T04:00:00",
-            "ticker": "SOL-USD",
-            "unrealized_gross_return_pct": -1.4149
+            "exit_action": "cover_short",
+            "exit_price": 93.601,
+            "exit_time": "2026-11-04T11:00:00",
+            "gross_return_pct": -1.404,
+            "outcome": "loss",
+            "ticker": "SOL-USD"
           }
-        },
+        ],
+        "open_positions": {},
         "today": {
-          "average_loss_pct": -2.5325,
+          "average_loss_pct": -2.2504,
           "average_win_pct": null,
-          "closed_trades": 3,
-          "cumulative_gross_return_pct": -7.5975,
-          "losses": 3,
+          "closed_trades": 4,
+          "cumulative_gross_return_pct": -9.0015,
+          "losses": 4,
           "win_rate_pct": 0.0,
           "wins": 0
         }
@@ -4490,12 +4492,12 @@
         },
         "intraday": {
           "all_time": {
-            "average_loss_pct": -2.8331,
+            "average_loss_pct": -2.771,
             "average_win_pct": 3.4558,
-            "closed_trades": 25,
-            "cumulative_gross_return_pct": -51.9617,
-            "losses": 22,
-            "win_rate_pct": 12.0,
+            "closed_trades": 26,
+            "cumulative_gross_return_pct": -53.3657,
+            "losses": 23,
+            "win_rate_pct": 11.54,
             "wins": 3
           },
           "btc_confirmed_short_now": false,
@@ -4799,29 +4801,29 @@
               "gross_return_pct": -3.2387,
               "outcome": "loss",
               "ticker": "SUI20947-USD"
+            },
+            {
+              "asset": "SOL",
+              "entry_price": 92.305,
+              "entry_time": "2026-11-04T04:00:00",
+              "exit_action": "cover_short",
+              "exit_price": 93.601,
+              "exit_time": "2026-11-04T11:00:00",
+              "filter": "BTC+ETH confirmed short + mid-cap enter_short",
+              "gross_return_pct": -1.404,
+              "outcome": "loss",
+              "ticker": "SOL-USD"
             }
           ],
           "dual_short_confirmed_now": false,
           "eth_confirmed_short_now": false,
-          "open_positions": {
-            "SOL": {
-              "asset": "SOL",
-              "btc_confirmed_short": true,
-              "current_price": 93.611,
-              "entry_price": 92.305,
-              "entry_time": "2026-11-04T04:00:00",
-              "eth_confirmed_short": true,
-              "filter": "BTC+ETH confirmed short + mid-cap enter_short",
-              "ticker": "SOL-USD",
-              "unrealized_gross_return_pct": -1.4149
-            }
-          },
+          "open_positions": {},
           "today": {
-            "average_loss_pct": -3.2387,
+            "average_loss_pct": -2.3213,
             "average_win_pct": null,
-            "closed_trades": 1,
-            "cumulative_gross_return_pct": -3.2387,
-            "losses": 1,
+            "closed_trades": 2,
+            "cumulative_gross_return_pct": -4.6427,
+            "losses": 2,
             "win_rate_pct": 0.0,
             "wins": 0
           }
@@ -4832,6 +4834,6 @@
     "errors": [],
     "scope": "Shadow-only fresh short signals for SOL/AVAX/LINK/SUI/XRP/ONDO that live trading blocks because mid-cap allow_short=False.",
     "tracking_started_at": "2026-09-10T22:03:23.796957+00:00",
-    "updated_at": "2026-11-04T11:08:14.212378+00:00"
+    "updated_at": "2026-11-04T12:08:16.889664+00:00"
   }
 }
