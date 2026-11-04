@@ -21,9 +21,9 @@ def inspect_intent_bound_fill_offline(*, response, intent):
     coin, direction = intent["coin"], intent["direction"]
     if (type(oid) is not int or oid <= 0
             or type(size) is not str or not size or size.strip() != size
-            or type(coin) is not str or not coin.isascii()
+            or type(coin) is not str or not coin or not coin.isascii()
             or not coin.isalnum() or coin != coin.upper()
-            or direction not in ("long", "short")):
+            or type(direction) is not str or direction not in ("long", "short")):
         return hold("invalid pinned intent")
     try:
         quantity = Decimal(size)
