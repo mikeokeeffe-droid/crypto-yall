@@ -47,3 +47,34 @@ def review_protective_exit_offline(*, action, reduce_only, account_verified,
         "review_only",
         "synthetic close meets preliminary checks; live enforcement unverified",
     )
+
+
+def review_pinned_close_identity_offline(*, intended, observed):
+    """Check synthetic close identity against a pinned bot/account/coin/side.
+
+    An exact match is review-only: neither caller-provided record is
+    authenticated. Never grants permission to send an exchange order.
+    """
+    def hold(reason):
+        return ExitReview("hold", reason)
+    keys = {"bot", "account", "coin", "side"}
+    if type(intended) is not dict or type(observed) is not dict:
+        return hold("missing pinned close identity")
+    if set(intended) != keys or set(observed) != keys:
+        return hold("missing or extra close identity fields")
+    for key in keys:
+        a, b = intended[key], observed[key]
+        if type(a) is not str or type(b) is not str or not a or not b:
+            return hold("invalid close identity")
+        if a != b:
+            return hold("close identity mismatch")
+    if intended["bot"] not in ("daily", "intraday", "aggressive"):
+        return hold("unknown bot")
+    if intended["side"] not in ("long", "short"):
+        return hold("unknown position side")
+    if (not intended["coin"].isascii()
+            or not intended["coin"].isalnum()
+            or intended["coin"] != intended["coin"].upper()):
+        return hold("invalid coin")
+    return ExitReview("review_only",
+                      "synthetic identities match; ownership not authenticated")
