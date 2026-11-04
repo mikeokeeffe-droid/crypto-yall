@@ -210,5 +210,50 @@ class SharedEntryAdmissionTests(unittest.TestCase):
         self.assertTrue(all(decision.accepted for decision in outcomes))
         self.assertEqual(set(backend.claims), {"SOL", "ETH", "BTC"})
 
+    def test_lost_confirmation_keeps_other_bots_blocked(self):
+        class LostFirstConfirmation(FakeAtomicCoordinator):
+            def __init__(self):
+                super().__init__()
+                self.lost = False
+
+            def claim_intent(self, **kwargs):
+                reply = super().claim_intent(**kwargs)
+                if reply.get("status") == "claimed" and not self.lost:
+                    self.lost = True
+                    raise TimeoutError("claim committed but response lost")
+                return reply
+
+        backend = LostFirstConfirmation()
+        first = claim_shared_entry(
+            backend, bot="daily", coin="SOL", action="open_long",
+            request_id=str(uuid.uuid4()))
+        self.assertFalse(first.accepted)
+        self.assertEqual(first.reason, "coordinator_result_uncertain")
+        self.assertIn("SOL", backend.claims)
+
+        for bot, action in (
+            ("intraday", "open_short"),
+            ("aggressive", "pyramid_long"),
+        ):
+            with self.subTest(bot=bot):
+                later = claim_shared_entry(
+                    backend, bot=bot, coin="SOL", action=action,
+                    request_id=str(uuid.uuid4()))
+                self.assertFalse(later.accepted)
+        self.assertEqual(len(backend.claims), 1)
+
+    def test_failed_backend_never_falls_back_to_local_approval(self):
+        class Unavailable:
+            def claim_intent(self, **kwargs):
+                raise ConnectionError("shared coordinator unavailable")
+
+        for bot in ("daily", "intraday", "aggressive"):
+            with self.subTest(bot=bot):
+                decision = claim_shared_entry(
+                    Unavailable(), bot=bot, coin="BTC",
+                    action="open_long", request_id=str(uuid.uuid4()))
+                self.assertFalse(decision.accepted)
+                self.assertEqual(decision.fence_token, 0)
+
 if __name__ == "__main__":
     unittest.main()
