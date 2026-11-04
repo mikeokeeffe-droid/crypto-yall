@@ -390,5 +390,50 @@ class OriginalResponseParserCharacterizationTests(unittest.TestCase):
         self.assertEqual(result["fill_size"], -1.0)
         self.assertTrue(result["fill_price"] != result["fill_price"])
 
+class OriginalClaimReleaseRiskTests(unittest.TestCase):
+    """Flag unsafe assumptions in original source without changing executors."""
+
+    def test_all_three_originals_clear_pending_claim_after_filled_result(self):
+        # This is a documented gap, NOT a passing safety guarantee:
+        # _parse_response currently trusts malformed filled amounts.
+        # Releasing the claim on that result alone is insufficient proof.
+        for bot, path in EXECUTORS.items():
+            with self.subTest(bot=bot):
+                tree = ast.parse((ROOT / path).read_text(encoding="utf-8"))
+                main = next(n for n in tree.body if isinstance(n, ast.FunctionDef)
+                            and n.name == "main")
+                fill_branches = [
+                    n for n in ast.walk(main)
+                    if isinstance(n, ast.If)
+                    and isinstance(n.test, ast.Compare)
+                    and any(isinstance(v, ast.Constant) and v.value == "filled"
+                            for v in ast.walk(n.test))
+                ]
+                claim_pops = [
+                    n for branch in fill_branches for n in ast.walk(branch)
+                    if isinstance(n, ast.Call)
+                    and isinstance(n.func, ast.Attribute)
+                    and n.func.attr == "pop"
+                    and n.args and isinstance(n.args[0], ast.Name)
+                    and n.args[0].id == "coin"
+                ]
+                self.assertTrue(claim_pops,
+                    f"{bot}: inspect filled-result ownership and pending-claim release")
+
+    def test_malformed_filled_receipt_cannot_count_as_verified_ownership(self):
+        # Original parser calls this filled; the offline ownership gate must
+        # remain blocked regardless of that legacy status.
+        parser = isolated_function("hyperliquid_executor.py", "_parse_response")
+        raw = {"status": "ok", "response": {"data": {"statuses": [
+            {"filled": {"oid": 42, "totalSz": "-1", "avgPx": "NaN"}}]}}}
+        parsed = parser({"hl_coin": "SOL", "action": "open_long"},
+                        raw, None, "SOL")
+        self.assertEqual(parsed["status"], "filled")
+        from offline_hyperliquid_intent_bound_fill import inspect_intent_bound_fill_offline
+        strict = inspect_intent_bound_fill_offline(
+            response=raw, intent={"oid": 42, "requested_size": "2",
+                                  "coin": "SOL", "direction": "long"})
+        self.assertEqual(strict.status, "hold")
+
 if __name__ == "__main__":
     unittest.main()
