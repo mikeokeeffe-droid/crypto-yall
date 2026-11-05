@@ -9,6 +9,7 @@ on:
       - 'tests/test_reconciliation_permission_boundary_ci.py'
       - 'tests/test_stale_handoff_cas_ci.py'
       - 'db/restricted_entry_logins_ci_only.sql'
+      - 'db/restricted_entry_proof_ci_only.sql'
       - 'tests/test_readonly_reconciler_login_ci.py'
       - 'restricted_shared_entry_postgres_ci.py'
       - '.github/workflows/test-shared-entry-postgres-isolated.yml'
@@ -56,6 +57,8 @@ jobs:
         run: psql -v ON_ERROR_STOP=1 -f db/entry_reservations_staging.sql
       - name: Create disposable restricted bot identities
         run: psql -v ON_ERROR_STOP=1 -f db/restricted_entry_logins_ci_only.sql
+      - name: Apply isolated bot-scoped claim proof restrictions
+        run: psql -v ON_ERROR_STOP=1 -f db/restricted_entry_proof_ci_only.sql
       - name: Test real concurrent claims and fresh-process restart
         run: |
           python -m unittest discover -s tests -p 'test_shared_entry_postgres_isolated.py' -v
