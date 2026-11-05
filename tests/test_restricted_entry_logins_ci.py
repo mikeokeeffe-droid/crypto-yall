@@ -77,6 +77,40 @@ class DedicatedLoginAdmissionTests(unittest.TestCase):
                     "'public.resolve_bot_entry_intent(text,text,uuid)','EXECUTE')"
                     ).fetchone()[0])
 
+    def test_claim_proof_is_readable_only_by_the_owning_login(self):
+        owner = claim_shared_entry(
+            self.coordinator("daily"), bot="daily", coin="SOL",
+            action="open_long", request_id=str(uuid.uuid4())
+        )
+        self.assertTrue(owner.accepted, owner.reason)
+        token = uuid.UUID(owner.intent_id)
+        with self.factory("daily")() as db:
+            own = db.execute(
+                "select bot,coin,token,status,fence_token "
+                "from public.read_bot_entry_claim_proof(%s,%s,%s)",
+                ("SOL", "daily", token),
+            ).fetchone()
+            self.assertEqual(own, ("daily", "SOL", token, "pending", owner.fence_token))
+            self.assertFalse(db.execute(
+                "select has_table_privilege(current_user,"
+                "'public.bot_entry_intents','SELECT')"
+            ).fetchone()[0])
+        with self.factory("intraday")() as db:
+            self.assertFalse(db.execute(
+                "select has_table_privilege(current_user,"
+                "'public.bot_entry_intents','SELECT')"
+            ).fetchone()[0])
+            with self.assertRaises(psycopg.errors.InsufficientPrivilege):
+                db.execute(
+                    "select * from public.read_bot_entry_claim_proof(%s,%s,%s)",
+                    ("SOL", "daily", token),
+                )
+        with self.factory("daily")() as db:
+            with self.assertRaises(psycopg.errors.InsufficientPrivilege):
+                db.execute(
+                    "select * from public.bot_entry_intents where coin='SOL'"
+                )
+
     def test_timeout_fails_closed(self):
         class Unavailable:
             def claim_intent(self, **kwargs):
