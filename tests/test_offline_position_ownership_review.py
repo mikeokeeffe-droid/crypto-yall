@@ -51,6 +51,30 @@ class OwnershipReviewTests(unittest.TestCase):
             self.assertEqual(review_offline_ownership(
                 replace(BASE,requested_close_size=value)).state,"hold")
 
+    def test_partial_fill_allows_only_review_within_remaining_exposure(self):
+        partial=replace(BASE,attributable_remaining="0.4",
+                        current_position_size="0.4",requested_close_size="0.25")
+        result=review_offline_ownership(partial)
+        self.assertEqual(result.state,"review")
+        self.assertFalse(result.submit_authorized)
+        self.assertEqual(review_offline_ownership(replace(
+            partial,requested_close_size="0.5")).state,"hold")
+
+    def test_position_reduction_below_requested_close_holds(self):
+        reduced=replace(BASE,attributable_remaining="1.0",
+                        current_position_size="0.3",requested_close_size="0.5")
+        self.assertEqual(review_offline_ownership(reduced).state,"hold")
+
+    def test_external_position_change_invalidates_ownership_review(self):
+        for changes in (
+            {"other_bot_activity":True,"current_position_size":"2.5"},
+            {"unknown_or_manual_fills":True,"current_position_size":"0.7"},
+            {"side_matches":False,"current_position_size":"1.0"},
+        ):
+            result=review_offline_ownership(replace(BASE,**changes))
+            self.assertEqual(result.state,"hold")
+            self.assertFalse(result.submit_authorized)
+
     def test_no_live_submission_authority_even_for_valid_evidence(self):
         self.assertFalse(review_offline_ownership(BASE).submit_authorized)
 
