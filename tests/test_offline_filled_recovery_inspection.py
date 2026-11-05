@@ -180,6 +180,39 @@ class FilledRecoveryInspectionTests(unittest.TestCase):
         self.reader = Changing(self.reader.intent, self.reader.baseline)
         self.assertEqual(self.review().status, "hold")
 
+    def test_fence_reassignment_between_restart_reads_blocks_handoff(self):
+        # The same bot/coin/order must not adopt an old claim if its
+        # database generation changes while exchange evidence is read.
+        class Reassigned(RecordedIntentReader):
+            def read_intent(self, **kwargs):
+                value = super().read_intent(**kwargs)
+                if self.intent_reads == 2:
+                    value["fence_token"] = 43
+                return value
+        self.reader = Reassigned(self.reader.intent, self.reader.baseline)
+        self.assertEqual(self.review().status, "hold")
+        self.assertEqual(self.reader.intent_reads, 2)
+
+    def test_claim_replaced_between_restart_reads_blocks_handoff(self):
+        class Replaced(RecordedIntentReader):
+            def read_intent(self, **kwargs):
+                value = super().read_intent(**kwargs)
+                if self.intent_reads == 2:
+                    value["token"] = "claim-replaced"
+                return value
+        self.reader = Replaced(self.reader.intent, self.reader.baseline)
+        self.assertEqual(self.review().status, "hold")
+
+    def test_baseline_fence_changed_between_restart_reads_blocks_handoff(self):
+        class ChangedBaseline(RecordedIntentReader):
+            def read_pre_submit_capture(self, **kwargs):
+                value = super().read_pre_submit_capture(**kwargs)
+                if self.baseline_reads == 2:
+                    value["fence_token"] = 43
+                return value
+        self.reader = ChangedBaseline(self.reader.intent, self.reader.baseline)
+        self.assertEqual(self.review().status, "hold")
+
     def test_re_read_pre_submit_capture_changed_blocks(self):
         class Changing(RecordedIntentReader):
             def read_pre_submit_capture(self, **kwargs):
