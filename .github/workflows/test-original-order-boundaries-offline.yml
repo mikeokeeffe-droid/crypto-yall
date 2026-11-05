@@ -18,6 +18,8 @@ on:
       - 'offline_account_scope_review.py'
       - 'offline_hyperliquid_cloid_order_review.py'
       - 'offline_dispatch_lifecycle_review.py'
+      - 'offline_bot_identity_fixture.py'
+      - 'tests/test_offline_bot_identity_fixture.py'
       - 'offline_shared_sender_prototype.py'
       - 'offline_sender_restart_journal.py'
       - 'offline_journaled_fake_dispatch.py'
@@ -125,6 +127,7 @@ jobs:
           python -m unittest discover -s tests -p 'test_offline_account_scope_review.py' -v
           python -m unittest discover -s tests -p 'test_offline_hyperliquid_cloid_order_review.py' -v
           python -m unittest discover -s tests -p 'test_offline_dispatch_lifecycle_review.py' -v
+          python -m unittest discover -s tests -p 'test_offline_bot_identity_fixture.py' -v
           python -m unittest discover -s tests -p 'test_offline_shared_sender_prototype.py' -v
           python -m unittest discover -s tests -p 'test_offline_sender_restart_journal.py' -v
           python -m unittest discover -s tests -p 'test_offline_journaled_fake_dispatch.py' -v
