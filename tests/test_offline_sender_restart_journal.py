@@ -106,6 +106,24 @@ class RestartJournalTests(unittest.TestCase):
                          ("daily",token,cloid,fence,"reserved"))
         self.assertIsNone(restarted.reserve(bot="intraday",**SCOPE))
 
+    def test_daily_cannot_take_intraday_reserved_claim_after_restart(self):
+        journal=OfflineRestartJournal(self.path,create=True)
+        token,cloid,fence=journal.reserve(bot="intraday",**SCOPE)
+        restarted=OfflineRestartJournal(self.path)
+        self.assertIsNone(restarted.reserve(bot="daily",**SCOPE))
+        self.assertEqual(restarted.inspect(**SCOPE),
+                         ("intraday",token,cloid,fence,"reserved"))
+
+    def test_aggressive_cannot_take_daily_unknown_dispatch_after_restart(self):
+        journal=OfflineRestartJournal(self.path,create=True)
+        token,cloid,fence=journal.reserve(bot="daily",**SCOPE)
+        self.assertTrue(journal.mark_dispatch_unknown(
+            token=token,fence=fence,**SCOPE))
+        restarted=OfflineRestartJournal(self.path)
+        self.assertIsNone(restarted.reserve(bot="aggressive",**SCOPE))
+        self.assertEqual(restarted.inspect(**SCOPE),
+                         ("daily",token,cloid,fence,"dispatch_unknown"))
+
     def test_no_exchange_sender_methods(self):
         import offline_sender_restart_journal as module
         self.assertFalse(hasattr(module,"market_open"))
