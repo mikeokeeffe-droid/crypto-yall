@@ -47,6 +47,28 @@ class ProtectedJournalFixtureTests(unittest.TestCase):
             "daily-principal","daily",environment="testnet").state,"hold")
         self.assertIsNone(self.journal.inspect(**SCOPE))
 
+    def test_unknown_identity_cannot_reserve(self):
+        self.assertEqual(self.request("unknown","daily").state,"hold")
+        self.assertIsNone(self.journal.inspect(**SCOPE))
+
+    def test_missing_identity_cannot_reserve(self):
+        self.assertEqual(self.request(None,"daily").state,"hold")
+        self.assertIsNone(self.journal.inspect(**SCOPE))
+
+    def test_deleted_journal_holds_without_recreating_database(self):
+        os.unlink(self.journal.path)
+        result=self.request("daily-principal","daily")
+        self.assertEqual(result.state,"hold")
+        self.assertFalse(result.submit_authorized)
+        self.assertFalse(os.path.exists(self.journal.path))
+
+    def test_corrupted_journal_holds_without_claim(self):
+        with open(self.journal.path,"wb") as handle:
+            handle.write(b"corrupt offline fixture")
+        result=self.request("daily-principal","daily")
+        self.assertEqual(result.state,"hold")
+        self.assertFalse(result.submit_authorized)
+
     def test_close_and_dispatch_are_always_held(self):
         self.assertEqual(self.fixture.request_close(
             principal="daily-principal",coin="SOL").state,"hold")
