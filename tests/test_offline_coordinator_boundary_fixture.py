@@ -141,6 +141,32 @@ class CoordinatorBoundaryFixtureTests(unittest.TestCase):
         self.assertFalse(result.submit_authorized)
         self.assertEqual(reopened.inspect(**SCOPE),before)
 
+    def test_claim_identifiers_cannot_authorize_dispatch_or_close(self):
+        self.assertEqual(self.daily.request_entry(self.intent).state,"reserved")
+        bot,token,cloid,fence,state=self.journal.inspect(**SCOPE)
+        for client in (self.daily,self.intraday):
+            self.assertEqual(client.request_dispatch(
+                token=token,cloid=cloid,fence=fence,**SCOPE).state,"hold")
+            self.assertEqual(client.request_close(
+                token=token,cloid=cloid,fence=fence,**SCOPE).state,"hold")
+        self.assertEqual(self.journal.inspect(**SCOPE)[-1],"reserved")
+
+    def test_claim_identifier_replay_across_account_and_environment_holds(self):
+        self.assertEqual(self.daily.request_entry(self.intent).state,"reserved")
+        before=self.journal.inspect(**SCOPE)
+        _,token,cloid,fence,_=before
+        for scope in (
+            dict(SCOPE,account="0x"+"2"*40),
+            dict(SCOPE,environment="testnet"),
+        ):
+            for operation in ("request_dispatch","request_close","mark_dispatch_unknown"):
+                result=self.server.handle(
+                    principal="daily-principal",operation=operation,
+                    intent={"token":token,"cloid":cloid,"fence":fence,**scope})
+                self.assertEqual(result.state,"hold")
+                self.assertFalse(result.submit_authorized)
+        self.assertEqual(self.journal.inspect(**SCOPE),before)
+
     def test_unknown_operation_and_malformed_request_hold(self):
         self.assertEqual(self.server.handle(
             principal="daily-principal",operation="raw_sql",intent=self.intent).state,"hold")
