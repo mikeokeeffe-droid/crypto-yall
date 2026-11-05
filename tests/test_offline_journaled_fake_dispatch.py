@@ -141,6 +141,31 @@ class JournaledFakeDispatchTests(unittest.TestCase):
         self.assertEqual(OfflineRestartJournal(self.path).inspect(**SCOPE)[4],
                          "dispatch_unknown")
 
+    def test_journal_removed_before_inspection_blocks_fake_dispatch(self):
+        os.unlink(self.path)
+        fake=FakeExchange()
+        self.assertEqual(self.attempt(fake).state,"hold")
+        self.assertEqual(fake.attempts,[])
+        self.assertFalse(os.path.exists(self.path))
+
+    def test_journal_unavailable_during_marker_commit_blocks_fake_dispatch(self):
+        fake=FakeExchange()
+        original=self.journal.mark_dispatch_unknown
+        def unavailable(**kwargs):
+            raise OSError("synthetic storage unavailable before commit")
+        self.journal.mark_dispatch_unknown=unavailable
+        self.assertEqual(self.attempt(fake).state,"hold")
+        self.assertEqual(fake.attempts,[])
+        self.journal.mark_dispatch_unknown=original
+        self.assertEqual(self.journal.inspect(**SCOPE)[4],"reserved")
+
+    def test_corrupt_journal_during_inspection_blocks_fake_dispatch(self):
+        fake=FakeExchange()
+        with open(self.path,"wb") as file:
+            file.write(b"invalid sqlite bytes")
+        self.assertEqual(self.attempt(fake).state,"hold")
+        self.assertEqual(fake.attempts,[])
+
     def test_stale_fence_and_wrong_scope_do_not_dispatch(self):
         fake=FakeExchange()
         self.assertEqual(self.attempt(fake,fence=self.fence+1).state,"hold")
