@@ -56,8 +56,8 @@ class RestrictedPostgresEntryCoordinator:
                     # Roll back reservation too: never leave a half-claim.
                     raise RuntimeError("reservation succeeded without durable intent")
                 proof = conn.execute(
-                    "select bot,coin,token,status,fence_token from public.bot_entry_intents "
-                    "where coin=%s and bot=%s and token=%s",
+                    "select bot,coin,token,status,fence_token "
+                    "from public.read_bot_entry_claim_proof(%s,%s,%s)",
                     (coin, bot, token)).fetchone()
                 if not proof or proof[:4] != (bot, coin, token, "pending"):
                     raise RuntimeError("durable intent evidence mismatch")
