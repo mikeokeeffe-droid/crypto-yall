@@ -36,7 +36,12 @@ def review_close_quantity_offline(*, bot, account, coin, side, close_size,
         return hold("invalid or oversized close")
     if provenance_verified is not True:
         return hold("independent fill provenance unverified")
-    # Opposite-side fills can net a shared account position. Without an\n    # independently reconciled per-order ledger, never attribute such flows.\n    if any(type(f) is dict and f.get("side") != side for f in fills):\n        return hold("opposite-direction fill may net shared position")\n    seen = set()\n    owned = Decimal(0)
+    # Opposite-side fills can net a shared account position. Without an
+    # independently reconciled per-order ledger, never attribute such flows.
+    if any(type(f) is dict and f.get("side") != side for f in fills):
+        return hold("opposite-direction fill may net shared position")
+    seen = set()
+    owned = Decimal(0)
     for fill in fills:
         if type(fill) is not dict or set(fill) != {"id", "bot", "account", "coin", "side", "kind", "size"}:
             return hold("incomplete or unexpected fill record")
@@ -53,5 +58,8 @@ def review_close_quantity_offline(*, bot, account, coin, side, close_size,
             owned += qty if fill["kind"] == "entry" else -qty
             if owned < 0:
                 return hold("close exceeds prior attributed entries")
-    if owned > exchange:\n        return hold("attributed quantity exceeds shared exchange position")\n    if close > owned:\n        return hold("close exceeds bot-attributed remaining quantity")
+    if owned > exchange:
+        return hold("attributed quantity exceeds shared exchange position")
+    if close > owned:
+        return hold("close exceeds bot-attributed remaining quantity")
     return QuantityReview("review_only", "synthetic attribution fits; independent reconciliation and live enforcement absent")
