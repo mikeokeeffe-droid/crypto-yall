@@ -75,6 +75,30 @@ class OwnershipReviewTests(unittest.TestCase):
             self.assertEqual(result.state,"hold")
             self.assertFalse(result.submit_authorized)
 
+    def test_cancelled_unfilled_order_has_no_attributable_exposure(self):
+        cancelled=replace(BASE,attributable_remaining="0",
+                          current_position_size="0",requested_close_size="1")
+        result=review_offline_ownership(cancelled)
+        self.assertEqual(result.state,"hold")
+        self.assertFalse(result.submit_authorized)
+
+    def test_reversed_position_holds_even_if_quantity_matches(self):
+        reversed_position=replace(BASE,side_matches=False,
+                                  attributable_remaining="1",
+                                  current_position_size="1",
+                                  requested_close_size="1")
+        result=review_offline_ownership(reversed_position)
+        self.assertEqual(result.state,"hold")
+        self.assertFalse(result.submit_authorized)
+
+    def test_fully_closed_position_cannot_be_closed_again(self):
+        fully_closed=replace(BASE,attributable_remaining="0",
+                             current_position_size="0",
+                             requested_close_size="0.1")
+        result=review_offline_ownership(fully_closed)
+        self.assertEqual(result.state,"hold")
+        self.assertFalse(result.submit_authorized)
+
     def test_no_live_submission_authority_even_for_valid_evidence(self):
         self.assertFalse(review_offline_ownership(BASE).submit_authorized)
 
