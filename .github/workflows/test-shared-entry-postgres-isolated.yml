@@ -11,6 +11,8 @@ on:
       - 'db/restricted_entry_logins_ci_only.sql'
       - 'db/restricted_entry_proof_ci_only.sql'
       - 'db/account_scoped_claims_ci_only.sql'
+      - 'db/pre_submit_intent_ci_only.sql'
+      - 'tests/test_pre_submit_intent_postgres_ci.py'
       - 'tests/test_account_scoped_claims_postgres_ci.py'
       - 'tests/test_readonly_reconciler_login_ci.py'
       - 'restricted_shared_entry_postgres_ci.py'
@@ -63,11 +65,14 @@ jobs:
         run: psql -v ON_ERROR_STOP=1 -f db/restricted_entry_proof_ci_only.sql
       - name: Create isolated account-scoped claim model
         run: psql -v ON_ERROR_STOP=1 -f db/account_scoped_claims_ci_only.sql
+      - name: Create disposable atomic pre-submit intent model
+        run: psql -v ON_ERROR_STOP=1 -f db/pre_submit_intent_ci_only.sql
       - name: Test real concurrent claims and fresh-process restart
         run: |
           python -m unittest discover -s tests -p 'test_shared_entry_postgres_isolated.py' -v
           python -m unittest discover -s tests -p 'test_restricted_entry_logins_ci.py' -v
           python -m unittest discover -s tests -p 'test_account_scoped_claims_postgres_ci.py' -v
+          python -m unittest discover -s tests -p 'test_pre_submit_intent_postgres_ci.py' -v
           python -m unittest discover -s tests -p 'test_uncertain_order_lifecycle_ci.py' -v
           python -m unittest discover -s tests -p 'test_reconciliation_permission_boundary_ci.py' -v
           python -m unittest discover -s tests -p 'test_stale_handoff_cas_ci.py' -v
