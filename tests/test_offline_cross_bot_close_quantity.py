@@ -59,5 +59,11 @@ class CloseQuantityTests(unittest.TestCase):
             "hold",
         )
 
+    def test_claimed_provenance_still_never_authorizes_submit(self):
+        # A caller-supplied True cannot authenticate a Hyperliquid receipt.
+        result = self.review([fill("a", "daily", "1")], provenance_verified=True)
+        self.assertEqual(result.status, "review_only")
+        self.assertFalse(result.submit_authorized)
+
 if __name__ == "__main__":
     unittest.main()
