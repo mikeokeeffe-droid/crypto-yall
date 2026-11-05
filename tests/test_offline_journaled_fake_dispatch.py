@@ -241,6 +241,32 @@ class JournaledFakeDispatchTests(unittest.TestCase):
         self.assertEqual(fake.attempts,[])
         self.assertEqual(restarted.inspect(**SCOPE)[4],"reserved")
 
+    def test_restart_rejects_claim_replayed_across_accounts(self):
+        fake=FakeExchange()
+        restarted=OfflineRestartJournal(self.path)
+        other_account=dict(SCOPE,account="0x"+"2"*40)
+        result=simulate_journaled_once(
+            journal=restarted,fake=fake,token=self.token,
+            fence=self.fence,**other_account)
+        self.assertEqual(result.state,"hold")
+        self.assertFalse(result.submit_authorized)
+        self.assertEqual(fake.attempts,[])
+        self.assertIsNone(restarted.inspect(**other_account))
+        self.assertEqual(restarted.inspect(**SCOPE)[4],"reserved")
+
+    def test_restart_rejects_claim_replayed_across_environments(self):
+        fake=FakeExchange()
+        restarted=OfflineRestartJournal(self.path)
+        other_environment=dict(SCOPE,environment="testnet")
+        result=simulate_journaled_once(
+            journal=restarted,fake=fake,token=self.token,
+            fence=self.fence,**other_environment)
+        self.assertEqual(result.state,"hold")
+        self.assertFalse(result.submit_authorized)
+        self.assertEqual(fake.attempts,[])
+        self.assertIsNone(restarted.inspect(**other_environment))
+        self.assertEqual(restarted.inspect(**SCOPE)[4],"reserved")
+
     def test_stale_fence_and_wrong_scope_do_not_dispatch(self):
         fake=FakeExchange()
         self.assertEqual(self.attempt(fake,fence=self.fence+1).state,"hold")
