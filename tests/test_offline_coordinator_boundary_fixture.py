@@ -1,6 +1,7 @@
 """Offline coordinator client/server boundary tests."""
 import os
 import tempfile
+from concurrent.futures import ThreadPoolExecutor
 import unittest
 from offline_bot_identity_fixture import OfflineIdentityVerifier, VerifiedFixtureIdentity
 from offline_sender_restart_journal import OfflineRestartJournal
@@ -101,6 +102,19 @@ class CoordinatorBoundaryFixtureTests(unittest.TestCase):
         result=self.daily.request_entry(self.intent)
         self.assertEqual(result.state,"hold")
         self.assertFalse(result.submit_authorized)
+
+    def test_simultaneous_bots_only_one_can_reserve_same_scope(self):
+        daily_intent=self.intent
+        intraday_intent=OfflineEntryIntent(requested_bot="intraday",**SCOPE)
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            a=pool.submit(self.daily.request_entry,daily_intent)
+            b=pool.submit(self.intraday.request_entry,intraday_intent)
+            results=[a.result(),b.result()]
+        self.assertEqual(sorted(result.state for result in results),
+                         ["hold","reserved"])
+        self.assertTrue(all(not result.submit_authorized for result in results))
+        row=self.journal.inspect(**SCOPE)
+        self.assertIn(row[0],("daily","intraday"))
 
     def test_unknown_operation_and_malformed_request_hold(self):
         self.assertEqual(self.server.handle(
