@@ -71,6 +71,37 @@ class CoordinatorBoundaryFixtureTests(unittest.TestCase):
         self.assertFalse(result.submit_authorized)
         self.assertIsNone(self.journal.inspect(**SCOPE))
 
+    def test_restart_preserves_claim_and_blocks_competing_bot(self):
+        self.assertEqual(self.daily.request_entry(self.intent).state,"reserved")
+        reopened=OfflineRestartJournal(self.journal.path)
+        protected=OfflineProtectedJournalFixture(
+            verifier=OfflineIdentityVerifier({
+                "daily-principal":VerifiedFixtureIdentity("daily","mainnet",ACCOUNT),
+                "intraday-principal":VerifiedFixtureIdentity("intraday","mainnet",ACCOUNT),
+            }),journal=reopened)
+        restarted=OfflineCoordinatorServerFixture(protected)
+        competing=OfflineCoordinatorClientFixture(
+            send=restarted.handle,principal="intraday-principal")
+        other=OfflineEntryIntent(requested_bot="intraday",**SCOPE)
+        result=competing.request_entry(other)
+        self.assertEqual(result.state,"hold")
+        self.assertFalse(result.submit_authorized)
+        self.assertEqual(reopened.inspect(**SCOPE)[0],"daily")
+
+    def test_deleted_journal_fails_closed_through_coordinator(self):
+        os.unlink(self.journal.path)
+        result=self.daily.request_entry(self.intent)
+        self.assertEqual(result.state,"hold")
+        self.assertFalse(result.submit_authorized)
+        self.assertFalse(os.path.exists(self.journal.path))
+
+    def test_corrupt_journal_fails_closed_through_coordinator(self):
+        with open(self.journal.path,"wb") as handle:
+            handle.write(b"invalid offline coordinator journal")
+        result=self.daily.request_entry(self.intent)
+        self.assertEqual(result.state,"hold")
+        self.assertFalse(result.submit_authorized)
+
     def test_unknown_operation_and_malformed_request_hold(self):
         self.assertEqual(self.server.handle(
             principal="daily-principal",operation="raw_sql",intent=self.intent).state,"hold")
