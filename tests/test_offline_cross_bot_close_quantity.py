@@ -41,5 +41,23 @@ class CloseQuantityTests(unittest.TestCase):
             with self.subTest(size=size):
                 self.assertEqual(self.review(f, close_size=size).status, "hold")
 
+    def test_opposite_direction_netting_holds(self):
+        opposite = dict(fill("b", "intraday", "1"), side="short")
+        self.assertEqual(
+            self.review([fill("a", "daily", "2"), opposite]).status, "hold"
+        )
+
+    def test_attributed_size_exceeding_exchange_holds(self):
+        self.assertEqual(
+            self.review([fill("a", "daily", "3")], exchange_size="2").status,
+            "hold",
+        )
+
+    def test_partial_fill_without_complete_evidence_holds(self):
+        self.assertEqual(
+            self.review([fill("a", "daily", "0.4")], close_size="1").status,
+            "hold",
+        )
+
 if __name__ == "__main__":
     unittest.main()
