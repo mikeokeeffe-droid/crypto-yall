@@ -31,7 +31,8 @@ class ScopedEntryAdmissionTests(unittest.TestCase):
 
     def setUp(self):
         with self.admin() as db:
-            db.execute("truncate public.ci_scoped_entry_claims")
+            db.execute("truncate public.ci_scoped_entry_intents, "
+                       "public.ci_scoped_entry_claims")
 
     def claim(self, bot, *, environment="mainnet", account=ADDRESS_A,
               dex="", coin="SOL", token=None):
