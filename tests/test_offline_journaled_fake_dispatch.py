@@ -197,6 +197,28 @@ class JournaledFakeDispatchTests(unittest.TestCase):
             OfflineRestartJournal(self.path)
         self.assertFalse(os.path.exists(self.path))
 
+    def test_rolled_back_marker_never_calls_fake_and_keeps_claim(self):
+        fake=FakeExchange()
+        original=self.journal.mark_dispatch_unknown
+        def rollback_before_commit(**kwargs):
+            with self.journal._connect() as db:
+                db.execute("BEGIN IMMEDIATE")
+                db.execute(
+                    "UPDATE claims SET state='dispatch_unknown' WHERE token=?",
+                    (kwargs["token"],),
+                )
+                db.rollback()
+            return False
+        self.journal.mark_dispatch_unknown=rollback_before_commit
+        self.assertEqual(self.attempt(fake).state,"hold")
+        self.assertEqual(fake.attempts,[])
+        self.journal.mark_dispatch_unknown=original
+        restarted=OfflineRestartJournal(self.path)
+        self.assertEqual(restarted.inspect(**SCOPE)[4],"reserved")
+        self.assertIsNone(restarted.reserve(bot="intraday",**SCOPE))
+        self.assertIsNone(restarted.reserve(bot="aggressive",**SCOPE))
+        # A reserved claim is unresolved, not permission to reassign it.
+
     def test_stale_fence_and_wrong_scope_do_not_dispatch(self):
         fake=FakeExchange()
         self.assertEqual(self.attempt(fake,fence=self.fence+1).state,"hold")
