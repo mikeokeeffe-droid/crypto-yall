@@ -235,6 +235,41 @@ class CoordinatorBoundaryFixtureTests(unittest.TestCase):
             self.assertFalse(result.submit_authorized)
             self.assertEqual(self.journal.inspect(**SCOPE),before)
 
+    def test_other_bot_matching_coin_side_cannot_authorize_close(self):
+        self.assertEqual(self.daily.request_entry(self.intent).state,"reserved")
+        before=self.journal.inspect(**SCOPE)
+        for client in (self.daily,self.intraday):
+            result=client.request_close(
+                owner_bot="daily",requesting_bot="intraday",
+                coin="SOL",side="long",position_side="long",
+                account=ACCOUNT,environment="mainnet",
+                token=before[1],cloid=before[2],fence=before[3])
+            self.assertEqual(result.state,"hold")
+            self.assertFalse(result.submit_authorized)
+        self.assertEqual(self.journal.inspect(**SCOPE),before)
+
+    def test_unknown_or_manual_position_never_authorizes_close(self):
+        self.assertEqual(self.daily.request_entry(self.intent).state,"reserved")
+        before=self.journal.inspect(**SCOPE)
+        for origin in ("manual","unknown",None):
+            result=self.daily.request_close(
+                coin="SOL",side="long",position_origin=origin,
+                position_size="1.0",requested_close_size="1.0")
+            self.assertEqual(result.state,"hold")
+            self.assertFalse(result.submit_authorized)
+        self.assertEqual(self.journal.inspect(**SCOPE),before)
+
+    def test_mismatched_side_or_size_never_authorizes_close(self):
+        self.assertEqual(self.daily.request_entry(self.intent).state,"reserved")
+        before=self.journal.inspect(**SCOPE)
+        for side,size in (("short","1.0"),("long","2.0"),("long",None)):
+            result=self.daily.request_close(
+                coin="SOL",side=side,position_side="long",
+                position_size="1.0",requested_close_size=size)
+            self.assertEqual(result.state,"hold")
+            self.assertFalse(result.submit_authorized)
+        self.assertEqual(self.journal.inspect(**SCOPE),before)
+
     def test_unknown_operation_and_malformed_request_hold(self):
         self.assertEqual(self.server.handle(
             principal="daily-principal",operation="raw_sql",intent=self.intent).state,"hold")
