@@ -40,7 +40,10 @@ class OfflineRestartJournal:
                 raise sqlite3.DatabaseError("incomplete journal schema; fail closed")
 
     def _connect(self):
-        db = sqlite3.connect(self.path, timeout=5, isolation_level=None)
+        # mode=rw refuses a deleted journal rather than creating a new one.
+        from pathlib import Path
+        uri = Path(self.path).resolve().as_uri() + "?mode=rw"
+        db = sqlite3.connect(uri, uri=True, timeout=5, isolation_level=None)
         db.execute("PRAGMA busy_timeout=5000")
         return db
 
