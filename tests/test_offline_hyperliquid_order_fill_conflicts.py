@@ -44,6 +44,35 @@ class ConflictTests(unittest.TestCase):
         self.assertEqual(inspect(end_ms=199).status, "hold")
         self.assertEqual(inspect(oid=999).status, "hold")
 
+    def test_competing_same_coin_fill_holds_even_when_owned_order_is_complete(self):
+        order = WireReview("parsed_untrusted", "fake", ((123, "filled", 100, 200),))
+        own_fills = (
+            ("SOL", 123, 1, 150, "B", "Open Long", "1"),
+            ("SOL", 123, 2, 151, "B", "Open Long", "1"),
+        )
+        for other in (
+            ("SOL", 456, 3, 152, "B", "Open Long", "1"),
+            ("SOL", 456, 3, 152, "A", "Close Long", "1"),
+        ):
+            with self.subTest(other=other):
+                fills = WireReview("parsed_untrusted", "fake", own_fills + (other,))
+                self.assertEqual(
+                    inspect(order_review=order, fills_review=fills).status,
+                    "hold",
+                )
+
+    def test_unrelated_coin_fill_does_not_imply_same_coin_conflict(self):
+        order = WireReview("parsed_untrusted", "fake", ((123, "filled", 100, 200),))
+        fills = WireReview("parsed_untrusted", "fake", (
+            ("SOL", 123, 1, 150, "B", "Open Long", "1"),
+            ("SOL", 123, 2, 151, "B", "Open Long", "1"),
+            ("BTC", 456, 3, 152, "B", "Open Long", "1"),
+        ))
+        self.assertEqual(
+            inspect(order_review=order, fills_review=fills).status,
+            "review_only",
+        )
+
     def test_duplicate_trade_ids_hold(self):
         fills = WireReview("parsed_untrusted", "fake", (
             ("SOL", 123, 1, 150, "B", "Open Long", "1"),
