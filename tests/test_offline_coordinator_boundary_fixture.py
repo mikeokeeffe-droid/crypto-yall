@@ -167,6 +167,43 @@ class CoordinatorBoundaryFixtureTests(unittest.TestCase):
                 self.assertFalse(result.submit_authorized)
         self.assertEqual(self.journal.inspect(**SCOPE),before)
 
+    def test_ambiguous_dispatch_marker_blocks_retry_and_competing_bot(self):
+        self.assertEqual(self.daily.request_entry(self.intent).state,"reserved")
+        bot,token,cloid,fence,state=self.journal.inspect(**SCOPE)
+        # Simulate the coordinator's internal pre-dispatch durable marker;
+        # client requests never receive this capability.
+        self.assertTrue(self.journal.mark_dispatch_unknown(
+            token=token,fence=fence,**SCOPE))
+        before=self.journal.inspect(**SCOPE)
+        self.assertEqual(before[-1],"dispatch_unknown")
+        daily_retry=self.daily.request_entry(self.intent)
+        intraday_retry=self.intraday.request_entry(
+            OfflineEntryIntent(requested_bot="intraday",**SCOPE))
+        self.assertEqual(daily_retry.state,"hold")
+        self.assertEqual(intraday_retry.state,"hold")
+        self.assertFalse(daily_retry.submit_authorized)
+        self.assertFalse(intraday_retry.submit_authorized)
+        self.assertEqual(self.journal.inspect(**SCOPE),before)
+
+    def test_ambiguous_dispatch_marker_survives_coordinator_restart(self):
+        self.assertEqual(self.daily.request_entry(self.intent).state,"reserved")
+        _,token,_,fence,_=self.journal.inspect(**SCOPE)
+        self.assertTrue(self.journal.mark_dispatch_unknown(
+            token=token,fence=fence,**SCOPE))
+        before=self.journal.inspect(**SCOPE)
+        reopened=OfflineRestartJournal(self.journal.path)
+        protected=OfflineProtectedJournalFixture(
+            verifier=OfflineIdentityVerifier({
+                "daily-principal":VerifiedFixtureIdentity("daily","mainnet",ACCOUNT),
+            }),journal=reopened)
+        restarted=OfflineCoordinatorClientFixture(
+            send=OfflineCoordinatorServerFixture(protected).handle,
+            principal="daily-principal")
+        result=restarted.request_entry(self.intent)
+        self.assertEqual(result.state,"hold")
+        self.assertFalse(result.submit_authorized)
+        self.assertEqual(reopened.inspect(**SCOPE),before)
+
     def test_unknown_operation_and_malformed_request_hold(self):
         self.assertEqual(self.server.handle(
             principal="daily-principal",operation="raw_sql",intent=self.intent).state,"hold")
