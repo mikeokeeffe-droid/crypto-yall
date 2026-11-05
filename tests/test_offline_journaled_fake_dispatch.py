@@ -13,7 +13,7 @@ class JournaledFakeDispatchTests(unittest.TestCase):
     def setUp(self):
         self.tmp=tempfile.TemporaryDirectory()
         self.path=os.path.join(self.tmp.name,"fake.sqlite")
-        self.journal=OfflineRestartJournal(self.path)
+        self.journal=OfflineRestartJournal(self.path, create=True)
         self.token,self.cloid,self.fence=self.journal.reserve(bot="daily",**SCOPE)
     def tearDown(self):
         self.tmp.cleanup()
