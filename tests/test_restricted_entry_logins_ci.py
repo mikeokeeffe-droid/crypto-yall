@@ -111,6 +111,96 @@ class DedicatedLoginAdmissionTests(unittest.TestCase):
                     "select * from public.bot_entry_intents where coin='SOL'"
                 )
 
+    def test_stale_or_wrong_token_cannot_read_durable_claim(self):
+        owner = claim_shared_entry(
+            self.coordinator("daily"), bot="daily", coin="SOL",
+            action="open_long", request_id=str(uuid.uuid4()),
+        )
+        self.assertTrue(owner.accepted, owner.reason)
+        token = uuid.UUID(owner.intent_id)
+        wrong_token = uuid.uuid4()
+        with self.factory("daily")() as db:
+            for coin, submitted_token in (
+                ("SOL", wrong_token), ("BTC", token),
+            ):
+                with self.subTest(coin=coin, token=submitted_token):
+                    observed = db.execute(
+                        "select * from public.read_bot_entry_claim_proof(%s,%s,%s)",
+                        (coin, "daily", submitted_token),
+                    ).fetchone()
+                    self.assertIsNone(observed)
+        with self.factory("intraday")() as db:
+            with self.assertRaises(psycopg.errors.InsufficientPrivilege):
+                db.execute(
+                    "select * from public.read_bot_entry_claim_proof(%s,%s,%s)",
+                    ("SOL", "daily", token),
+                )
+
+    def test_old_generation_cannot_read_successor_claim(self):
+        original = claim_shared_entry(
+            self.coordinator("daily"), bot="daily", coin="SOL",
+            action="open_long", request_id=str(uuid.uuid4()),
+        )
+        self.assertTrue(original.accepted, original.reason)
+        # Only a disposable CI admin simulates previously completed,
+        # independently approved reconciliation. Never auto-release in bots.
+        with psycopg.connect(
+            host="localhost", port=5432, dbname="safety_test",
+            user="postgres", password=os.environ["PGPASSWORD"],
+            autocommit=True,
+        ) as admin:
+            admin.execute("delete from public.bot_entry_intents where coin='SOL'")
+            admin.execute("delete from public.bot_entry_reservations where coin='SOL'")
+        successor = claim_shared_entry(
+            self.coordinator("intraday"), bot="intraday", coin="SOL",
+            action="open_short", request_id=str(uuid.uuid4()),
+        )
+        self.assertTrue(successor.accepted, successor.reason)
+        self.assertGreater(successor.fence_token, original.fence_token)
+        with self.factory("daily")() as db:
+            self.assertIsNone(db.execute(
+                "select * from public.read_bot_entry_claim_proof(%s,%s,%s)",
+                ("SOL", "daily", uuid.UUID(original.intent_id)),
+            ).fetchone())
+        with self.factory("intraday")() as db:
+            current = db.execute(
+                "select bot,coin,token,status,fence_token "
+                "from public.read_bot_entry_claim_proof(%s,%s,%s)",
+                ("SOL", "intraday", uuid.UUID(successor.intent_id)),
+            ).fetchone()
+            self.assertEqual(current, (
+                "intraday", "SOL", uuid.UUID(successor.intent_id),
+                "pending", successor.fence_token,
+            ))
+
+    def test_expired_reservation_does_not_make_intent_available(self):
+        original = claim_shared_entry(
+            self.coordinator("aggressive"), bot="aggressive", coin="XRP",
+            action="open_long", request_id=str(uuid.uuid4()),
+        )
+        self.assertTrue(original.accepted, original.reason)
+        with psycopg.connect(
+            host="localhost", port=5432, dbname="safety_test",
+            user="postgres", password=os.environ["PGPASSWORD"],
+            autocommit=True,
+        ) as admin:
+            admin.execute(
+                "update public.bot_entry_reservations "
+                "set expires_at=now()-interval '1 second' where coin='XRP'"
+            )
+        contender = claim_shared_entry(
+            self.coordinator("daily"), bot="daily", coin="XRP",
+            action="open_short", request_id=str(uuid.uuid4()),
+        )
+        self.assertFalse(contender.accepted)
+        with self.factory("aggressive")() as db:
+            retained = db.execute(
+                "select status,fence_token "
+                "from public.read_bot_entry_claim_proof(%s,%s,%s)",
+                ("XRP", "aggressive", uuid.UUID(original.intent_id)),
+            ).fetchone()
+            self.assertEqual(retained, ("pending", original.fence_token))
+
     def test_timeout_fails_closed(self):
         class Unavailable:
             def claim_intent(self, **kwargs):
