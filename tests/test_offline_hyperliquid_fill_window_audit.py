@@ -72,6 +72,26 @@ class FillWindowBoundaryTests(unittest.TestCase):
         wrong["request"]["user"] = "0x" + "c" * 40
         self.assertEqual(audit([wrong]).status, "hold")
 
+    def test_ten_thousand_record_retention_boundary_holds(self):
+        # Six sub-cap windows exercise the aggregate retention ceiling.
+        # Unique TIDs are required even when timestamps repeat.
+        windows = []
+        for i in range(6):
+            lo = 100 + i
+            hi = lo
+            count = 1900 if i < 5 else 500
+            offset = i * 1900
+            windows.append(window(
+                lo, hi,
+                [fill(offset + n + 1, lo) for n in range(count)],
+            ))
+        result = audit_fill_windows_offline(
+            account=ACCOUNT, start_ms=100, end_ms=105,
+            windows=windows,
+        )
+        self.assertEqual(result.status, "hold")
+        self.assertIn("retention", result.reason)
+
     def test_max_window_limit_holds(self):
         self.assertEqual(audit([window(100, 104, []),
                                 window(105, 109, [])],
