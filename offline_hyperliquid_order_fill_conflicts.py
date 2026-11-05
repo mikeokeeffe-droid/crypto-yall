@@ -62,7 +62,9 @@ def inspect_order_fill_consistency_offline(*, order_review, fills_review,
         if type(timestamp) is not int or not start_ms <= timestamp <= end_ms:
             return hold("fill outside requested window")
         if foid != oid:
-            continue  # Other orders can coexist in the same account window.
+            if fcoin == coin:
+                return hold("other same-coin order may have changed the shared account position")
+            continue  # Different-coin activity does not establish this coin's ownership.
         if (fcoin != coin or side != ("B" if direction == "long" else "A")
                 or timestamp < submitted_at_ms or timestamp > order[3]):
             return hold("fill conflicts with order identity, side or time")
