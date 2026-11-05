@@ -47,6 +47,30 @@ class CoordinatorBoundaryFixtureTests(unittest.TestCase):
         other=OfflineEntryIntent(requested_bot="intraday",**SCOPE)
         self.assertEqual(self.intraday.request_entry(other).state,"hold")
 
+    def test_unknown_principal_cannot_reserve(self):
+        unknown=OfflineCoordinatorClientFixture(
+            send=self.server.handle,principal="unknown-principal")
+        result=unknown.request_entry(self.intent)
+        self.assertEqual(result.state,"hold")
+        self.assertFalse(result.submit_authorized)
+        self.assertIsNone(self.journal.inspect(**SCOPE))
+
+    def test_other_account_cannot_be_claimed(self):
+        wrong=OfflineEntryIntent(
+            requested_bot="daily",**dict(SCOPE,account="0x"+"2"*40))
+        result=self.daily.request_entry(wrong)
+        self.assertEqual(result.state,"hold")
+        self.assertFalse(result.submit_authorized)
+        self.assertIsNone(self.journal.inspect(**SCOPE))
+
+    def test_other_environment_cannot_be_claimed(self):
+        wrong=OfflineEntryIntent(
+            requested_bot="daily",**dict(SCOPE,environment="testnet"))
+        result=self.daily.request_entry(wrong)
+        self.assertEqual(result.state,"hold")
+        self.assertFalse(result.submit_authorized)
+        self.assertIsNone(self.journal.inspect(**SCOPE))
+
     def test_unknown_operation_and_malformed_request_hold(self):
         self.assertEqual(self.server.handle(
             principal="daily-principal",operation="raw_sql",intent=self.intent).state,"hold")
