@@ -72,6 +72,40 @@ class RestartJournalTests(unittest.TestCase):
         with self.assertRaises(sqlite3.DatabaseError):
             OfflineRestartJournal(self.path)
 
+    def test_rolled_back_dispatch_marker_remains_reserved_and_claimed(self):
+        import sqlite3
+        journal=OfflineRestartJournal(self.path,create=True)
+        token,cloid,fence=journal.reserve(bot="daily",**SCOPE)
+        # Simulate process interruption before the SQLite transaction commits.
+        with journal._connect() as db:
+            db.execute("BEGIN IMMEDIATE")
+            db.execute(
+                "UPDATE claims SET state='dispatch_unknown' WHERE token=?",
+                (token,),
+            )
+            db.rollback()
+        restarted=OfflineRestartJournal(self.path)
+        self.assertEqual(restarted.inspect(**SCOPE),
+                         ("daily",token,cloid,fence,"reserved"))
+        self.assertIsNone(restarted.reserve(bot="intraday",**SCOPE))
+        # Reserved is not proof that no send happened: never auto-release it.
+        self.assertTrue(restarted.mark_dispatch_unknown(
+            token=token,fence=fence,**SCOPE))
+        self.assertIsNone(OfflineRestartJournal(self.path).reserve(
+            bot="aggressive",**SCOPE))
+
+    def test_uncommitted_new_claim_disappears_without_releasing_prior_claim(self):
+        journal=OfflineRestartJournal(self.path,create=True)
+        token,cloid,fence=journal.reserve(bot="daily",**SCOPE)
+        with journal._connect() as db:
+            db.execute("BEGIN IMMEDIATE")
+            db.execute("DELETE FROM claims WHERE token=?",(token,))
+            db.rollback()
+        restarted=OfflineRestartJournal(self.path)
+        self.assertEqual(restarted.inspect(**SCOPE),
+                         ("daily",token,cloid,fence,"reserved"))
+        self.assertIsNone(restarted.reserve(bot="intraday",**SCOPE))
+
     def test_no_exchange_sender_methods(self):
         import offline_sender_restart_journal as module
         self.assertFalse(hasattr(module,"market_open"))
