@@ -25,15 +25,16 @@ class JournaledFakeDispatchTests(unittest.TestCase):
 
     def test_marker_is_durable_before_fake_observes(self):
         journal=self.journal
-        class ObservingFake(FakeExchange):
-            def record_fake_attempt(self,token,cloid):
-                self_observation=journal.inspect(**SCOPE)
-                assert self_observation[4]=="dispatch_unknown"
-                assert self_observation[2]==cloid
-                return super().record_fake_attempt(token,cloid)
-        # The bridge deliberately accepts only the exact fake type.
         fake=FakeExchange()
+        original=fake.record_fake_attempt
+        observed=[]
+        def inspect_before_fake(token,cloid):
+            record=journal.inspect(**SCOPE)
+            observed.append((record[4],record[2]))
+            return original(token,cloid)
+        fake.record_fake_attempt=inspect_before_fake
         self.assertEqual(self.attempt(fake).state,"observed_unverified")
+        self.assertEqual(observed,[("dispatch_unknown",self.cloid)])
         self.assertEqual(self.journal.inspect(**SCOPE)[4],"dispatch_unknown")
         self.assertFalse(self.attempt(fake).submit_authorized)
 
