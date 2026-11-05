@@ -294,6 +294,34 @@ class CoordinatorBoundaryFixtureTests(unittest.TestCase):
             self.assertFalse(result.submit_authorized)
         self.assertEqual(self.journal.inspect(**SCOPE),before)
 
+    def test_ambiguous_close_acknowledgement_never_allows_retry(self):
+        self.assertEqual(self.daily.request_entry(self.intent).state,"reserved")
+        before=self.journal.inspect(**SCOPE)
+        for acknowledgement in (None,"timeout","unknown","connection_lost"):
+            result=self.server.handle(
+                principal="daily-principal",operation="close_acknowledgement",
+                intent={"acknowledgement":acknowledgement,
+                        "token":before[1],"fence":before[3],**SCOPE})
+            self.assertEqual(result.state,"hold")
+            self.assertFalse(result.submit_authorized)
+            retry=self.daily.request_close(
+                coin="SOL",token=before[1],fence=before[3])
+            self.assertEqual(retry.state,"hold")
+            self.assertFalse(retry.submit_authorized)
+        self.assertEqual(self.journal.inspect(**SCOPE),before)
+
+    def test_ambiguous_close_acknowledgement_cannot_release_claim(self):
+        self.assertEqual(self.daily.request_entry(self.intent).state,"reserved")
+        before=self.journal.inspect(**SCOPE)
+        for operation in ("release_claim","retry_close","confirm_close"):
+            result=self.server.handle(
+                principal="daily-principal",operation=operation,
+                intent={"token":before[1],"fence":before[3],
+                        "close_acknowledgement":"unknown",**SCOPE})
+            self.assertEqual(result.state,"hold")
+            self.assertFalse(result.submit_authorized)
+        self.assertEqual(self.journal.inspect(**SCOPE),before)
+
     def test_unknown_operation_and_malformed_request_hold(self):
         self.assertEqual(self.server.handle(
             principal="daily-principal",operation="raw_sql",intent=self.intent).state,"hold")
