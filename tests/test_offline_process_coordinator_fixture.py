@@ -63,6 +63,31 @@ class OfflineProcessCoordinatorTests(unittest.TestCase):
         finally:
             second.close()
 
+    def test_malformed_requests_hold_and_valid_request_still_works(self):
+        coordinator=OfflineProcessCoordinator(self.path,PRINCIPALS)
+        try:
+            for malformed in (None,{},{"coin":"SOL"},
+                              dict(SCOPE,requested_bot=None),
+                              dict(SCOPE,account=[])):
+                self.assertEqual(coordinator.request(
+                    "daily-principal","request_entry",malformed),("hold",False))
+            self.assertEqual(coordinator.request(
+                "daily-principal","request_entry",SCOPE),("reserved",False))
+        finally:
+            coordinator.close()
+
+    def test_unknown_operations_do_not_modify_claim(self):
+        coordinator=OfflineProcessCoordinator(self.path,PRINCIPALS)
+        try:
+            for operation in ("raw_sql","release_claim","mark_dispatch_unknown",
+                              "request_close","request_dispatch"):
+                self.assertEqual(coordinator.request(
+                    "daily-principal",operation,SCOPE),("hold",False))
+            self.assertEqual(coordinator.request(
+                "daily-principal","request_entry",SCOPE),("reserved",False))
+        finally:
+            coordinator.close()
+
     def test_missing_journal_prevents_process_start(self):
         os.unlink(self.path)
         with self.assertRaises(RuntimeError):
