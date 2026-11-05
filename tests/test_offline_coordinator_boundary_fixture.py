@@ -270,6 +270,30 @@ class CoordinatorBoundaryFixtureTests(unittest.TestCase):
             self.assertFalse(result.submit_authorized)
         self.assertEqual(self.journal.inspect(**SCOPE),before)
 
+    def test_simultaneous_close_requests_never_authorize_or_mutate_claim(self):
+        self.assertEqual(self.daily.request_entry(self.intent).state,"reserved")
+        before=self.journal.inspect(**SCOPE)
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            daily_close=pool.submit(self.daily.request_close,
+                                    coin="SOL",side="long",size="1")
+            intraday_close=pool.submit(self.intraday.request_close,
+                                       coin="SOL",side="long",size="1")
+            results=(daily_close.result(),intraday_close.result())
+        self.assertTrue(all(result.state=="hold" for result in results))
+        self.assertTrue(all(not result.submit_authorized for result in results))
+        self.assertEqual(self.journal.inspect(**SCOPE),before)
+
+    def test_repeated_close_request_never_authorizes_or_mutates_claim(self):
+        self.assertEqual(self.daily.request_entry(self.intent).state,"reserved")
+        before=self.journal.inspect(**SCOPE)
+        for _ in range(3):
+            result=self.daily.request_close(
+                coin="SOL",side="long",size="1",
+                token=before[1],fence=before[3])
+            self.assertEqual(result.state,"hold")
+            self.assertFalse(result.submit_authorized)
+        self.assertEqual(self.journal.inspect(**SCOPE),before)
+
     def test_unknown_operation_and_malformed_request_hold(self):
         self.assertEqual(self.server.handle(
             principal="daily-principal",operation="raw_sql",intent=self.intent).state,"hold")
