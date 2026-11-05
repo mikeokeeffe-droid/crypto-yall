@@ -135,6 +135,36 @@ class FilledRecoveryInspectionTests(unittest.TestCase):
                 self.exchange.captures[0]["fills"][0].update(changes)
                 self.assertEqual(self.review().status, "hold")
 
+    def test_restart_cannot_adopt_same_side_manual_or_other_bot_fill(self):
+        # A matching SOL long is insufficient to establish bot ownership.
+        for side in ("long", "short"):
+            with self.subTest(competing_side=side):
+                self.setUp()
+                foreign = dict(
+                    account="test-account", coin="SOL", order_id="manual-999",
+                    side=side, fill_id="manual-fill-1", size="1",
+                    time_ms=100_150,
+                )
+                for capture in self.exchange.captures:
+                    capture["fills"].append(dict(foreign))
+                result = self.review()
+                self.assertEqual(result.status, "hold")
+
+    def test_restart_history_completeness_flag_missing_or_false_holds(self):
+        for value in (False, None):
+            with self.subTest(value=value):
+                self.setUp()
+                for capture in self.exchange.captures:
+                    capture["fills_complete"] = value
+                self.assertEqual(self.review().status, "hold")
+
+    def test_restart_unexpected_position_delta_holds_even_with_matching_order(self):
+        for value in ("3", "1", "0", "-2"):
+            with self.subTest(position=value):
+                self.setUp()
+                self.exchange.captures[1]["position_size"] = value
+                self.assertEqual(self.review().status, "hold")
+
     def test_uncertain_order_without_id_blocks_without_exchange_access(self):
         self.reader.intent["exchange_order_id"] = None
         self.assertEqual(self.review().status, "hold")
