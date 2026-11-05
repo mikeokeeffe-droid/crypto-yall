@@ -92,6 +92,55 @@ class JournaledFakeDispatchTests(unittest.TestCase):
         self.assertEqual(sum(r.state=="observed_unverified" for r in results),1)
         self.assertEqual(len(fake.attempts),1)
 
+    def test_separate_restarted_journal_instances_dispatch_at_most_once(self):
+        fake=FakeExchange()
+        def competing_instance(_):
+            journal=OfflineRestartJournal(self.path)
+            return simulate_journaled_once(
+                journal=journal, fake=fake, token=self.token,
+                fence=self.fence, **SCOPE)
+        with concurrent.futures.ThreadPoolExecutor(max_workers=6) as pool:
+            results=list(pool.map(competing_instance,range(12)))
+        self.assertEqual(sum(r.state=="observed_unverified" for r in results),1)
+        self.assertEqual(len(fake.attempts),1)
+        self.assertEqual(OfflineRestartJournal(self.path).inspect(**SCOPE)[4],
+                         "dispatch_unknown")
+
+    def test_concurrent_restarts_after_lost_reply_do_not_retry(self):
+        fake=FakeExchange()
+        def lose_reply(token,cloid):
+            fake.attempts.append((token,cloid))
+            raise TimeoutError("synthetic accepted but reply lost")
+        fake.record_fake_attempt=lose_reply
+        self.assertEqual(self.attempt(fake).state,"hold")
+        def recovered_instance(_):
+            journal=OfflineRestartJournal(self.path)
+            return simulate_journaled_once(
+                journal=journal, fake=fake, token=self.token,
+                fence=self.fence, **SCOPE)
+        with concurrent.futures.ThreadPoolExecutor(max_workers=6) as pool:
+            results=list(pool.map(recovered_instance,range(12)))
+        self.assertTrue(all(r.state=="hold" for r in results))
+        self.assertEqual(len(fake.attempts),1)
+        self.assertIsNone(OfflineRestartJournal(self.path).reserve(
+            bot="intraday",**SCOPE))
+
+    def test_concurrent_restarts_after_pre_send_crash_do_not_send(self):
+        self.assertTrue(self.journal.mark_dispatch_unknown(
+            token=self.token,fence=self.fence,**SCOPE))
+        fake=FakeExchange()
+        def recovered_instance(_):
+            journal=OfflineRestartJournal(self.path)
+            return simulate_journaled_once(
+                journal=journal, fake=fake, token=self.token,
+                fence=self.fence, **SCOPE)
+        with concurrent.futures.ThreadPoolExecutor(max_workers=6) as pool:
+            results=list(pool.map(recovered_instance,range(12)))
+        self.assertTrue(all(r.state=="hold" for r in results))
+        self.assertEqual(fake.attempts,[])
+        self.assertEqual(OfflineRestartJournal(self.path).inspect(**SCOPE)[4],
+                         "dispatch_unknown")
+
     def test_stale_fence_and_wrong_scope_do_not_dispatch(self):
         fake=FakeExchange()
         self.assertEqual(self.attempt(fake,fence=self.fence+1).state,"hold")
