@@ -27,6 +27,9 @@ def audit_fill_windows_offline(*, account, start_ms, end_ms, windows,
             or type(max_windows) is not int or not 1 <= max_windows <= 20
             or len(windows) > max_windows):
         return hold("invalid bounded history window")
+    # Hyperliquid only exposes the most recent 10,000 fills through this API.
+    # At the retention boundary, earlier fills may be silently inaccessible.
+    # This is an additional HOLD condition, not proof below the threshold.
     expected = start_ms
     seen = {}
     for item in windows:
@@ -51,6 +54,8 @@ def audit_fill_windows_offline(*, account, start_ms, end_ms, windows,
             if tid in seen:
                 return hold("duplicate trade id across windows")
             seen[tid] = record
+            if len(seen) >= 10000:
+                return hold("10,000-fill retention boundary; older history may be missing")
         expected = hi + 1
     if expected != end_ms + 1:
         return hold("requested history window not exhausted")
