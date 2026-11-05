@@ -57,6 +57,26 @@ class JournaledFakeDispatchTests(unittest.TestCase):
         self.assertEqual(len(fake.attempts),1)
         self.assertIsNone(self.journal.reserve(bot="intraday",**SCOPE))
 
+    def test_restart_after_fake_observation_retains_uncertain_marker(self):
+        fake=FakeExchange()
+        self.assertEqual(self.attempt(fake).state,"observed_unverified")
+        self.journal=OfflineRestartJournal(self.path)
+        self.assertEqual(self.journal.inspect(**SCOPE)[4],"dispatch_unknown")
+        self.assertIsNone(self.journal.reserve(bot="aggressive",**SCOPE))
+        self.assertEqual(self.attempt(fake).state,"hold")
+        self.assertEqual(len(fake.attempts),1)
+
+    def test_fake_callback_failure_does_not_roll_back_durable_marker(self):
+        fake=FakeExchange()
+        def crash(token,cloid):
+            raise RuntimeError("synthetic process interruption")
+        fake.record_fake_attempt=crash
+        self.assertEqual(self.attempt(fake).state,"hold")
+        self.journal=OfflineRestartJournal(self.path)
+        self.assertEqual(self.journal.inspect(**SCOPE)[4],"dispatch_unknown")
+        self.assertFalse(self.journal.mark_dispatch_unknown(
+            token=self.token,fence=self.fence,**SCOPE))
+
     def test_crash_after_marker_before_fake_stays_locked(self):
         self.assertTrue(self.journal.mark_dispatch_unknown(
             token=self.token,fence=self.fence,**SCOPE))
