@@ -69,6 +69,21 @@ class ProtectedJournalFixtureTests(unittest.TestCase):
         self.assertEqual(result.state,"hold")
         self.assertFalse(result.submit_authorized)
 
+    def test_underlying_journal_reference_bypasses_fixture_identity_gate(self):
+        # Known NO-GO: Python attribute access is not a security boundary.
+        # An untrusted in-process caller can still reach the journal.
+        bypass=self.fixture._journal.reserve(bot="aggressive",**SCOPE)
+        self.assertIsNotNone(bypass)
+        self.assertEqual(self.journal.inspect(**SCOPE)[0],"aggressive")
+        self.assertEqual(self.request("daily-principal","daily").state,"hold")
+
+    def test_same_process_can_open_journal_path_and_bypass_fixture(self):
+        # A separate journal instance with filesystem access can reserve.
+        reopened=OfflineRestartJournal(self.journal.path)
+        claim=reopened.reserve(bot="intraday",**SCOPE)
+        self.assertIsNotNone(claim)
+        self.assertEqual(self.journal.inspect(**SCOPE)[0],"intraday")
+
     def test_close_and_dispatch_are_always_held(self):
         self.assertEqual(self.fixture.request_close(
             principal="daily-principal",coin="SOL").state,"hold")
