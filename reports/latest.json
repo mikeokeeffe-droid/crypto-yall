@@ -375,7 +375,7 @@
     }
   },
   "date_utc": "2026-11-05",
-  "generated_at": "2026-11-05T13:08:17.690963+00:00",
+  "generated_at": "2026-11-05T14:08:22.974950+00:00",
   "report_errors": [],
   "reporting_only": true,
   "schema_version": 2,
@@ -3985,20 +3985,20 @@
           "AVAX": {
             "asset": "AVAX",
             "blocked_live_reason": "mid-cap allow_short=False",
-            "current_price": 8.6593,
+            "current_price": 8.6987,
             "entry_price": 8.7753,
             "entry_time": "2026-11-05T03:00:00",
             "ticker": "AVAX-USD",
-            "unrealized_gross_return_pct": 1.3219
+            "unrealized_gross_return_pct": 0.8729
           },
           "SUI": {
             "asset": "SUI",
             "blocked_live_reason": "mid-cap allow_short=False",
-            "current_price": 0.9112,
+            "current_price": 0.91142,
             "entry_price": 0.92585,
             "entry_time": "2026-11-05T06:00:00",
             "ticker": "SUI20947-USD",
-            "unrealized_gross_return_pct": 1.5823
+            "unrealized_gross_return_pct": 1.5586
           }
         },
         "today": {
@@ -4865,6 +4865,6 @@
     "errors": [],
     "scope": "Shadow-only fresh short signals for SOL/AVAX/LINK/SUI/XRP/ONDO that live trading blocks because mid-cap allow_short=False.",
     "tracking_started_at": "2026-09-10T22:03:23.796957+00:00",
-    "updated_at": "2026-11-05T13:08:17.690963+00:00"
+    "updated_at": "2026-11-05T14:08:22.974950+00:00"
   }
 }
