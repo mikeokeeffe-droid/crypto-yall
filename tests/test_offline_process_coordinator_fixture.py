@@ -88,6 +88,32 @@ class OfflineProcessCoordinatorTests(unittest.TestCase):
         finally:
             coordinator.close()
 
+    def test_forced_process_termination_retains_claim_after_restart(self):
+        coordinator=OfflineProcessCoordinator(self.path,PRINCIPALS)
+        try:
+            self.assertEqual(coordinator.request(
+                "daily-principal","request_entry",SCOPE),("reserved",False))
+            before=OfflineRestartJournal(self.path).inspect(
+                environment="mainnet",account=ACCOUNT,dex="",coin="SOL")
+            coordinator._process.terminate()
+            coordinator._process.join(timeout=3)
+            self.assertEqual(coordinator.request(
+                "daily-principal","request_entry",SCOPE),("hold",False))
+        finally:
+            coordinator.close()
+        restarted=OfflineProcessCoordinator(self.path,PRINCIPALS)
+        try:
+            self.assertEqual(restarted.request(
+                "intraday-principal","request_entry",
+                dict(SCOPE,requested_bot="intraday")),("hold",False))
+            self.assertEqual(restarted.request(
+                "daily-principal","request_entry",SCOPE),("hold",False))
+        finally:
+            restarted.close()
+        after=OfflineRestartJournal(self.path).inspect(
+            environment="mainnet",account=ACCOUNT,dex="",coin="SOL")
+        self.assertEqual(after,before)
+
     def test_missing_journal_prevents_process_start(self):
         os.unlink(self.path)
         with self.assertRaises(RuntimeError):
