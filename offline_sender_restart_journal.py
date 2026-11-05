@@ -4,6 +4,7 @@ No SDK, network, signer, trading credentials or live order capability.
 SQLite file is created only by the test harness; no production path.
 """
 import sqlite3
+import os
 from uuid import uuid4
 
 _SCHEMA = """
@@ -17,10 +18,26 @@ CREATE TABLE IF NOT EXISTS claims (
 """
 
 class OfflineRestartJournal:
-    def __init__(self, path):
+    def __init__(self, path, *, create=False):
+        # Reopening a missing file must never silently create a fresh,
+        # empty claim table that permits a second fake submission.
         self.path = path
+        if create:
+            if os.path.exists(path):
+                raise FileExistsError("fixture journal already exists")
+            with sqlite3.connect(path) as db:
+                db.executescript(_SCHEMA)
+        elif not os.path.isfile(path):
+            raise FileNotFoundError("missing journal; fail closed")
         with self._connect() as db:
-            db.executescript(_SCHEMA)
+            check = db.execute("PRAGMA integrity_check").fetchone()
+            if check != ("ok",):
+                raise sqlite3.DatabaseError("damaged journal; fail closed")
+            required = {"environment", "account", "dex", "coin", "bot",
+                        "token", "cloid", "fence", "state"}
+            columns = {row[1] for row in db.execute("PRAGMA table_info(claims)")}
+            if not required.issubset(columns):
+                raise sqlite3.DatabaseError("incomplete journal schema; fail closed")
 
     def _connect(self):
         db = sqlite3.connect(self.path, timeout=5, isolation_level=None)
