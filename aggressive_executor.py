@@ -27,6 +27,8 @@ import copy
 
 import requests
 
+from entry_claim_safety import blocks_entry_with_pending_claim, safe_to_release_pre_submit_skip
+
 from intraday_data_loader import fetch_all_intraday, HL_SYMBOL_MAP
 from aggressive_strategy import generate_aggressive_signals, classify_aggressive_signal
 from aggressive_entry_shadow import score_entry_quality
@@ -697,26 +699,19 @@ def main():
         if skipped:
             print(f"Skipping unavailable assets on this env: {skipped}")
 
-    # Ownership tracking with stale-position reconciliation.
-    # Recover any entry that filled on Hyperliquid after we persisted a
-    # pre-order claim but before the post-fill state save completed.
+    # Ownership tracking: do not infer ownership from an unresolved pre-order
+    # claim, even when the shared exchange position has the claimed side.
     owned_coins = set(state.get("owned_coins", []))
     pending_claims = state.get("pending_entry_claims", {}) or {}
-    for pending_coin, claim in list(pending_claims.items()):
-        pos = open_positions.get(pending_coin)
-        if pos is None:
-            pending_claims.pop(pending_coin, None)
-            continue
-        claimed_side = str((claim or {}).get("side", "")).lower()
-        actual_side = "long" if float(pos.get("size", 0.0) or 0.0) > 0 else "short"
-        if claimed_side == actual_side:
-            if pending_coin not in owned_coins:
-                print(
-                    f"Recovered Aggressive ownership for {pending_coin} "
-                    f"from persisted pending entry claim"
-                )
-            owned_coins.add(pending_coin)
-            pending_claims.pop(pending_coin, None)
+    for pending_coin, _claim in list(pending_claims.items()):
+        # A same-side exchange position is NOT evidence that this bot placed
+        # the matching order; another bot may have opened that position.
+        # Preserve the unresolved claim and previously recorded ownership,
+        # but never adopt new ownership without order-specific reconciliation.
+        print(
+            f"Unresolved Aggressive entry claim for {pending_coin}: "
+            "independent order/fill ownership verification required"
+        )
     state["pending_entry_claims"] = pending_claims
 
     stale_owned = owned_coins - set(open_positions.keys())
@@ -785,6 +780,11 @@ def main():
 
     results = []
     for trade in trades:
+        # Entry-only guard: unresolved own claims must not be overwritten or retried.
+        # This does not replace the atomic cross-bot reservation still needed.
+        if blocks_entry_with_pending_claim(trade, state.get("pending_entry_claims", {})):
+            print(f"BLOCKED: {trade['action']} {trade['hl_coin']} has unresolved entry claim")
+            continue
         # Aggressive leverage is controlled by repository/environment variables.
         # Mid-cap / volatile assets use the normal setting; large caps use the max setting.
         # Hyperliquid may apply a lower market-specific cap where required.
@@ -796,8 +796,8 @@ def main():
         # Persist ownership intent BEFORE a new external order is submitted.
         # If Hyperliquid fills but a later Gist write fails, the next run can
         # safely recover this bot's ownership instead of orphaning the position.
-        is_new_entry = trade.get("action") in ("open_long", "open_short")
-        if is_new_entry:
+        is_increase = trade.get("action") in ("open_long", "open_short", "pyramid_long", "pyramid_short")
+        if is_increase:
             state.setdefault("pending_entry_claims", {})[trade["hl_coin"]] = {
                 "side": trade.get("side"),
                 "created_at": dt.datetime.now(dt.UTC).isoformat(),
@@ -807,7 +807,9 @@ def main():
 
         result = execute_trade(info, exchange, trade, capital, leverage)
 
-        if is_new_entry and result.get("status") != "filled":
+        # Only locally skipped requests prove no exchange order was sent.
+        # Errors, unknowns and timeouts keep the claim until reconciliation.
+        if is_increase and safe_to_release_pre_submit_skip(result):
             state.setdefault("pending_entry_claims", {}).pop(trade["hl_coin"], None)
             save_state(state)
 
@@ -1052,6 +1054,10 @@ def main():
                 state.setdefault("peak_return_pct", {}).pop(coin, None)
             elif result["action"].startswith("pyramid_"):
                 pyramid_state[coin] = pyramid_state.get(coin, 0) + 1
+                # Only a confirmed fill clears the durable pyramid intent.
+                state.setdefault("pending_entry_claims", {}).pop(coin, None)
+                state["pyramid_state"] = pyramid_state
+                save_state(state)
             else:
                 owned_coins.add(coin)
                 state.setdefault("pending_entry_claims", {}).pop(coin, None)
