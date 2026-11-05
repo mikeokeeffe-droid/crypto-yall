@@ -204,6 +204,37 @@ class CoordinatorBoundaryFixtureTests(unittest.TestCase):
         self.assertFalse(result.submit_authorized)
         self.assertEqual(reopened.inspect(**SCOPE),before)
 
+    def test_stale_reconciliation_cannot_release_uncertain_claim(self):
+        self.assertEqual(self.daily.request_entry(self.intent).state,"reserved")
+        _,token,_,fence,_=self.journal.inspect(**SCOPE)
+        self.assertTrue(self.journal.mark_dispatch_unknown(
+            token=token,fence=fence,**SCOPE))
+        before=self.journal.inspect(**SCOPE)
+        result=self.server.handle(
+            principal="daily-principal",operation="reconcile",
+            intent={"fresh":False,"token":token,"fence":fence,**SCOPE})
+        self.assertEqual(result.state,"hold")
+        self.assertFalse(result.submit_authorized)
+        self.assertEqual(self.journal.inspect(**SCOPE),before)
+
+    def test_incomplete_reconciliation_cannot_release_uncertain_claim(self):
+        self.assertEqual(self.daily.request_entry(self.intent).state,"reserved")
+        _,token,_,fence,_=self.journal.inspect(**SCOPE)
+        self.assertTrue(self.journal.mark_dispatch_unknown(
+            token=token,fence=fence,**SCOPE))
+        before=self.journal.inspect(**SCOPE)
+        for incomplete in (
+            {"orders":[],"fills":None,"position":None},
+            {"orders":None,"fills":[],"position":{"coin":"SOL"}},
+            {"orders":[],"fills":[],"position":None},
+        ):
+            result=self.server.handle(
+                principal="daily-principal",operation="reconcile",
+                intent={"token":token,"fence":fence,**SCOPE,**incomplete})
+            self.assertEqual(result.state,"hold")
+            self.assertFalse(result.submit_authorized)
+            self.assertEqual(self.journal.inspect(**SCOPE),before)
+
     def test_unknown_operation_and_malformed_request_hold(self):
         self.assertEqual(self.server.handle(
             principal="daily-principal",operation="raw_sql",intent=self.intent).state,"hold")
