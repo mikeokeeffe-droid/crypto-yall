@@ -116,6 +116,31 @@ class CoordinatorBoundaryFixtureTests(unittest.TestCase):
         row=self.journal.inspect(**SCOPE)
         self.assertIn(row[0],("daily","intraday"))
 
+    def test_duplicate_same_bot_request_cannot_create_second_claim(self):
+        first=self.daily.request_entry(self.intent)
+        self.assertEqual(first.state,"reserved")
+        before=self.journal.inspect(**SCOPE)
+        again=self.daily.request_entry(self.intent)
+        self.assertEqual(again.state,"hold")
+        self.assertFalse(again.submit_authorized)
+        self.assertEqual(self.journal.inspect(**SCOPE),before)
+
+    def test_replayed_request_after_restart_cannot_replace_claim(self):
+        self.assertEqual(self.daily.request_entry(self.intent).state,"reserved")
+        before=self.journal.inspect(**SCOPE)
+        reopened=OfflineRestartJournal(self.journal.path)
+        protected=OfflineProtectedJournalFixture(
+            verifier=OfflineIdentityVerifier({
+                "daily-principal":VerifiedFixtureIdentity("daily","mainnet",ACCOUNT),
+            }),journal=reopened)
+        replay_client=OfflineCoordinatorClientFixture(
+            send=OfflineCoordinatorServerFixture(protected).handle,
+            principal="daily-principal")
+        result=replay_client.request_entry(self.intent)
+        self.assertEqual(result.state,"hold")
+        self.assertFalse(result.submit_authorized)
+        self.assertEqual(reopened.inspect(**SCOPE),before)
+
     def test_unknown_operation_and_malformed_request_hold(self):
         self.assertEqual(self.server.handle(
             principal="daily-principal",operation="raw_sql",intent=self.intent).state,"hold")
