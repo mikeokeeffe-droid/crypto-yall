@@ -101,6 +101,59 @@ class ScopedEntryAdmissionTests(unittest.TestCase):
                         (target, priv),
                     ).fetchone()[0])
 
+    def test_concurrent_claims_on_two_accounts_do_not_cross_block(self):
+        # Exactly one winner per independently allowlisted account.
+        contenders = (
+            ("daily", ADDRESS_A), ("aggressive", ADDRESS_A),
+            ("intraday", ADDRESS_A), ("intraday", ADDRESS_B),
+        )
+        def attempt(item):
+            bot, account = item
+            return account, self.claim(bot, account=account)
+        with concurrent.futures.ThreadPoolExecutor(max_workers=4) as pool:
+            results = list(pool.map(attempt, contenders))
+        self.assertEqual(sum(result[1][0] for result in results), 2)
+        for account in (ADDRESS_A, ADDRESS_B):
+            self.assertEqual(
+                sum(result[1][0] for result in results if result[0] == account),
+                1,
+            )
+        with self.admin() as db:
+            rows = db.execute(
+                "select effective_account,coin,status "
+                "from public.ci_scoped_entry_claims order by effective_account"
+            ).fetchall()
+        self.assertEqual(rows, [
+            (ADDRESS_A, "SOL", "pending"), (ADDRESS_B, "SOL", "pending"),
+        ])
+
+    def test_same_token_cannot_be_replayed_across_environments(self):
+        # A request UUID is single-use even when scopes are distinct.
+        token = uuid.uuid4()
+        self.assertTrue(
+            self.claim("daily", environment="mainnet", token=token)[0]
+        )
+        self.assertEqual(
+            self.claim("daily", environment="testnet", token=token),
+            (False, None, None),
+        )
+        with self.admin() as db:
+            self.assertEqual(db.execute(
+                "select count(*) from public.ci_scoped_entry_claims"
+            ).fetchone()[0], 1)
+
+    def test_login_cannot_spoof_another_bot_for_same_account(self):
+        with self.connect("daily") as db:
+            with self.assertRaises(InsufficientPrivilege):
+                db.execute(
+                    "select * from public.ci_claim_scoped_entry(%s,%s,%s,%s,%s,%s)",
+                    ("mainnet", ADDRESS_A, "", "SOL", "intraday", uuid.uuid4()),
+                )
+        with self.admin() as db:
+            self.assertEqual(db.execute(
+                "select count(*) from public.ci_scoped_entry_claims"
+            ).fetchone()[0], 0)
+
     def test_durable_unknown_claim_stays_a_fence(self):
         self.assertTrue(self.claim("aggressive")[0])
         with self.admin() as db:
