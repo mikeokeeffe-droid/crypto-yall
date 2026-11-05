@@ -18,6 +18,8 @@ on:
       - 'offline_account_scope_review.py'
       - 'offline_hyperliquid_cloid_order_review.py'
       - 'offline_dispatch_lifecycle_review.py'
+      - 'offline_position_ownership_review.py'
+      - 'tests/test_offline_position_ownership_review.py'
       - 'offline_coordinator_boundary_fixture.py'
       - 'tests/test_offline_coordinator_boundary_fixture.py'
       - 'offline_protected_journal_fixture.py'
@@ -135,6 +137,7 @@ jobs:
           python -m unittest discover -s tests -p 'test_offline_hyperliquid_cloid_order_review.py' -v
           python -m unittest discover -s tests -p 'test_offline_dispatch_lifecycle_review.py' -v
           python -m unittest discover -s tests -p 'test_offline_direct_journal_bypass_audit.py' -v
+          python -m unittest discover -s tests -p 'test_offline_position_ownership_review.py' -v
           python -m unittest discover -s tests -p 'test_offline_coordinator_boundary_fixture.py' -v
           python -m unittest discover -s tests -p 'test_offline_protected_journal_fixture.py' -v
           python -m unittest discover -s tests -p 'test_offline_verified_claim_fixture.py' -v
