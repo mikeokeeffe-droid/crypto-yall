@@ -32,7 +32,7 @@ class RestartJournalTests(unittest.TestCase):
         self.assertTrue(restarted.mark_dispatch_unknown(token=token,fence=fence,**SCOPE))
 
     def test_stale_token_or_fence_cannot_mark_dispatch(self):
-        journal = OfflineRestartJournal(self.path)
+        journal = OfflineRestartJournal(self.path, create=True)
         token,_,fence = journal.reserve(bot="daily",**SCOPE)
         self.assertFalse(journal.mark_dispatch_unknown(token="other",fence=fence,**SCOPE))
         self.assertFalse(journal.mark_dispatch_unknown(token=token,fence=fence+1,**SCOPE))
@@ -46,6 +46,31 @@ class RestartJournalTests(unittest.TestCase):
         with concurrent.futures.ThreadPoolExecutor(max_workers=3) as pool:
             results=list(pool.map(attempt,("daily","intraday","aggressive")))
         self.assertEqual(sum(r is not None for r in results),1)
+
+    def test_missing_journal_fails_closed_instead_of_creating_empty_claims(self):
+        with self.assertRaises(FileNotFoundError):
+            OfflineRestartJournal(self.path)
+        self.assertFalse(os.path.exists(self.path))
+
+    def test_corrupted_journal_fails_closed(self):
+        with open(self.path,"wb") as file:
+            file.write(b"not a sqlite journal")
+        with self.assertRaises(Exception):
+            OfflineRestartJournal(self.path)
+
+    def test_existing_journal_cannot_be_recreated_as_fresh(self):
+        journal=OfflineRestartJournal(self.path,create=True)
+        token,cloid,fence=journal.reserve(bot="daily",**SCOPE)
+        with self.assertRaises(FileExistsError):
+            OfflineRestartJournal(self.path,create=True)
+        self.assertEqual(OfflineRestartJournal(self.path).inspect(**SCOPE),
+                         ("daily",token,cloid,fence,"reserved"))
+
+    def test_empty_sqlite_file_without_claims_schema_fails_closed(self):
+        import sqlite3
+        sqlite3.connect(self.path).close()
+        with self.assertRaises(sqlite3.DatabaseError):
+            OfflineRestartJournal(self.path)
 
     def test_no_exchange_sender_methods(self):
         import offline_sender_restart_journal as module
