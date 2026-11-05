@@ -166,6 +166,37 @@ class JournaledFakeDispatchTests(unittest.TestCase):
         self.assertEqual(self.attempt(fake).state,"hold")
         self.assertEqual(fake.attempts,[])
 
+    def test_crash_immediately_after_durable_marker_commit_blocks_replay(self):
+        fake=FakeExchange()
+        original=self.journal.mark_dispatch_unknown
+        def commit_then_crash(**kwargs):
+            self.assertTrue(original(**kwargs))
+            raise OSError("synthetic crash after durable commit")
+        self.journal.mark_dispatch_unknown=commit_then_crash
+        self.assertEqual(self.attempt(fake).state,"hold")
+        self.assertEqual(fake.attempts,[])
+        restarted=OfflineRestartJournal(self.path)
+        self.assertEqual(restarted.inspect(**SCOPE)[4],"dispatch_unknown")
+        self.assertEqual(simulate_journaled_once(
+            journal=restarted,fake=fake,token=self.token,
+            fence=self.fence,**SCOPE).state,"hold")
+        self.assertEqual(fake.attempts,[])
+        self.assertIsNone(restarted.reserve(bot="intraday",**SCOPE))
+
+    def test_fake_response_then_storage_unavailable_requires_manual_recovery(self):
+        fake=FakeExchange()
+        original=fake.record_fake_attempt
+        def record_then_unlink(token,cloid):
+            result=original(token,cloid)
+            os.unlink(self.path)
+            return result
+        fake.record_fake_attempt=record_then_unlink
+        self.assertEqual(self.attempt(fake).state,"observed_unverified")
+        self.assertEqual(len(fake.attempts),1)
+        with self.assertRaises(FileNotFoundError):
+            OfflineRestartJournal(self.path)
+        self.assertFalse(os.path.exists(self.path))
+
     def test_stale_fence_and_wrong_scope_do_not_dispatch(self):
         fake=FakeExchange()
         self.assertEqual(self.attempt(fake,fence=self.fence+1).state,"hold")
