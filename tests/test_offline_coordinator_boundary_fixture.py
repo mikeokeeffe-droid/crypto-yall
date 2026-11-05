@@ -322,6 +322,31 @@ class CoordinatorBoundaryFixtureTests(unittest.TestCase):
             self.assertFalse(result.submit_authorized)
         self.assertEqual(self.journal.inspect(**SCOPE),before)
 
+    def test_ambiguous_close_recovery_after_restart_preserves_claim(self):
+        self.assertEqual(self.daily.request_entry(self.intent).state,"reserved")
+        before=self.journal.inspect(**SCOPE)
+        reopened=OfflineRestartJournal(self.journal.path)
+        protected=OfflineProtectedJournalFixture(
+            verifier=OfflineIdentityVerifier({
+                "daily-principal":VerifiedFixtureIdentity("daily","mainnet",ACCOUNT),
+                "intraday-principal":VerifiedFixtureIdentity("intraday","mainnet",ACCOUNT),
+            }),journal=reopened)
+        restarted_server=OfflineCoordinatorServerFixture(protected)
+        restarted_daily=OfflineCoordinatorClientFixture(
+            send=restarted_server.handle,principal="daily-principal")
+        restarted_intraday=OfflineCoordinatorClientFixture(
+            send=restarted_server.handle,principal="intraday-principal")
+        unknown_ack=restarted_server.handle(
+            principal="daily-principal",operation="close_acknowledgement",
+            intent={"acknowledgement":"unknown",
+                    "token":before[1],"fence":before[3],**SCOPE})
+        self.assertEqual(unknown_ack.state,"hold")
+        self.assertEqual(restarted_daily.request_close(
+            coin="SOL",token=before[1],fence=before[3]).state,"hold")
+        self.assertEqual(restarted_intraday.request_entry(
+            OfflineEntryIntent(requested_bot="intraday",**SCOPE)).state,"hold")
+        self.assertEqual(reopened.inspect(**SCOPE),before)
+
     def test_unknown_operation_and_malformed_request_hold(self):
         self.assertEqual(self.server.handle(
             principal="daily-principal",operation="raw_sql",intent=self.intent).state,"hold")
