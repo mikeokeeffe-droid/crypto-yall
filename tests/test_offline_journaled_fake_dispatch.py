@@ -219,6 +219,28 @@ class JournaledFakeDispatchTests(unittest.TestCase):
         self.assertIsNone(restarted.reserve(bot="aggressive",**SCOPE))
         # A reserved claim is unresolved, not permission to reassign it.
 
+    def test_restart_rejects_old_token_with_correct_fence(self):
+        fake=FakeExchange()
+        restarted=OfflineRestartJournal(self.path)
+        result=simulate_journaled_once(
+            journal=restarted,fake=fake,token="old-claim-token",
+            fence=self.fence,**SCOPE)
+        self.assertEqual(result.state,"hold")
+        self.assertFalse(result.submit_authorized)
+        self.assertEqual(fake.attempts,[])
+        self.assertEqual(restarted.inspect(**SCOPE)[4],"reserved")
+
+    def test_restart_rejects_correct_token_with_stale_fence(self):
+        fake=FakeExchange()
+        restarted=OfflineRestartJournal(self.path)
+        result=simulate_journaled_once(
+            journal=restarted,fake=fake,token=self.token,
+            fence=self.fence+1,**SCOPE)
+        self.assertEqual(result.state,"hold")
+        self.assertFalse(result.submit_authorized)
+        self.assertEqual(fake.attempts,[])
+        self.assertEqual(restarted.inspect(**SCOPE)[4],"reserved")
+
     def test_stale_fence_and_wrong_scope_do_not_dispatch(self):
         fake=FakeExchange()
         self.assertEqual(self.attempt(fake,fence=self.fence+1).state,"hold")
