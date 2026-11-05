@@ -15,7 +15,7 @@ class RestartJournalTests(unittest.TestCase):
         self.temp.cleanup()
 
     def test_restart_retains_unresolved_claim_and_cloid(self):
-        journal = OfflineRestartJournal(self.path)
+        journal = OfflineRestartJournal(self.path, create=True)
         token,cloid,fence = journal.reserve(bot="daily",**SCOPE)
         self.assertTrue(journal.mark_dispatch_unknown(token=token,fence=fence,**SCOPE))
         restarted = OfflineRestartJournal(self.path)
@@ -24,7 +24,7 @@ class RestartJournalTests(unittest.TestCase):
         self.assertFalse(restarted.mark_dispatch_unknown(token=token,fence=fence,**SCOPE))
 
     def test_restart_before_dispatch_still_blocks_reassignment(self):
-        journal = OfflineRestartJournal(self.path)
+        journal = OfflineRestartJournal(self.path, create=True)
         token,cloid,fence = journal.reserve(bot="aggressive",**SCOPE)
         restarted = OfflineRestartJournal(self.path)
         self.assertEqual(restarted.inspect(**SCOPE)[-1],"reserved")
@@ -42,7 +42,7 @@ class RestartJournalTests(unittest.TestCase):
     def test_competing_journal_instances_one_claim(self):
         def attempt(bot):
             return OfflineRestartJournal(self.path).reserve(bot=bot,**SCOPE)
-        OfflineRestartJournal(self.path)
+        OfflineRestartJournal(self.path, create=True)
         with concurrent.futures.ThreadPoolExecutor(max_workers=3) as pool:
             results=list(pool.map(attempt,("daily","intraday","aggressive")))
         self.assertEqual(sum(r is not None for r in results),1)
