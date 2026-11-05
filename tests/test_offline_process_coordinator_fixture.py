@@ -114,6 +114,20 @@ class OfflineProcessCoordinatorTests(unittest.TestCase):
             environment="mainnet",account=ACCOUNT,dex="",coin="SOL")
         self.assertEqual(after,before)
 
+    def test_same_user_filesystem_access_still_bypasses_process_boundary(self):
+        # Explicit NO-GO audit: a child process alone does not isolate the DB.
+        coordinator=OfflineProcessCoordinator(self.path,PRINCIPALS)
+        try:
+            # The parent has the same journal file permissions as the child.
+            bypass=OfflineRestartJournal(self.path).reserve(
+                bot="aggressive",environment="mainnet",
+                account=ACCOUNT,dex="",coin="SOL")
+            self.assertIsNotNone(bypass)
+            self.assertEqual(coordinator.request(
+                "daily-principal","request_entry",SCOPE),("hold",False))
+        finally:
+            coordinator.close()
+
     def test_missing_journal_prevents_process_start(self):
         os.unlink(self.path)
         with self.assertRaises(RuntimeError):
