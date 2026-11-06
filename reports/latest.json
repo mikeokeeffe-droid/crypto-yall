@@ -374,8 +374,8 @@
       "trading_fees": 0
     }
   },
-  "date_utc": "2026-11-05",
-  "generated_at": "2026-11-05T23:08:18.865037+00:00",
+  "date_utc": "2026-11-06",
+  "generated_at": "2026-11-06T00:08:25.373285+00:00",
   "report_errors": [],
   "reporting_only": true,
   "schema_version": 2,
@@ -2796,12 +2796,12 @@
         ],
         "open_positions": {},
         "today": {
-          "average_loss_pct": -0.3335,
+          "average_loss_pct": null,
           "average_win_pct": null,
-          "closed_trades": 2,
-          "cumulative_gross_return_pct": -0.6669,
-          "losses": 2,
-          "win_rate_pct": 0.0,
+          "closed_trades": 0,
+          "cumulative_gross_return_pct": 0,
+          "losses": 0,
+          "win_rate_pct": null,
           "wins": 0
         }
       },
@@ -3985,29 +3985,29 @@
           "AVAX": {
             "asset": "AVAX",
             "blocked_live_reason": "mid-cap allow_short=False",
-            "current_price": 8.2233,
+            "current_price": 8.1702,
             "entry_price": 8.7753,
             "entry_time": "2026-11-05T03:00:00",
             "ticker": "AVAX-USD",
-            "unrealized_gross_return_pct": 6.2904
+            "unrealized_gross_return_pct": 6.8955
           },
           "SOL": {
             "asset": "SOL",
             "blocked_live_reason": "mid-cap allow_short=False",
-            "current_price": 89.56,
+            "current_price": 89.291,
             "entry_price": 92.979,
             "entry_time": "2026-11-05T14:00:00",
             "ticker": "SOL-USD",
-            "unrealized_gross_return_pct": 3.6772
+            "unrealized_gross_return_pct": 3.9665
           },
           "SUI": {
             "asset": "SUI",
             "blocked_live_reason": "mid-cap allow_short=False",
-            "current_price": 0.84028,
+            "current_price": 0.84106,
             "entry_price": 0.92585,
             "entry_time": "2026-11-05T06:00:00",
             "ticker": "SUI20947-USD",
-            "unrealized_gross_return_pct": 9.2423
+            "unrealized_gross_return_pct": 9.1581
           }
         },
         "today": {
@@ -4874,6 +4874,6 @@
     "errors": [],
     "scope": "Shadow-only fresh short signals for SOL/AVAX/LINK/SUI/XRP/ONDO that live trading blocks because mid-cap allow_short=False.",
     "tracking_started_at": "2026-09-10T22:03:23.796957+00:00",
-    "updated_at": "2026-11-05T23:08:18.865037+00:00"
+    "updated_at": "2026-11-06T00:08:25.373285+00:00"
   }
 }
