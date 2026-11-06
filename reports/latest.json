@@ -375,7 +375,7 @@
     }
   },
   "date_utc": "2026-11-06",
-  "generated_at": "2026-11-06T20:08:09.716643+00:00",
+  "generated_at": "2026-11-06T21:08:04.109523+00:00",
   "report_errors": [],
   "reporting_only": true,
   "schema_version": 2,
@@ -2794,7 +2794,17 @@
             "ticker": "SOL-USD"
           }
         ],
-        "open_positions": {},
+        "open_positions": {
+          "LINK": {
+            "asset": "LINK",
+            "blocked_live_reason": "mid-cap allow_short=False",
+            "current_price": 10.858,
+            "entry_price": 10.858,
+            "entry_time": "2026-11-06T20:30:00",
+            "ticker": "LINK-USD",
+            "unrealized_gross_return_pct": 0.0
+          }
+        },
         "today": {
           "average_loss_pct": -1.0454,
           "average_win_pct": null,
@@ -4527,7 +4537,19 @@
           ],
           "dual_short_confirmed_now": true,
           "eth_confirmed_short_now": true,
-          "open_positions": {},
+          "open_positions": {
+            "LINK": {
+              "asset": "LINK",
+              "btc_confirmed_short": true,
+              "current_price": 10.858,
+              "entry_price": 10.858,
+              "entry_time": "2026-11-06T20:30:00",
+              "eth_confirmed_short": true,
+              "filter": "BTC+ETH confirmed short + mid-cap enter_short",
+              "ticker": "LINK-USD",
+              "unrealized_gross_return_pct": 0.0
+            }
+          },
           "today": {
             "average_loss_pct": null,
             "average_win_pct": null,
@@ -4882,6 +4904,6 @@
     "errors": [],
     "scope": "Shadow-only fresh short signals for SOL/AVAX/LINK/SUI/XRP/ONDO that live trading blocks because mid-cap allow_short=False.",
     "tracking_started_at": "2026-09-10T22:03:23.796957+00:00",
-    "updated_at": "2026-11-06T20:08:09.716643+00:00"
+    "updated_at": "2026-11-06T21:08:04.109523+00:00"
   }
 }
