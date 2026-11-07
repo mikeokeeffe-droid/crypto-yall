@@ -1,0 +1,193 @@
+import unittest
+from unittest.mock import patch
+from types import SimpleNamespace
+from trusted_reconciler_service_staging import reconcile_submitted_entry, reconcile_flat_owner, authenticated_rpc, authorized_reconcile_submitted_entry, authorized_reconcile_flat_owner
+
+ARGS = dict(coin="SOL", bot="intraday", token="durable-token", order_id=17,
+            order_start_ms=99000, requested_size=2, clock=lambda: 100)
+
+class ServiceTests(unittest.TestCase):
+    def test_authorized_entry_reaches_verified_handoff(self):
+        calls = []
+        with patch("trusted_reconciler_service_staging.reconcile_entry",
+                   return_value=SimpleNamespace(action="handoff_candidate")):
+            result = authorized_reconcile_submitted_entry(None, None,
+                lambda name, data: calls.append(name) or True,
+                authorized=True, **ARGS)
+        self.assertTrue(result.confirmed)
+        self.assertEqual(calls, ["record_bot_position_owner"])
+
+    def test_authorized_release_uses_verified_release_path(self):
+        with patch("trusted_reconciler_service_staging.release_verified",
+                   return_value=False) as release:
+            result = authorized_reconcile_flat_owner(None, None,
+                lambda *a: True, authorized=True, coin="SOL", bot="intraday",
+                token="durable-token", clock=lambda: 100)
+        self.assertFalse(result.confirmed)
+        release.assert_called_once()
+
+    def test_release_never_skips_first_exchange_verification(self):
+        calls = []
+        with patch("trusted_reconciler_release_staging.reconcile_closed",
+                   return_value=SimpleNamespace(action="hold")) as exchange:
+            result = authorized_reconcile_flat_owner(None, None,
+                lambda *args: calls.append(args) or True,
+                authorized=True, coin="SOL", bot="intraday",
+                token="durable-token", clock=lambda: 100)
+        self.assertFalse(result.confirmed)
+        exchange.assert_called_once()
+        self.assertEqual(calls, [])
+
+    def test_release_requires_explicit_database_confirmation(self):
+        for response in (False, None, "true", 1):
+            with self.subTest(response=response):
+                calls = []
+                with patch("trusted_reconciler_release_staging.reconcile_closed",
+                           return_value=SimpleNamespace(action="release_candidate")) as exchange:
+                    result = authorized_reconcile_flat_owner(None, None,
+                        lambda name, params: calls.append(name) or response,
+                        authorized=True, coin="SOL", bot="intraday",
+                        token="durable-token", clock=lambda: 100)
+                self.assertFalse(result.confirmed)
+                self.assertEqual(calls, ["mark_bot_position_closed"])
+                exchange.assert_called_once()
+
+    def test_authorized_release_transport_failure_keeps_fence(self):
+        with patch("trusted_reconciler_release_staging.reconcile_closed",
+                   return_value=SimpleNamespace(action="release_candidate")):
+            def broken_rpc(*args):
+                raise ConnectionError("offline")
+            result = authorized_reconcile_flat_owner(None, None,
+                broken_rpc, authorized=True, coin="SOL", bot="intraday",
+                token="durable-token", clock=lambda: 100)
+        self.assertFalse(result.confirmed)
+
+    def test_authorized_release_requires_two_fresh_checks(self):
+        checks = [SimpleNamespace(action="release_candidate"),
+                  SimpleNamespace(action="hold")]
+        calls = []
+        with patch("trusted_reconciler_release_staging.reconcile_closed",
+                   side_effect=checks) as exchange:
+            result = authorized_reconcile_flat_owner(None, None,
+                lambda name, params: calls.append(name) or True,
+                authorized=True, coin="SOL", bot="intraday",
+                token="durable-token", clock=lambda: 100)
+        self.assertFalse(result.confirmed)
+        self.assertEqual(exchange.call_count, 2)
+        self.assertEqual(calls, ["mark_bot_position_closed"])
+
+    def test_denied_authorization_never_invokes_rpc(self):
+        calls = []
+        for value in (False, None, "true", 1, {}, []):
+            with self.subTest(value=value):
+                with self.assertRaises(PermissionError):
+                    authorized_reconcile_flat_owner(None, None,
+                        lambda *a: calls.append(a), authorized=value,
+                        coin="SOL", bot="intraday", token="durable-token",
+                        clock=lambda: 100)
+        self.assertEqual(calls, [])
+
+    def test_authorized_entry_transport_failure_keeps_fence(self):
+        with patch("trusted_reconciler_service_staging.reconcile_entry",
+                   return_value=SimpleNamespace(action="handoff_candidate")):
+            def broken_rpc(*args):
+                raise ConnectionError("offline")
+            result = authorized_reconcile_submitted_entry(None, None,
+                broken_rpc, authorized=True, **ARGS)
+        self.assertFalse(result.confirmed)
+
+    def test_authorized_entry_rpc_must_confirm_true(self):
+        with patch("trusted_reconciler_service_staging.reconcile_entry",
+                   return_value=SimpleNamespace(action="handoff_candidate")):
+            for response in (False, None, "true", 1):
+                with self.subTest(response=response):
+                    result = authorized_reconcile_submitted_entry(None, None,
+                        lambda *args: response, authorized=True, **ARGS)
+                    self.assertFalse(result.confirmed)
+
+    def test_unauthorized_entry_does_not_read_exchange_or_mutate(self):
+        with patch("trusted_reconciler_service_staging.reconcile_entry") as exchange:
+            with self.assertRaises(PermissionError):
+                authorized_reconcile_submitted_entry(None, None, lambda *a: True, **ARGS)
+            exchange.assert_not_called()
+
+    def test_unauthorized_release_does_not_read_exchange_or_mutate(self):
+        with patch("trusted_reconciler_service_staging.release_verified") as exchange:
+            with self.assertRaises(PermissionError):
+                authorized_reconcile_flat_owner(None, None, lambda *a: True,
+                    coin="SOL", bot="intraday", token="durable-token", clock=lambda: 100)
+            exchange.assert_not_called()
+
+    def test_rpc_adapter_denies_missing_authorization(self):
+        for authorized in (False, None, "true", 1):
+            with self.subTest(authorized=authorized):
+                with self.assertRaises(PermissionError):
+                    authenticated_rpc(lambda *a: True, authorized=authorized)
+
+    def test_rpc_adapter_allows_explicit_authorization(self):
+        rpc = lambda *a: True
+        self.assertIs(authenticated_rpc(rpc, authorized=True), rpc)
+
+    def test_verified_entry_calls_trusted_rpc(self):
+        calls = []
+        with patch("trusted_reconciler_service_staging.reconcile_entry",
+                   return_value=SimpleNamespace(action="handoff_candidate")):
+            result = reconcile_submitted_entry(None, None,
+                       lambda name, data: calls.append(name) or True, **ARGS)
+        self.assertTrue(result.confirmed)
+        self.assertEqual(calls, ["record_bot_position_owner"])
+
+    def test_held_entry_never_mutates_database(self):
+        calls = []
+        with patch("trusted_reconciler_service_staging.reconcile_entry",
+                   return_value=SimpleNamespace(action="hold", reason="incomplete fills")):
+            result = reconcile_submitted_entry(None, None,
+                       lambda name, data: calls.append(name) or True, **ARGS)
+        self.assertFalse(result.confirmed)
+        self.assertEqual(calls, [])
+
+    def test_all_three_bots_can_use_the_reconciler_boundary(self):
+        for bot in ("aggressive", "intraday", "daily"):
+            with self.subTest(bot=bot):
+                calls = []
+                with patch("trusted_reconciler_service_staging.reconcile_entry",
+                           return_value=SimpleNamespace(action="handoff_candidate")):
+                    result = reconcile_submitted_entry(
+                        None, None, lambda name, data: calls.append(name) or True,
+                        **{**ARGS, "bot": bot},
+                    )
+                self.assertTrue(result.confirmed)
+                self.assertEqual(calls, ["record_bot_position_owner"])
+
+    def test_invalid_bot_rejected_before_evidence_or_rpc(self):
+        for bot in ("", None, "unknown"):
+            with self.subTest(bot=bot):
+                with patch("trusted_reconciler_service_staging.reconcile_entry") as evidence:
+                    rpc_calls = []
+                    result = reconcile_submitted_entry(None, None,
+                        lambda *a: rpc_calls.append(a) or True,
+                        **{**ARGS, "bot": bot})
+                self.assertFalse(result.confirmed)
+                evidence.assert_not_called()
+                self.assertEqual(rpc_calls, [])
+
+    def test_release_accepts_each_bot_but_rejects_invalid_identity(self):
+        for bot in ("", None, "unknown"):
+            with self.subTest(bot=bot):
+                with patch("trusted_reconciler_service_staging.release_verified") as release:
+                    rpc_calls = []
+                    result = reconcile_flat_owner(None, None,
+                        lambda *a: rpc_calls.append(a) or True,
+                        coin="SOL", bot=bot, token="durable-token", clock=lambda: 100)
+                self.assertFalse(result.confirmed)
+                release.assert_not_called()
+                self.assertEqual(rpc_calls, [])
+
+    def test_release_holds_when_evidence_denied(self):
+        with patch("trusted_reconciler_service_staging.release_verified", return_value=False):
+            result = reconcile_flat_owner(None, None, lambda *a: True,
+                        coin="SOL", bot="intraday", token="durable-token", clock=lambda: 100)
+        self.assertFalse(result.confirmed)
+
+if __name__ == "__main__":
+    unittest.main()

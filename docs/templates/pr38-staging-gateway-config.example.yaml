@@ -1,0 +1,62 @@
+# NON-RUNNABLE REVIEW TEMPLATE — placeholders only; not consumed by the gateway.
+# Never store credentials in this file. Keep disabled until separately approved.
+deployment:
+  environment: staging
+  enabled: false
+  route_mounted: false
+  listener: none
+  public_network: false
+  private_ingress_only: true
+  tls_required_at_ingress: true
+  client_to_ingress_mtls: REQUIRED_BY_APPROVED_HOSTING_POLICY
+
+gateway:
+  path: /staging/entry-claims
+  method: POST
+  issuer: REPLACE_WITH_STAGING_ISSUER
+  audience: REPLACE_WITH_STAGING_AUDIENCE
+  maximum_request_bytes: 4096
+  # This is an application factory input, not a listen/bind address.
+  application_factory: create_staging_executor_entry_app
+
+postgres:
+  endpoint: REPLACE_WITH_PRIVATE_STAGING_DATABASE_ENDPOINT
+  database: REPLACE_WITH_VERIFIED_STAGING_DATABASE_NAME
+  tls_mode: verify-full
+  ca_bundle_secret_ref: REPLACE_WITH_STAGING_CA_SECRET_REFERENCE
+  # No shared service-role, owner, or superuser connection is permitted.
+  bots:
+    aggressive:
+      login: staging_executor_aggressive
+      password_secret_ref: REPLACE_WITH_UNIQUE_SECRET_REFERENCE
+    intraday:
+      login: staging_executor_intraday
+      password_secret_ref: REPLACE_WITH_UNIQUE_SECRET_REFERENCE
+    daily:
+      login: staging_executor_daily
+      password_secret_ref: REPLACE_WITH_UNIQUE_SECRET_REFERENCE
+
+jwt:
+  algorithm: HS256
+  minimum_key_bytes: 32
+  bots:
+    aggressive:
+      signing_key_secret_ref: REPLACE_WITH_UNIQUE_SECRET_REFERENCE
+      subject: executor:aggressive
+      scope: executor:entry
+    intraday:
+      signing_key_secret_ref: REPLACE_WITH_UNIQUE_SECRET_REFERENCE
+      subject: executor:intraday
+      scope: executor:entry
+    daily:
+      signing_key_secret_ref: REPLACE_WITH_UNIQUE_SECRET_REFERENCE
+      subject: executor:daily
+      scope: executor:entry
+
+operations:
+  startup_identity_preflight_required: true
+  fail_closed_on_any_permission_error: true
+  audit_sink: REPLACE_WITH_ACCESS_CONTROLLED_APPEND_ONLY_STAGING_SINK
+  log_bearer_tokens_or_secret_values: false
+  rotation_requires_request_pause: true
+  rollback_action: unmount_route_and_stop_staging_app
