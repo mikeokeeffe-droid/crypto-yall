@@ -6,6 +6,7 @@ on:
       - safety/original-bots-offline-baseline-20261030
     paths:
       - '.github/workflows/test-distinct-uid-journal-isolation-manual.yml'
+      - 'tests/test_offline_credential_uid_isolation.py'
       - 'tests/test_offline_distinct_uid_journal_isolation.py'
       - 'offline_sender_restart_journal.py'
   workflow_dispatch: {}
@@ -30,8 +31,24 @@ jobs:
             python -m unittest discover -s tests \
               -p 'test_offline_distinct_uid_journal_isolation.py' -v \
               2>&1 | tee /tmp/distinct-uid-isolation.log
+          sudo -n env PATH="$PATH" PYTHONPATH="$PWD" \
+            python -m unittest discover -s tests \
+              -p 'test_offline_credential_uid_isolation.py' -v \
+              2>&1 | tee /tmp/credential-uid-isolation.log
           grep -q 'Ran 1 test' /tmp/distinct-uid-isolation.log
-          grep -q '^OK$' /tmp/distinct-uid-isolation.log
+          grep -q 'Ran 1 test' /tmp/credential-uid-isolation.log
+          grep -q '^OK
+          if grep -Eq 'skipped|SKIP' /tmp/distinct-uid-isolation.log /tmp/credential-uid-isolation.log; then
+            echo 'Distinct UID test was skipped: isolation is NOT verified'
+            exit 1
+          fi
+ /tmp/distinct-uid-isolation.log
+          grep -q '^OK
+          if grep -Eq 'skipped|SKIP' /tmp/distinct-uid-isolation.log; then
+            echo 'Distinct UID test was skipped: isolation is NOT verified'
+            exit 1
+          fi
+ /tmp/credential-uid-isolation.log
           if grep -Eq 'skipped|SKIP' /tmp/distinct-uid-isolation.log; then
             echo 'Distinct UID test was skipped: isolation is NOT verified'
             exit 1
