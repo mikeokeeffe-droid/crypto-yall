@@ -21,6 +21,8 @@ on:
       - 'offline_process_coordinator_fixture.py'
       - 'offline_unix_peer_identity_fixture.py'
       - 'offline_framed_unix_coordinator_fixture.py'
+      - 'offline_coordinator_listener_fixture.py'
+      - 'tests/test_offline_coordinator_listener_fixture.py'
       - 'offline_socket_journal_bridge_fixture.py'
       - 'tests/test_offline_three_bot_restart_recovery.py'
       - 'tests/test_offline_three_bot_socket_admission.py'
@@ -167,6 +169,7 @@ jobs:
           python -m unittest discover -s tests -p 'test_offline_three_bot_restart_recovery.py' -v
           python -m unittest discover -s tests -p 'test_offline_three_bot_socket_admission.py' -v
           python -m unittest discover -s tests -p 'test_offline_concurrent_socket_journal.py' -v
+          python -m unittest discover -s tests -p 'test_offline_coordinator_listener_fixture.py' -v
           python -m unittest discover -s tests -p 'test_offline_socket_journal_bridge_fixture.py' -v
           python -m unittest discover -s tests -p 'test_offline_framed_unix_coordinator_fixture.py' -v
           python -m unittest discover -s tests -p 'test_offline_unix_socket_interruption_restart.py' -v
