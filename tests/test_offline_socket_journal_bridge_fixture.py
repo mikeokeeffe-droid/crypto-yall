@@ -64,6 +64,10 @@ class OfflineSocketJournalBridgeTests(unittest.TestCase):
         self.assertIsNone(OfflineRestartJournal(self.journal).inspect(
             environment="mainnet",account=ACCOUNT,dex="",coin="SOL"))
 
+    def test_invalid_scope_does_not_consume_nonce(self):
+        self.assertEqual(self.exchange(dict(self.payload,coin="bad!")),("hold",False))
+        self.assertEqual(self.exchange(self.payload),("reserved_offline_only",False))
+
     def test_missing_replay_ledger_holds_without_claim(self):
         os.unlink(self.replay)
         self.assertEqual(self.exchange(self.payload),("hold",False))
