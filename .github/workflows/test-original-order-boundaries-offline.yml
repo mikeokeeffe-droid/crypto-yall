@@ -19,6 +19,8 @@ on:
       - 'offline_hyperliquid_cloid_order_review.py'
       - 'offline_dispatch_lifecycle_review.py'
       - 'offline_process_coordinator_fixture.py'
+      - 'offline_unix_peer_identity_fixture.py'
+      - 'tests/test_offline_unix_peer_identity_fixture.py'
       - 'tests/test_offline_same_uid_auth_bypass_audit.py'
       - 'tests/test_offline_worker_credential_startup.py'
       - 'offline_worker_credential_loader.py'
@@ -153,6 +155,7 @@ jobs:
           python -m unittest discover -s tests -p 'test_offline_hyperliquid_cloid_order_review.py' -v
           python -m unittest discover -s tests -p 'test_offline_dispatch_lifecycle_review.py' -v
           python -m unittest discover -s tests -p 'test_offline_direct_journal_bypass_audit.py' -v
+          python -m unittest discover -s tests -p 'test_offline_unix_peer_identity_fixture.py' -v
           python -m unittest discover -s tests -p 'test_offline_same_uid_auth_bypass_audit.py' -v
           python -m unittest discover -s tests -p 'test_offline_worker_credential_startup.py' -v
           python -m unittest discover -s tests -p 'test_offline_worker_credential_loader.py' -v
