@@ -12,12 +12,14 @@ from offline_coordinator_boundary_fixture import (
     OfflineCoordinatorServerFixture,OfflineEntryIntent)
 from offline_persistent_replay_ledger import OfflinePersistentReplayLedger
 from offline_authenticated_envelope_fixture import OfflineAuthenticatedEnvelopeVerifier
+from offline_worker_credential_loader import load_offline_worker_keys
 
-def _authenticated_worker(pipe,journal_path,replay_path,principals,keys):
+def _authenticated_worker(pipe,journal_path,replay_path,principals,keys,credential_path):
     try:
         journal=OfflineRestartJournal(journal_path)
         ledger=OfflinePersistentReplayLedger(replay_path)
-        verifier=OfflineAuthenticatedEnvelopeVerifier(keys,ledger=ledger)
+        worker_keys=load_offline_worker_keys(credential_path) if credential_path is not None else keys
+        verifier=OfflineAuthenticatedEnvelopeVerifier(worker_keys,ledger=ledger)
         identity=OfflineIdentityVerifier({
             principal:VerifiedFixtureIdentity(*scope)
             for principal,scope in principals.items()})
@@ -53,12 +55,14 @@ def _authenticated_worker(pipe,journal_path,replay_path,principals,keys):
         pipe.close()
 
 class OfflineWorkerAuthenticatedCoordinator:
-    def __init__(self,journal_path,replay_path,principals,keys):
+    def __init__(self,journal_path,replay_path,principals,keys=None,credential_path=None):
+        if credential_path is None and keys is None:
+            raise ValueError('fixture keys or credential path required')
         ctx=get_context("spawn")
         self._pipe,child=ctx.Pipe()
         self._process=ctx.Process(
             target=_authenticated_worker,
-            args=(child,journal_path,replay_path,principals,keys))
+            args=(child,journal_path,replay_path,principals,keys,credential_path))
         self._process.start()
         child.close()
         if not self._pipe.poll(10) or self._pipe.recv()!=("ready",None):
