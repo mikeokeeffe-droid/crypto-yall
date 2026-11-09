@@ -5,6 +5,7 @@ Two SQLite files are NOT one atomic transaction: a crash between writes can
 burn a nonce without a claim (safe HOLD), and no trading is authorized.
 """
 import json
+import socket
 import struct
 from offline_unix_peer_identity_fixture import offline_peer_identity
 from offline_framed_unix_coordinator_fixture import MAX_FRAME,_read_exact
@@ -34,7 +35,7 @@ def handle_offline_journal_socket(connection,allowed_uids,replay_path,journal_pa
         # Validate the journal before consuming a nonce. Never recreate missing files.
         journal=OfflineRestartJournal(journal_path)
         ledger=OfflinePersistentReplayLedger(replay_path)
-        if not ledger.consume(str(connection.getsockopt(1,17,12).hex())+":"+bot,
+        if not ledger.consume(str(struct.unpack("3i",connection.getsockopt(socket.SOL_SOCKET,socket.SO_PEERCRED,12))[1])+":"+bot,
                               payload["nonce"]):
             return ("hold",False)
         reserved=journal.reserve(bot=bot,environment=environment,account=account,
