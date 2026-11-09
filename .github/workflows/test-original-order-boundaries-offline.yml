@@ -20,6 +20,8 @@ on:
       - 'offline_dispatch_lifecycle_review.py'
       - 'offline_process_coordinator_fixture.py'
       - 'offline_unix_peer_identity_fixture.py'
+      - 'offline_framed_unix_coordinator_fixture.py'
+      - 'tests/test_offline_framed_unix_coordinator_fixture.py'
       - 'tests/test_offline_unix_socket_interruption_restart.py'
       - 'tests/test_offline_unix_socket_access_failures.py'
       - 'tests/test_offline_unix_peer_identity_fixture.py'
@@ -157,6 +159,7 @@ jobs:
           python -m unittest discover -s tests -p 'test_offline_hyperliquid_cloid_order_review.py' -v
           python -m unittest discover -s tests -p 'test_offline_dispatch_lifecycle_review.py' -v
           python -m unittest discover -s tests -p 'test_offline_direct_journal_bypass_audit.py' -v
+          python -m unittest discover -s tests -p 'test_offline_framed_unix_coordinator_fixture.py' -v
           python -m unittest discover -s tests -p 'test_offline_unix_socket_interruption_restart.py' -v
           python -m unittest discover -s tests -p 'test_offline_unix_socket_access_failures.py' -v
           python -m unittest discover -s tests -p 'test_offline_unix_peer_identity_fixture.py' -v
