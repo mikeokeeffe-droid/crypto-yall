@@ -1,6 +1,13 @@
-name: Distinct UID journal isolation (offline manual)
+name: Distinct UID journal isolation (offline branch test)
 
 on:
+  push:
+    branches:
+      - safety/original-bots-offline-baseline-20261030
+    paths:
+      - '.github/workflows/test-distinct-uid-journal-isolation-manual.yml'
+      - 'tests/test_offline_distinct_uid_journal_isolation.py'
+      - 'offline_sender_restart_journal.py'
   workflow_dispatch: {}
 
 permissions:
