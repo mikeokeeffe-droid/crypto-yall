@@ -1,0 +1,29 @@
+name: Distinct UID journal isolation (offline manual)
+
+on:
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  distinct-uid-isolation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Exercise disposable journal as separate Linux UID
+        run: |
+          set -euo pipefail
+          # Explicit root invocation makes the distinct-UID test execute
+          # rather than silently skip. No secrets or production services.
+          sudo -n env PATH="$PATH" PYTHONPATH="$PWD" \
+            python -m unittest discover -s tests -p 'test_offline_distinct_uid_journal_isolation.py' -v
+      - name: Verify that isolation test actually ran
+        run: |
+          # A separate explicit guard ensures the runner supports root.
+          test "$(id -u)" -ne 0
+          command -v sudo
