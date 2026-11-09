@@ -1,5 +1,6 @@
 """Offline worker-side authentication and durable replay checks."""
 import os
+import json
 import tempfile
 import unittest
 from offline_sender_restart_journal import OfflineRestartJournal
@@ -10,7 +11,6 @@ from offline_worker_authenticated_coordinator_fixture import OfflineWorkerAuthen
 ACCOUNT="0x"+"1"*40
 KEY=b"d"*32
 PRINCIPALS={"daily-principal":("daily","mainnet",ACCOUNT)}
-KEYS={"daily-principal":KEY}
 INTENT=dict(requested_bot="daily",environment="mainnet",
             account=ACCOUNT,dex="",coin="SOL")
 
@@ -21,11 +21,15 @@ class WorkerAuthenticationTests(unittest.TestCase):
         self.replay=os.path.join(self.temp.name,"replay.sqlite")
         OfflineRestartJournal(self.journal,create=True)
         OfflinePersistentReplayLedger(self.replay,create=True)
+        self.credentials=os.path.join(self.temp.name,'credentials.json')
+        with open(self.credentials,'w') as stream:
+            json.dump({'daily-principal':KEY.hex()},stream)
+        os.chmod(self.credentials,0o600)
     def tearDown(self):
         self.temp.cleanup()
     def start(self):
         return OfflineWorkerAuthenticatedCoordinator(
-            self.journal,self.replay,PRINCIPALS,KEYS)
+            self.journal,self.replay,PRINCIPALS,self.credentials)
     def signed(self,nonce,operation="request_entry"):
         return sign_fixture_request(KEY,"daily-principal",operation,INTENT,nonce)
 
