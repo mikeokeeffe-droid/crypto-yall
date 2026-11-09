@@ -39,21 +39,11 @@ jobs:
             python -m unittest discover -s tests \
               -p 'test_offline_distinct_uid_bypass_denial.py' -v \
               2>&1 | tee /tmp/distinct-uid-bypass-denial.log
-          grep -q 'Ran 1 test' /tmp/distinct-uid-bypass-denial.log
-          grep -q '^OK
-          grep -q 'Ran 1 test' /tmp/credential-uid-isolation.log
-          grep -q '^OK$' /tmp/distinct-uid-isolation.log
-          grep -q '^OK$' /tmp/credential-uid-isolation.log
-          if grep -Eq 'skipped|SKIP' /tmp/distinct-uid-isolation.log /tmp/credential-uid-isolation.log /tmp/distinct-uid-bypass-denial.log; then
-            echo 'UID isolation test skipped; cannot claim isolation verified'
-            exit 1
-          fi
- /tmp/distinct-uid-bypass-denial.log
-          grep -q 'Ran 1 test' /tmp/distinct-uid-isolation.log
-          grep -q 'Ran 1 test' /tmp/credential-uid-isolation.log
-          grep -q '^OK$' /tmp/distinct-uid-isolation.log
-          grep -q '^OK$' /tmp/credential-uid-isolation.log
-          if grep -Eq 'skipped|SKIP' /tmp/distinct-uid-isolation.log /tmp/credential-uid-isolation.log; then
-            echo 'UID isolation test skipped; cannot claim isolation verified'
-            exit 1
-          fi
+          for log in /tmp/distinct-uid-isolation.log /tmp/credential-uid-isolation.log /tmp/distinct-uid-bypass-denial.log; do
+            grep -q 'Ran 1 test' "$log"
+            grep -q '^OK$' "$log"
+            if grep -Eq 'skipped|SKIP' "$log"; then
+              echo "UID isolation test skipped: $log"
+              exit 1
+            fi
+          done
