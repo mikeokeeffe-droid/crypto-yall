@@ -11,6 +11,7 @@ from offline_unix_peer_identity_fixture import offline_peer_identity
 from offline_framed_unix_coordinator_fixture import MAX_FRAME,_read_exact
 from offline_persistent_replay_ledger import OfflinePersistentReplayLedger
 from offline_sender_restart_journal import OfflineRestartJournal
+from offline_shared_sender_prototype import OfflineSharedSender
 
 def handle_offline_journal_socket(connection,allowed_uids,replay_path,journal_path):
     try:
@@ -30,7 +31,8 @@ def handle_offline_journal_socket(connection,allowed_uids,replay_path,journal_pa
         bot,environment,account=identity
         if (payload["operation"]!="request_entry" or
             (payload["requested_bot"],payload["environment"],payload["account"])!=identity or
-            not 1<=len(payload["nonce"])<=128):
+            not 1<=len(payload["nonce"])<=128 or
+            OfflineSharedSender._scope(environment,account,payload["dex"],payload["coin"]) is None):
             return ("hold",False)
         # Validate the journal before consuming a nonce. Never recreate missing files.
         journal=OfflineRestartJournal(journal_path)
