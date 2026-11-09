@@ -23,10 +23,9 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Exercise disposable journal as separate Linux UID (no skips)
+      - name: Exercise disposable journal and credential isolation as distinct Linux UID
         run: |
           set -euo pipefail
-          # Fail explicitly if the environment cannot execute this test.
           sudo -n env PATH="$PATH" PYTHONPATH="$PWD" \
             python -m unittest discover -s tests \
               -p 'test_offline_distinct_uid_journal_isolation.py' -v \
@@ -37,19 +36,9 @@ jobs:
               2>&1 | tee /tmp/credential-uid-isolation.log
           grep -q 'Ran 1 test' /tmp/distinct-uid-isolation.log
           grep -q 'Ran 1 test' /tmp/credential-uid-isolation.log
-          grep -q '^OK
+          grep -q '^OK$' /tmp/distinct-uid-isolation.log
+          grep -q '^OK$' /tmp/credential-uid-isolation.log
           if grep -Eq 'skipped|SKIP' /tmp/distinct-uid-isolation.log /tmp/credential-uid-isolation.log; then
-            echo 'Distinct UID test was skipped: isolation is NOT verified'
-            exit 1
-          fi
- /tmp/distinct-uid-isolation.log
-          grep -q '^OK
-          if grep -Eq 'skipped|SKIP' /tmp/distinct-uid-isolation.log; then
-            echo 'Distinct UID test was skipped: isolation is NOT verified'
-            exit 1
-          fi
- /tmp/credential-uid-isolation.log
-          if grep -Eq 'skipped|SKIP' /tmp/distinct-uid-isolation.log; then
-            echo 'Distinct UID test was skipped: isolation is NOT verified'
+            echo 'UID isolation test skipped; cannot claim isolation verified'
             exit 1
           fi
