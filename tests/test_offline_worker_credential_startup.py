@@ -30,7 +30,7 @@ class WorkerCredentialStartupTests(unittest.TestCase):
         os.chmod(self.credentials,mode)
     def start(self):
         return OfflineWorkerAuthenticatedCoordinator(
-            self.journal,self.replay,PRINCIPALS,credential_path=self.credentials)
+            self.journal,self.replay,PRINCIPALS,self.credentials)
     def test_worker_reads_valid_file_and_accepts_only_signed_request(self):
         self.write(json.dumps({"daily-principal":KEY.hex()}).encode())
         coordinator=self.start()
