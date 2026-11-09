@@ -22,6 +22,7 @@ on:
       - 'offline_unix_peer_identity_fixture.py'
       - 'offline_framed_unix_coordinator_fixture.py'
       - 'offline_socket_journal_bridge_fixture.py'
+      - 'tests/test_offline_three_bot_socket_admission.py'
       - 'tests/test_offline_concurrent_socket_journal.py'
       - 'tests/test_offline_socket_journal_bridge_fixture.py'
       - 'tests/test_offline_framed_unix_coordinator_fixture.py'
@@ -162,6 +163,7 @@ jobs:
           python -m unittest discover -s tests -p 'test_offline_hyperliquid_cloid_order_review.py' -v
           python -m unittest discover -s tests -p 'test_offline_dispatch_lifecycle_review.py' -v
           python -m unittest discover -s tests -p 'test_offline_direct_journal_bypass_audit.py' -v
+          python -m unittest discover -s tests -p 'test_offline_three_bot_socket_admission.py' -v
           python -m unittest discover -s tests -p 'test_offline_concurrent_socket_journal.py' -v
           python -m unittest discover -s tests -p 'test_offline_socket_journal_bridge_fixture.py' -v
           python -m unittest discover -s tests -p 'test_offline_framed_unix_coordinator_fixture.py' -v
