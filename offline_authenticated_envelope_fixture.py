@@ -22,9 +22,10 @@ def sign_fixture_request(secret, principal, operation, intent, nonce):
                 mac=hmac.new(secret,payload,hashlib.sha256).hexdigest())
 
 class OfflineAuthenticatedEnvelopeVerifier:
-    def __init__(self,keys):
+    def __init__(self,keys,ledger=None):
         self._keys=dict(keys)
         self._seen=set()
+        self._ledger=ledger
 
     def verify(self,envelope):
         if type(envelope) is not dict or set(envelope)!={"principal","operation","intent","nonce","mac"}:
@@ -48,5 +49,11 @@ class OfflineAuthenticatedEnvelopeVerifier:
         replay_key=(principal,nonce)
         if replay_key in self._seen:
             return None
+        if self._ledger is not None:
+            try:
+                if not self._ledger.consume(principal,nonce):
+                    return None
+            except Exception:
+                return None  # storage failure must fail closed
         self._seen.add(replay_key)
         return (principal,envelope["operation"],envelope["intent"])
