@@ -62,7 +62,11 @@ jobs:
             python -m unittest \
               tests.test_offline_coordinator_listener_fixture.OfflineCoordinatorListenerTests.test_socket_parent_wrong_owner_denied -v \
               2>&1 | tee /tmp/socket-parent-ownership.log
-          for log in /tmp/distinct-uid-isolation.log /tmp/credential-uid-isolation.log /tmp/distinct-uid-bypass-denial.log /tmp/distinct-uid-socket-identity.log /tmp/distinct-uid-socket-permission.log /tmp/three-distinct-uid-socket.log /tmp/socket-parent-ownership.log; do
+          sudo -n env PATH="$PATH" PYTHONPATH="$PWD" \
+            python -m unittest \
+              tests.test_offline_coordinator_listener_fixture.OfflineCoordinatorListenerTests.test_foreign_owned_replay_file_rejected -v \
+              2>&1 | tee /tmp/replay-file-ownership.log
+          for log in /tmp/distinct-uid-isolation.log /tmp/credential-uid-isolation.log /tmp/distinct-uid-bypass-denial.log /tmp/distinct-uid-socket-identity.log /tmp/distinct-uid-socket-permission.log /tmp/three-distinct-uid-socket.log /tmp/socket-parent-ownership.log /tmp/replay-file-ownership.log; do
             grep -q 'Ran 1 test' "$log"
             grep -q '^OK$' "$log"
             if grep -Eq 'skipped|SKIP' "$log"; then
