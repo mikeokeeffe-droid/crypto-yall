@@ -180,6 +180,17 @@ os._exit(19)
         with self.assertRaises(sqlite3.DatabaseError):
             OfflineAtomicCoordinator(self.path)
 
+    def test_rejects_world_readable_database(self):
+        os.chmod(self.path,0o644)
+        with self.assertRaises(PermissionError):
+            OfflineAtomicCoordinator(self.path)
+
+    def test_rejects_symlinked_database(self):
+        link=os.path.join(self.temp.name,"linked.sqlite")
+        os.symlink(self.path,link)
+        with self.assertRaises(PermissionError):
+            OfflineAtomicCoordinator(link)
+
     def test_missing_file_not_recreated(self):
         os.unlink(self.path)
         with self.assertRaises(FileNotFoundError):
