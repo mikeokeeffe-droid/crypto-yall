@@ -162,6 +162,24 @@ os._exit(19)
         self.assertEqual(claim[3],1)
         self.assertEqual(claim[4],"reserved")
 
+    def test_rejects_replay_table_without_unique_nonce_constraint(self):
+        import sqlite3
+        with sqlite3.connect(self.path) as db:
+            db.execute("DROP TABLE replay_nonces")
+            db.execute("CREATE TABLE replay_nonces(principal TEXT, nonce TEXT)")
+        with self.assertRaises(sqlite3.DatabaseError):
+            OfflineAtomicCoordinator(self.path)
+
+    def test_rejects_claim_table_without_scope_primary_key(self):
+        import sqlite3
+        with sqlite3.connect(self.path) as db:
+            db.execute("DROP TABLE claims")
+            db.execute("CREATE TABLE claims("
+                       "environment TEXT,account TEXT,dex TEXT,coin TEXT,"
+                       "bot TEXT,token TEXT,cloid TEXT,fence INTEGER,state TEXT)")
+        with self.assertRaises(sqlite3.DatabaseError):
+            OfflineAtomicCoordinator(self.path)
+
     def test_missing_file_not_recreated(self):
         os.unlink(self.path)
         with self.assertRaises(FileNotFoundError):
