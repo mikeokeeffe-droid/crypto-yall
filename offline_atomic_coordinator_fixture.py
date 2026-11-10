@@ -39,6 +39,8 @@ class OfflineAtomicCoordinator:
             raise PermissionError("atomic fixture parent must be protected directory")
         if parent_info.st_uid!=os.geteuid():
             raise PermissionError("atomic fixture parent must belong to coordinator")
+        self._parent=parent
+        self._parent_identity=(parent_info.st_dev,parent_info.st_ino)
         current=parent
         while True:
             if stat.S_ISLNK(os.lstat(current).st_mode):
@@ -85,6 +87,12 @@ class OfflineAtomicCoordinator:
                     raise sqlite3.DatabaseError("missing atomic fixture uniqueness: "+table)
 
     def _connect(self):
+        parent_info=os.lstat(self._parent)
+        if (not stat.S_ISDIR(parent_info.st_mode)
+            or parent_info.st_mode & 0o022
+            or parent_info.st_uid!=os.geteuid()
+            or (parent_info.st_dev,parent_info.st_ino)!=self._parent_identity):
+            raise PermissionError("atomic fixture parent directory replaced or unsafe")
         # Fail closed when the validated database pathname has been swapped.
         # Still not a race-free openat/fstat design; never deploy this fixture.
         info=os.lstat(self.path)
