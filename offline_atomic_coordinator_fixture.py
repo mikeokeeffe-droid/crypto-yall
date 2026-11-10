@@ -54,6 +54,7 @@ class OfflineAtomicCoordinator:
             raise PermissionError("atomic fixture must be a private regular file")
         if file_info.st_uid!=os.geteuid():
             raise PermissionError("atomic fixture must belong to coordinator")
+        self._identity=(file_info.st_dev,file_info.st_ino)
         with self._connect() as db:
             if db.execute("PRAGMA integrity_check").fetchone()!=("ok",):
                 raise sqlite3.DatabaseError("damaged atomic fixture")
@@ -84,8 +85,24 @@ class OfflineAtomicCoordinator:
                     raise sqlite3.DatabaseError("missing atomic fixture uniqueness: "+table)
 
     def _connect(self):
+        # Fail closed when the validated database pathname has been swapped.
+        # Still not a race-free openat/fstat design; never deploy this fixture.
+        info=os.lstat(self.path)
+        if (not stat.S_ISREG(info.st_mode) or info.st_mode & 0o077
+            or info.st_uid!=os.geteuid()
+            or (info.st_dev,info.st_ino)!=self._identity):
+            raise PermissionError("atomic fixture database replaced or unsafe")
         uri=Path(self.path).absolute().as_uri()+"?mode=rw"
-        return sqlite3.connect(uri,uri=True,timeout=5,isolation_level=None)
+        db=sqlite3.connect(uri,uri=True,timeout=5,isolation_level=None)
+        try:
+            # Check the path again after opening, rejecting observed replacement.
+            after=os.lstat(self.path)
+            if (after.st_dev,after.st_ino)!=self._identity:
+                raise PermissionError("atomic fixture database changed during open")
+            return db
+        except Exception:
+            db.close()
+            raise
 
     def reserve(self,*,principal,nonce,bot,environment,account,dex,coin,
                 inject_failure=None):
