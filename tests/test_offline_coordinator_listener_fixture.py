@@ -229,6 +229,24 @@ class OfflineCoordinatorListenerTests(unittest.TestCase):
                     replay,journal)
             self.assertFalse(os.path.lexists(path))
 
+    @unittest.skipUnless(hasattr(os,"chown") and os.geteuid()==0,
+                         "requires disposable Linux root runner")
+    def test_foreign_owned_journal_file_rejected(self):
+        with tempfile.TemporaryDirectory() as directory:
+            journal=os.path.join(directory,"journal.sqlite")
+            replay=os.path.join(directory,"replay.sqlite")
+            path=os.path.join(directory,"coordinator.sock")
+            OfflineRestartJournal(journal,create=True)
+            OfflinePersistentReplayLedger(replay,create=True)
+            os.chmod(journal,0o600)
+            os.chmod(replay,0o600)
+            os.chown(journal,1,-1)
+            with self.assertRaises(PermissionError):
+                serve_offline_socket_once(
+                    path,{os.getuid():("daily","mainnet",ACCOUNT)},
+                    replay,journal)
+            self.assertFalse(os.path.lexists(path))
+
     def test_world_writable_database_parent_rejected(self):
         with tempfile.TemporaryDirectory() as directory:
             unsafe=os.path.join(directory,"unsafe-state")
