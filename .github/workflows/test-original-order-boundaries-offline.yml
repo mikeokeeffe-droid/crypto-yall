@@ -21,6 +21,8 @@ on:
       - 'offline_process_coordinator_fixture.py'
       - 'offline_unix_peer_identity_fixture.py'
       - 'offline_framed_unix_coordinator_fixture.py'
+      - 'offline_atomic_socket_bridge_fixture.py'
+      - 'tests/test_offline_atomic_socket_bridge_fixture.py'
       - 'offline_atomic_coordinator_fixture.py'
       - 'tests/test_offline_atomic_coordinator_fixture.py'
       - 'offline_coordinator_listener_fixture.py'
@@ -155,6 +157,7 @@ jobs:
           python-version: '3.12'
       - name: Exercise fake exchanges only (no secrets, no clients, no orders)
         run: |
+          python -m unittest discover -s tests -p 'test_offline_atomic_socket_bridge_fixture.py' -v
           python -m unittest discover -s tests -p 'test_offline_atomic_coordinator_fixture.py' -v
           python -m unittest discover -s tests -p 'test_original_order_boundaries_offline.py' -v
           python -m unittest discover -s tests -p 'test_position_increase_claim_invariant_offline.py' -v
