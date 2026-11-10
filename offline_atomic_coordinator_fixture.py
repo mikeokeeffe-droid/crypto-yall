@@ -31,6 +31,22 @@ class OfflineAtomicCoordinator:
             with sqlite3.connect(self.path) as db:
                 db.executescript(_SCHEMA)
             os.chmod(self.path,0o600)
+        # Check the containing directory before trusting a database pathname.
+        # This is a fixture-level check, not race-free production path handling.
+        parent=os.path.dirname(os.path.abspath(self.path))
+        parent_info=os.lstat(parent)
+        if not stat.S_ISDIR(parent_info.st_mode) or parent_info.st_mode & 0o022:
+            raise PermissionError("atomic fixture parent must be protected directory")
+        if parent_info.st_uid!=os.geteuid():
+            raise PermissionError("atomic fixture parent must belong to coordinator")
+        current=parent
+        while True:
+            if stat.S_ISLNK(os.lstat(current).st_mode):
+                raise PermissionError("symlinked atomic fixture ancestor")
+            upper=os.path.dirname(current)
+            if upper==current:
+                break
+            current=upper
         if not os.path.lexists(self.path):
             raise FileNotFoundError("atomic fixture missing")
         file_info=os.lstat(self.path)
