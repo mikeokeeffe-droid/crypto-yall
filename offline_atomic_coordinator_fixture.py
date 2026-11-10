@@ -1,6 +1,7 @@
 """Disposable atomic replay + scope reservation prototype. NEVER authorizes trading."""
 import os
 import sqlite3
+import stat
 import uuid
 from pathlib import Path
 from offline_shared_sender_prototype import OfflineSharedSender
@@ -29,8 +30,14 @@ class OfflineAtomicCoordinator:
                 raise FileExistsError("atomic fixture already exists")
             with sqlite3.connect(self.path) as db:
                 db.executescript(_SCHEMA)
-        if not os.path.isfile(self.path) or os.path.islink(self.path):
-            raise FileNotFoundError("atomic fixture missing or unsafe")
+            os.chmod(self.path,0o600)
+        if not os.path.lexists(self.path):
+            raise FileNotFoundError("atomic fixture missing")
+        file_info=os.lstat(self.path)
+        if not stat.S_ISREG(file_info.st_mode) or file_info.st_mode & 0o077:
+            raise PermissionError("atomic fixture must be a private regular file")
+        if file_info.st_uid!=os.geteuid():
+            raise PermissionError("atomic fixture must belong to coordinator")
         with self._connect() as db:
             if db.execute("PRAGMA integrity_check").fetchone()!=("ok",):
                 raise sqlite3.DatabaseError("damaged atomic fixture")
