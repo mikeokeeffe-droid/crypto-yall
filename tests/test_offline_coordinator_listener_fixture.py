@@ -210,6 +210,25 @@ class OfflineCoordinatorListenerTests(unittest.TestCase):
                     replay,journal)
             self.assertFalse(os.path.lexists(path))
 
+    @unittest.skipUnless(hasattr(os,"geteuid") and os.geteuid()==0,
+                         "requires disposable root test runner")
+    def test_foreign_owned_socket_directory_rejected(self):
+        import pwd
+        candidates=[entry for entry in pwd.getpwall() if entry.pw_uid>0]
+        if not candidates:
+            self.skipTest("no nonroot Linux UID")
+        with tempfile.TemporaryDirectory() as directory:
+            socket_dir=os.path.join(directory,"socket-dir")
+            os.mkdir(socket_dir,0o700)
+            os.chown(socket_dir,candidates[0].pw_uid,-1)
+            path=os.path.join(socket_dir,"coordinator.sock")
+            with self.assertRaises(PermissionError):
+                serve_offline_socket_once(
+                    path,{os.getuid():("daily","mainnet",ACCOUNT)},
+                    os.path.join(directory,"missing-replay.sqlite"),
+                    os.path.join(directory,"missing-journal.sqlite"))
+            self.assertFalse(os.path.lexists(path))
+
     def test_missing_state_never_recreated(self):
         with tempfile.TemporaryDirectory() as directory:
             path=os.path.join(directory,"coordinator.sock")
