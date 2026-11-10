@@ -10,6 +10,7 @@ import stat
 from offline_socket_journal_bridge_fixture import handle_offline_journal_socket
 from offline_persistent_replay_ledger import OfflinePersistentReplayLedger
 from offline_sender_restart_journal import OfflineRestartJournal
+from offline_shared_sender_prototype import OfflineSharedSender
 
 def serve_offline_socket_once(socket_path,allowed_uids,replay_path,journal_path,
                               ready=None,timeout=2):
@@ -21,6 +22,9 @@ def serve_offline_socket_once(socket_path,allowed_uids,replay_path,journal_path,
            any(type(value) is not str or not value for value in identity)
            for uid,identity in allowed_uids.items()):
         raise ValueError("invalid UID identity mapping")
+    if any(OfflineSharedSender._scope(identity[1],identity[2],"","SOL") is None
+           for identity in allowed_uids.values()):
+        raise ValueError("invalid bot environment or account scope")
     bots=[identity[0] for identity in allowed_uids.values()]
     if len(set(bots)) != len(bots):
         raise ValueError("each bot must have its own Linux UID")
