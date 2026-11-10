@@ -78,6 +78,26 @@ class AtomicCoordinatorTests(unittest.TestCase):
             self.assertEqual(db.execute("SELECT COUNT(*) FROM replay_nonces").fetchone()[0],len(coins))
             self.assertEqual(db.execute("SELECT next_fence FROM metadata").fetchone()[0],len(coins)+1)
 
+    def test_rollback_survives_reopen_and_retry_uses_first_fence(self):
+        for stage in ("after_nonce","after_claim"):
+            with self.subTest(stage=stage):
+                self.assertEqual(self.coordinator.reserve(
+                    **self.args,inject_failure=stage),("hold",False))
+                reopened=OfflineAtomicCoordinator(self.path)
+                with reopened._connect() as db:
+                    self.assertEqual(db.execute(
+                        "SELECT COUNT(*) FROM replay_nonces").fetchone()[0],0)
+                    self.assertEqual(db.execute(
+                        "SELECT COUNT(*) FROM claims").fetchone()[0],0)
+                    self.assertEqual(db.execute(
+                        "SELECT next_fence FROM metadata").fetchone()[0],1)
+        reopened=OfflineAtomicCoordinator(self.path)
+        self.assertEqual(reopened.reserve(**self.args),("reserved_offline_only",False))
+        claim=reopened.inspect(environment="mainnet",account=ACCOUNT,dex="",coin="SOL")
+        self.assertEqual(claim[3],1)
+        self.assertEqual(OfflineAtomicCoordinator(self.path).reserve(**self.args),
+                         ("hold",False))
+
     def test_missing_file_not_recreated(self):
         os.unlink(self.path)
         with self.assertRaises(FileNotFoundError):
