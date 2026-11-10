@@ -128,6 +128,40 @@ os._exit(17)
         self.assertEqual(restarted.inspect(
             environment="mainnet",account=ACCOUNT,dex="",coin="SOL")[3],1)
 
+    def test_real_process_exit_after_commit_before_ack_holds_on_restart(self):
+        import subprocess
+        import sys
+        # Child commits a complete nonce+claim transaction, then dies without
+        # returning any acknowledgement to its caller.
+        script = """
+import os, sqlite3, sys
+from pathlib import Path
+uri=Path(sys.argv[1]).absolute().as_uri()+'?mode=rw'
+db=sqlite3.connect(uri,uri=True,isolation_level=None)
+db.execute('BEGIN IMMEDIATE')
+db.execute('INSERT INTO replay_nonces VALUES(?,?)',('uid1001:daily','first'))
+db.execute('INSERT INTO claims VALUES(?,?,?,?,?,?,?,?,?)',
+           ('mainnet',sys.argv[2],'','SOL','daily','token-test',
+            '0x'+'b'*32,1,'reserved'))
+db.execute('UPDATE metadata SET next_fence=2')
+db.commit()
+os._exit(19)
+"""
+        result=subprocess.run([sys.executable,"-c",script,self.path,ACCOUNT],
+                              check=False,timeout=10)
+        self.assertEqual(result.returncode,19)
+        restarted=OfflineAtomicCoordinator(self.path)
+        self.assertEqual(restarted.reserve(**self.args),("hold",False))
+        self.assertEqual(restarted.reserve(
+            **dict(self.args,nonce="fresh-after-lost-ack")),("hold",False))
+        with restarted._connect() as db:
+            self.assertEqual(db.execute("SELECT COUNT(*) FROM replay_nonces").fetchone()[0],1)
+            self.assertEqual(db.execute("SELECT COUNT(*) FROM claims").fetchone()[0],1)
+            self.assertEqual(db.execute("SELECT next_fence FROM metadata").fetchone()[0],2)
+        claim=restarted.inspect(environment="mainnet",account=ACCOUNT,dex="",coin="SOL")
+        self.assertEqual(claim[3],1)
+        self.assertEqual(claim[4],"reserved")
+
     def test_missing_file_not_recreated(self):
         os.unlink(self.path)
         with self.assertRaises(FileNotFoundError):
