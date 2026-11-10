@@ -192,6 +192,25 @@ class OfflineCoordinatorListenerTests(unittest.TestCase):
             self.assertTrue(os.path.islink(linked))
             self.assertTrue(os.path.isfile(journal))
 
+    def test_symlink_replay_database_rejected_before_socket_bind(self):
+        with tempfile.TemporaryDirectory() as directory:
+            journal=os.path.join(directory,"journal.sqlite")
+            replay=os.path.join(directory,"replay.sqlite")
+            linked=os.path.join(directory,"replay-link.sqlite")
+            path=os.path.join(directory,"coordinator.sock")
+            OfflineRestartJournal(journal,create=True)
+            OfflinePersistentReplayLedger(replay,create=True)
+            os.chmod(journal,0o600)
+            os.chmod(replay,0o600)
+            os.symlink(replay,linked)
+            with self.assertRaises(PermissionError):
+                serve_offline_socket_once(
+                    path,{os.getuid():("daily","mainnet",ACCOUNT)},
+                    linked,journal)
+            self.assertFalse(os.path.lexists(path))
+            self.assertTrue(os.path.islink(linked))
+            self.assertTrue(os.path.isfile(replay))
+
     def test_world_writable_database_parent_rejected(self):
         with tempfile.TemporaryDirectory() as directory:
             unsafe=os.path.join(directory,"unsafe-state")
