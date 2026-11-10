@@ -30,6 +30,7 @@ def serve_offline_socket_once(socket_path,allowed_uids,replay_path,journal_path,
         listener.bind(socket_path)
         try:
             os.chmod(socket_path,0o600)
+            bound_inode=os.lstat(socket_path).st_ino
             listener.listen(1)
             listener.settimeout(timeout)
             if ready is not None:
@@ -41,7 +42,7 @@ def serve_offline_socket_once(socket_path,allowed_uids,replay_path,journal_path,
         finally:
             # Only remove our own socket inode, not a replacement path.
             try:
-                if os.path.exists(socket_path) and os.stat(socket_path).st_ino==os.fstat(listener.fileno()).st_ino:
+                if os.path.exists(socket_path) and os.path.islink(socket_path) is False and os.lstat(socket_path).st_ino==bound_inode:
                     os.unlink(socket_path)
             except OSError:
                 pass
