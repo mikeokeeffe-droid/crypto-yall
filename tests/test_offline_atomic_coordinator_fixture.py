@@ -98,6 +98,36 @@ class AtomicCoordinatorTests(unittest.TestCase):
         self.assertEqual(OfflineAtomicCoordinator(self.path).reserve(**self.args),
                          ("hold",False))
 
+    def test_real_process_exit_before_commit_rolls_back(self):
+        import subprocess
+        import sys
+        # A separate interpreter exits abruptly without commit or rollback.
+        # SQLite must discard both writes and the uncommitted fence increment.
+        script = """
+import os, sqlite3, sys
+from pathlib import Path
+uri=Path(sys.argv[1]).absolute().as_uri()+'?mode=rw'
+db=sqlite3.connect(uri,uri=True,isolation_level=None)
+db.execute('BEGIN IMMEDIATE')
+db.execute('INSERT INTO replay_nonces VALUES(?,?)',('uid1001:daily','first'))
+db.execute('INSERT INTO claims VALUES(?,?,?,?,?,?,?,?,?)',
+           ('mainnet',sys.argv[2],'','SOL','daily','token-test',
+            '0x'+'a'*32,1,'reserved'))
+db.execute('UPDATE metadata SET next_fence=2')
+os._exit(17)
+"""
+        result=subprocess.run([sys.executable,"-c",script,self.path,ACCOUNT],
+                              check=False,timeout=10)
+        self.assertEqual(result.returncode,17)
+        restarted=OfflineAtomicCoordinator(self.path)
+        with restarted._connect() as db:
+            self.assertEqual(db.execute("SELECT COUNT(*) FROM replay_nonces").fetchone()[0],0)
+            self.assertEqual(db.execute("SELECT COUNT(*) FROM claims").fetchone()[0],0)
+            self.assertEqual(db.execute("SELECT next_fence FROM metadata").fetchone()[0],1)
+        self.assertEqual(restarted.reserve(**self.args),("reserved_offline_only",False))
+        self.assertEqual(restarted.inspect(
+            environment="mainnet",account=ACCOUNT,dex="",coin="SOL")[3],1)
+
     def test_missing_file_not_recreated(self):
         os.unlink(self.path)
         with self.assertRaises(FileNotFoundError):
