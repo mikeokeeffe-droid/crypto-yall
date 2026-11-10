@@ -21,6 +21,8 @@ class OfflineCoordinatorListenerTests(unittest.TestCase):
             path=os.path.join(directory,"coordinator.sock")
             OfflineRestartJournal(journal,create=True)
             OfflinePersistentReplayLedger(replay,create=True)
+            os.chmod(journal,0o600)
+            os.chmod(replay,0o600)
             ready=threading.Event()
             results=[]
             def serve():
@@ -51,6 +53,8 @@ class OfflineCoordinatorListenerTests(unittest.TestCase):
             path=os.path.join(directory,"coordinator.sock")
             OfflineRestartJournal(journal,create=True)
             OfflinePersistentReplayLedger(replay,create=True)
+            os.chmod(journal,0o600)
+            os.chmod(replay,0o600)
             allowed={os.getuid():("daily","mainnet",ACCOUNT)}
             for attempt in range(2):
                 ready=threading.Event()
@@ -81,6 +85,8 @@ class OfflineCoordinatorListenerTests(unittest.TestCase):
             replay=os.path.join(directory,"replay.sqlite")
             OfflineRestartJournal(journal,create=True)
             OfflinePersistentReplayLedger(replay,create=True)
+            os.chmod(journal,0o600)
+            os.chmod(replay,0o600)
             with self.assertRaises(FileExistsError):
                 serve_offline_socket_once(path,{os.getuid():("daily","mainnet",ACCOUNT)},
                                           replay,journal)
@@ -94,6 +100,8 @@ class OfflineCoordinatorListenerTests(unittest.TestCase):
             path=os.path.join(directory,"coordinator.sock")
             OfflineRestartJournal(journal,create=True)
             OfflinePersistentReplayLedger(replay,create=True)
+            os.chmod(journal,0o600)
+            os.chmod(replay,0o600)
             ready=threading.Event()
             errors=[]
             def serve():
@@ -144,6 +152,26 @@ class OfflineCoordinatorListenerTests(unittest.TestCase):
                     with self.assertRaises(ValueError):
                         serve_offline_socket_once(path,mapping,replay,journal)
                     self.assertFalse(os.path.lexists(path))
+
+    def test_shared_database_permissions_fail_before_socket_bind(self):
+        with tempfile.TemporaryDirectory() as directory:
+            journal=os.path.join(directory,"journal.sqlite")
+            replay=os.path.join(directory,"replay.sqlite")
+            path=os.path.join(directory,"coordinator.sock")
+            OfflineRestartJournal(journal,create=True)
+            OfflinePersistentReplayLedger(replay,create=True)
+            os.chmod(journal,0o600)
+            os.chmod(replay,0o644)
+            with self.assertRaises(PermissionError):
+                serve_offline_socket_once(path,{os.getuid():("daily","mainnet",ACCOUNT)},
+                                          replay,journal)
+            self.assertFalse(os.path.lexists(path))
+            os.chmod(replay,0o600)
+            os.chmod(journal,0o666)
+            with self.assertRaises(PermissionError):
+                serve_offline_socket_once(path,{os.getuid():("daily","mainnet",ACCOUNT)},
+                                          replay,journal)
+            self.assertFalse(os.path.lexists(path))
 
     def test_missing_state_never_recreated(self):
         with tempfile.TemporaryDirectory() as directory:
