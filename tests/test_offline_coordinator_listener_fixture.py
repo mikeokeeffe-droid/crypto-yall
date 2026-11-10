@@ -245,6 +245,20 @@ class OfflineCoordinatorListenerTests(unittest.TestCase):
             finally:
                 os.chown(directory,0,-1)
 
+    def test_symlink_socket_directory_denied(self):
+        with tempfile.TemporaryDirectory() as directory:
+            actual=os.path.join(directory,"actual")
+            alias=os.path.join(directory,"alias")
+            os.mkdir(actual)
+            os.symlink(actual,alias)
+            path=os.path.join(alias,"coordinator.sock")
+            with self.assertRaises(ValueError):
+                serve_offline_socket_once(
+                    path,{os.getuid():("daily","mainnet",ACCOUNT)},
+                    os.path.join(directory,"missing-replay.sqlite"),
+                    os.path.join(directory,"missing-journal.sqlite"))
+            self.assertFalse(os.path.lexists(os.path.join(actual,"coordinator.sock")))
+
     def test_missing_state_never_recreated(self):
         with tempfile.TemporaryDirectory() as directory:
             path=os.path.join(directory,"coordinator.sock")
