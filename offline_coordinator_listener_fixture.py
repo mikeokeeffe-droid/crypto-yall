@@ -34,6 +34,8 @@ def serve_offline_socket_once(socket_path,allowed_uids,replay_path,journal_path,
     if os.path.islink(parent) or not stat.S_ISDIR(os.stat(parent).st_mode):
         raise ValueError("invalid socket directory")
     # Private coordinator-owned directory; a real service needs managed ACLs.
+    if os.lstat(parent).st_uid != os.geteuid():
+        raise PermissionError("socket parent must belong to coordinator")
     if os.stat(parent).st_mode & 0o022:
         raise PermissionError("socket parent must not be group/world writable")
     if os.path.lexists(socket_path):
