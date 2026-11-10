@@ -127,6 +127,24 @@ class OfflineCoordinatorListenerTests(unittest.TestCase):
                     os.path.join(directory,"missing-journal.sqlite"))
             self.assertFalse(os.path.lexists(path))
 
+    def test_duplicate_bot_identity_and_invalid_uids_denied(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path=os.path.join(directory,"coordinator.sock")
+            replay=os.path.join(directory,"missing-replay.sqlite")
+            journal=os.path.join(directory,"missing-journal.sqlite")
+            invalid=(
+                {1001:("daily","mainnet",ACCOUNT),
+                 1002:("daily","mainnet",ACCOUNT)},
+                {"1001":("daily","mainnet",ACCOUNT)},
+                {1001:("unknown","mainnet",ACCOUNT)},
+                {1001:("daily","mainnet",ACCOUNT),1002:["intraday","mainnet",ACCOUNT]},
+            )
+            for mapping in invalid:
+                with self.subTest(mapping=mapping):
+                    with self.assertRaises(ValueError):
+                        serve_offline_socket_once(path,mapping,replay,journal)
+                    self.assertFalse(os.path.lexists(path))
+
     def test_missing_state_never_recreated(self):
         with tempfile.TemporaryDirectory() as directory:
             path=os.path.join(directory,"coordinator.sock")
