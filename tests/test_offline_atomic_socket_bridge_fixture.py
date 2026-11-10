@@ -106,6 +106,36 @@ class OfflineAtomicSocketBridgeTests(unittest.TestCase):
             self.assertEqual(db.execute("SELECT COUNT(*) FROM claims").fetchone()[0],1)
             self.assertEqual(db.execute("SELECT COUNT(*) FROM replay_nonces").fetchone()[0],1)
 
+    def test_lost_response_after_commit_retry_holds(self):
+        # Client closes immediately after sending: there is no response
+        # channel and no acknowledgement, even if the reservation commits.
+        path=os.path.join(self.temp.name,"lost-ack.sock")
+        with socket.socket(socket.AF_UNIX,socket.SOCK_STREAM) as listener:
+            listener.bind(path)
+            listener.listen(1)
+            output=[]
+            def server():
+                conn,_=listener.accept()
+                with conn:
+                    output.append(handle_offline_atomic_socket(
+                        conn,{os.getuid():("daily","mainnet",ACCOUNT)},self.db))
+            worker=threading.Thread(target=server,daemon=True)
+            worker.start()
+            data=json.dumps(self.payload).encode("utf-8")
+            with socket.socket(socket.AF_UNIX,socket.SOCK_STREAM) as client:
+                client.connect(path)
+                client.sendall(struct.pack("!I",len(data))+data)
+                # Close without waiting for or reading any reply.
+            worker.join(timeout=5)
+            self.assertFalse(worker.is_alive())
+            self.assertEqual(output,[("reserved_offline_only",False)])
+        self.assertEqual(self.exchange(self.payload),("hold",False))
+        self.assertEqual(self.exchange(dict(self.payload,nonce="lost-ack-retry")),
+                         ("hold",False))
+        with OfflineAtomicCoordinator(self.db)._connect() as db:
+            self.assertEqual(db.execute("SELECT COUNT(*) FROM claims").fetchone()[0],1)
+            self.assertEqual(db.execute("SELECT COUNT(*) FROM replay_nonces").fetchone()[0],1)
+
     def test_missing_database_holds_without_recreation(self):
         os.unlink(self.db)
         self.assertEqual(self.exchange(self.payload),("hold",False))
