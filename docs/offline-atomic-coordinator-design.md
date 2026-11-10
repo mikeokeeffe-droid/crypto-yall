@@ -58,3 +58,43 @@ reconciliation, safe reduce-only close semantics, staged failure testing,
 operational review and explicit separate live approval.
 
 Do not merge or deploy this draft PR as a live trading system.
+
+## Open-file identity and SQLite pathname race (P0 — unresolved)
+
+The offline fixture currently performs `lstat` before `sqlite3.connect`,
+then checks the pathname and `PRAGMA database_list` after opening. These
+checks detect some observed replacements, but **cannot prove that SQLite is
+using the validated inode**: an attacker able to rename files between checks
+can restore the pathname before the second check, and `database_list` reports
+a pathname rather than a stable open file descriptor. A successful CI test
+does not establish race freedom.
+
+A deployable design must choose a verifiable database-opening boundary:
+
+1. Provision the database and parent directory under coordinator-controlled
+   ownership and permissions, with worker UIDs unable to rename or modify
+   any path component. Validate the entire ancestry and mount assumptions
+   during service startup; reject unsafe writable ancestors.
+2. On Linux, open the protected parent with directory file descriptors,
+   `O_DIRECTORY|O_NOFOLLOW|O_CLOEXEC`, then open the database relative to
+   that directory using `openat2` resolution restrictions (or equivalent
+   verified descriptor-relative traversal). Validate `fstat` ownership,
+   permissions, device and inode on the **opened descriptor**.
+3. The standard Python `sqlite3.connect(path)` API cannot directly adopt
+   that validated file descriptor. Do **not** pretend that a prior `open`
+   followed by pathname-based `connect` closes the race. Use a reviewed
+   SQLite VFS/open integration with descriptor identity guarantees, or a
+   database/service architecture that removes pathname replacement from
+   untrusted actors' control. Validate journal/WAL/shm sidecar handling too.
+4. Add adversarial multi-process tests that repeatedly rename/swap the
+   database and ancestors during open, including WAL creation, restart,
+   process termination and read-only failures. The only acceptable result
+   under uncertainty is HOLD; never recreate missing state.
+5. Independently audit SQLite durability settings, filesystem and backup
+   semantics, and transaction outcome uncertainty. None of these changes
+   authorizes exchange dispatch.
+
+**Decision:** Keep the existing prototype offline-only and PR #40 draft.
+Do not claim the current `_connect` function is race-free, and do not
+wire it to a live bot until this P0 blocker and exchange reconciliation
+requirements are separately reviewed and approved.
