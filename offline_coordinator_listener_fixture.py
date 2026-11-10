@@ -38,6 +38,12 @@ def serve_offline_socket_once(socket_path,allowed_uids,replay_path,journal_path,
         raise PermissionError("socket parent must not be group/world writable")
     if os.path.lexists(socket_path):
         raise FileExistsError("refuse to overwrite existing socket path")
+    for state_path in (journal_path,replay_path):
+        state=os.lstat(state_path)
+        if not stat.S_ISREG(state.st_mode) or state.st_mode & 0o077:
+            raise PermissionError("offline state file must be private regular file")
+        if state.st_uid != os.geteuid():
+            raise PermissionError("offline state file must belong to coordinator")
     OfflineRestartJournal(journal_path)
     OfflinePersistentReplayLedger(replay_path)
     with socket.socket(socket.AF_UNIX,socket.SOCK_STREAM) as listener:
