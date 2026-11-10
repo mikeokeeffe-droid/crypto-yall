@@ -191,6 +191,23 @@ os._exit(19)
         with self.assertRaises(PermissionError):
             OfflineAtomicCoordinator(link)
 
+    def test_rejects_group_writable_parent_directory(self):
+        os.chmod(self.temp.name,0o770)
+        with self.assertRaises(PermissionError):
+            OfflineAtomicCoordinator(self.path)
+
+    def test_rejects_symlinked_parent_directory(self):
+        link=os.path.join(self.temp.name,"linked-parent")
+        actual=os.path.join(self.temp.name,"actual-parent")
+        os.mkdir(actual,0o700)
+        os.symlink(actual,link)
+        target=os.path.join(actual,"atomic.sqlite")
+        with open(self.path,"rb") as source, open(target,"wb") as dest:
+            dest.write(source.read())
+        os.chmod(target,0o600)
+        with self.assertRaises(PermissionError):
+            OfflineAtomicCoordinator(os.path.join(link,"atomic.sqlite"))
+
     def test_missing_file_not_recreated(self):
         os.unlink(self.path)
         with self.assertRaises(FileNotFoundError):
