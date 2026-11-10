@@ -47,6 +47,20 @@ class AtomicCoordinatorTests(unittest.TestCase):
         self.assertIsNotNone(restarted.inspect(
             environment="mainnet",account=ACCOUNT,dex="",coin="SOL"))
 
+    def test_concurrent_same_scope_only_one_reservation(self):
+        from concurrent.futures import ThreadPoolExecutor
+        def attempt(i):
+            return self.coordinator.reserve(**dict(
+                self.args,principal="uid"+str(i)+":daily",nonce="nonce-"+str(i)))
+        with ThreadPoolExecutor(max_workers=12) as pool:
+            decisions=list(pool.map(attempt,range(24)))
+        self.assertEqual(decisions.count(("reserved_offline_only",False)),1)
+        self.assertEqual(decisions.count(("hold",False)),23)
+        with self.coordinator._connect() as db:
+            self.assertEqual(db.execute("SELECT COUNT(*) FROM claims").fetchone()[0],1)
+            self.assertEqual(db.execute("SELECT COUNT(*) FROM replay_nonces").fetchone()[0],1)
+            self.assertEqual(db.execute("SELECT next_fence FROM metadata").fetchone()[0],2)
+
     def test_missing_file_not_recreated(self):
         os.unlink(self.path)
         with self.assertRaises(FileNotFoundError):
