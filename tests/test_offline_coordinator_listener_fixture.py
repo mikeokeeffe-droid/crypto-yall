@@ -59,6 +59,46 @@ class OfflineCoordinatorListenerTests(unittest.TestCase):
             with open(path) as handle:
                 self.assertEqual(handle.read(),"preserve")
 
+    def test_listener_socket_permissions_and_timeout_cleanup(self):
+        with tempfile.TemporaryDirectory() as directory:
+            journal=os.path.join(directory,"journal.sqlite")
+            replay=os.path.join(directory,"replay.sqlite")
+            path=os.path.join(directory,"coordinator.sock")
+            OfflineRestartJournal(journal,create=True)
+            OfflinePersistentReplayLedger(replay,create=True)
+            ready=threading.Event()
+            errors=[]
+            def serve():
+                try:
+                    serve_offline_socket_once(
+                        path,{os.getuid():("daily","mainnet",ACCOUNT)},
+                        replay,journal,ready=ready,timeout=0.2)
+                except socket.timeout:
+                    errors.append("timeout")
+            thread=threading.Thread(target=serve)
+            thread.start()
+            self.assertTrue(ready.wait(5))
+            self.assertEqual(os.stat(path).st_mode & 0o777,0o600)
+            thread.join(5)
+            self.assertFalse(thread.is_alive())
+            self.assertEqual(errors,["timeout"])
+            self.assertFalse(os.path.lexists(path))
+            self.assertIsNone(OfflineRestartJournal(journal).inspect(
+                environment="mainnet",account=ACCOUNT,dex="",coin="SOL"))
+
+    def test_world_writable_directory_denied_before_bind(self):
+        with tempfile.TemporaryDirectory() as directory:
+            unsafe=os.path.join(directory,"unsafe")
+            os.mkdir(unsafe,0o777)
+            os.chmod(unsafe,0o777)
+            path=os.path.join(unsafe,"coordinator.sock")
+            with self.assertRaises(PermissionError):
+                serve_offline_socket_once(
+                    path,{os.getuid():("daily","mainnet",ACCOUNT)},
+                    os.path.join(directory,"missing-replay.sqlite"),
+                    os.path.join(directory,"missing-journal.sqlite"))
+            self.assertFalse(os.path.lexists(path))
+
     def test_missing_state_never_recreated(self):
         with tempfile.TemporaryDirectory() as directory:
             path=os.path.join(directory,"coordinator.sock")
