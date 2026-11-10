@@ -61,6 +61,23 @@ class AtomicCoordinatorTests(unittest.TestCase):
             self.assertEqual(db.execute("SELECT COUNT(*) FROM replay_nonces").fetchone()[0],1)
             self.assertEqual(db.execute("SELECT next_fence FROM metadata").fetchone()[0],2)
 
+    def test_concurrent_distinct_scopes_all_reserve_with_unique_fences(self):
+        from concurrent.futures import ThreadPoolExecutor
+        coins=("SOL","AVAX","LINK","SUI","XRP","ONDO")
+        def attempt(i):
+            return self.coordinator.reserve(**dict(
+                self.args,principal="uid"+str(i)+":daily",
+                nonce="distinct-"+str(i),coin=coins[i]))
+        with ThreadPoolExecutor(max_workers=len(coins)) as pool:
+            decisions=list(pool.map(attempt,range(len(coins))))
+        self.assertEqual(decisions,[("reserved_offline_only",False)]*len(coins))
+        with self.coordinator._connect() as db:
+            claims=db.execute("SELECT coin,fence FROM claims").fetchall()
+            self.assertEqual({coin for coin,_ in claims},set(coins))
+            self.assertEqual({fence for _,fence in claims},set(range(1,len(coins)+1)))
+            self.assertEqual(db.execute("SELECT COUNT(*) FROM replay_nonces").fetchone()[0],len(coins))
+            self.assertEqual(db.execute("SELECT next_fence FROM metadata").fetchone()[0],len(coins)+1)
+
     def test_missing_file_not_recreated(self):
         os.unlink(self.path)
         with self.assertRaises(FileNotFoundError):
