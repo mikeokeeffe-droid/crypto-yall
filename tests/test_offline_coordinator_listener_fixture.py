@@ -173,6 +173,25 @@ class OfflineCoordinatorListenerTests(unittest.TestCase):
                                           replay,journal)
             self.assertFalse(os.path.lexists(path))
 
+    def test_symlink_database_path_rejected_before_socket_bind(self):
+        with tempfile.TemporaryDirectory() as directory:
+            journal=os.path.join(directory,"journal.sqlite")
+            replay=os.path.join(directory,"replay.sqlite")
+            linked=os.path.join(directory,"journal-link.sqlite")
+            path=os.path.join(directory,"coordinator.sock")
+            OfflineRestartJournal(journal,create=True)
+            OfflinePersistentReplayLedger(replay,create=True)
+            os.chmod(journal,0o600)
+            os.chmod(replay,0o600)
+            os.symlink(journal,linked)
+            with self.assertRaises(PermissionError):
+                serve_offline_socket_once(
+                    path,{os.getuid():("daily","mainnet",ACCOUNT)},
+                    replay,linked)
+            self.assertFalse(os.path.lexists(path))
+            self.assertTrue(os.path.islink(linked))
+            self.assertTrue(os.path.isfile(journal))
+
     def test_missing_state_never_recreated(self):
         with tempfile.TemporaryDirectory() as directory:
             path=os.path.join(directory,"coordinator.sock")
