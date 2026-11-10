@@ -1,0 +1,84 @@
+"""Disposable atomic replay + scope reservation prototype. NEVER authorizes trading."""
+import os
+import sqlite3
+import uuid
+from pathlib import Path
+from offline_shared_sender_prototype import OfflineSharedSender
+
+_SCHEMA = """
+CREATE TABLE replay_nonces(
+ principal TEXT NOT NULL, nonce TEXT NOT NULL,
+ PRIMARY KEY(principal,nonce));
+CREATE TABLE claims(
+ environment TEXT NOT NULL, account TEXT NOT NULL, dex TEXT NOT NULL,
+ coin TEXT NOT NULL, bot TEXT NOT NULL, token TEXT NOT NULL UNIQUE,
+ cloid TEXT NOT NULL UNIQUE, fence INTEGER NOT NULL UNIQUE,
+ state TEXT NOT NULL CHECK(state IN ('reserved','dispatch_unknown')),
+ PRIMARY KEY(environment,account,dex,coin));
+CREATE TABLE metadata(schema_version INTEGER NOT NULL, next_fence INTEGER NOT NULL);
+INSERT INTO metadata VALUES(1,1);
+"""
+
+class OfflineAtomicCoordinator:
+    """Test fixture only: one local SQLite file; no SDK, signer or network."""
+
+    def __init__(self,path,*,create=False):
+        self.path=str(path)
+        if create:
+            if os.path.lexists(self.path):
+                raise FileExistsError("atomic fixture already exists")
+            with sqlite3.connect(self.path) as db:
+                db.executescript(_SCHEMA)
+        if not os.path.isfile(self.path) or os.path.islink(self.path):
+            raise FileNotFoundError("atomic fixture missing or unsafe")
+        with self._connect() as db:
+            if db.execute("PRAGMA integrity_check").fetchone()!=("ok",):
+                raise sqlite3.DatabaseError("damaged atomic fixture")
+            version=db.execute("SELECT schema_version,next_fence FROM metadata").fetchall()
+            if len(version)!=1 or version[0][0]!=1 or version[0][1]<1:
+                raise sqlite3.DatabaseError("invalid atomic fixture metadata")
+            for name in ("replay_nonces","claims"):
+                if not db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?",(name,)).fetchone():
+                    raise sqlite3.DatabaseError("missing atomic fixture table")
+
+    def _connect(self):
+        uri=Path(self.path).absolute().as_uri()+"?mode=rw"
+        return sqlite3.connect(uri,uri=True,timeout=5,isolation_level=None)
+
+    def reserve(self,*,principal,nonce,bot,environment,account,dex,coin,
+                inject_failure=None):
+        scope=OfflineSharedSender._scope(environment,account,dex,coin)
+        if (scope is None or bot not in ("daily","intraday","aggressive")
+            or type(principal) is not str or not principal
+            or type(nonce) is not str or not 1<=len(nonce)<=128):
+            return ("hold",False)
+        try:
+            with self._connect() as db:
+                db.execute("BEGIN IMMEDIATE")
+                try:
+                    db.execute("INSERT INTO replay_nonces VALUES(?,?)",(principal,nonce))
+                    if inject_failure=="after_nonce":
+                        raise RuntimeError("simulated crash before claim")
+                    fence=db.execute("SELECT next_fence FROM metadata").fetchone()[0]
+                    token,cloid=str(uuid.uuid4()),"0x"+uuid.uuid4().hex
+                    db.execute("INSERT INTO claims VALUES(?,?,?,?,?,?,?,?,?)",
+                               (*scope,bot,token,cloid,fence,"reserved"))
+                    db.execute("UPDATE metadata SET next_fence=?",(fence+1,))
+                    if inject_failure=="after_claim":
+                        raise RuntimeError("simulated crash before commit")
+                    db.commit()
+                    return ("reserved_offline_only",False)
+                except Exception:
+                    db.rollback()
+                    return ("hold",False)
+        except (sqlite3.Error,OSError):
+            return ("hold",False)
+
+    def inspect(self,*,environment,account,dex,coin):
+        scope=OfflineSharedSender._scope(environment,account,dex,coin)
+        if scope is None:
+            return None
+        with self._connect() as db:
+            return db.execute(
+                "SELECT bot,token,cloid,fence,state FROM claims "
+                "WHERE environment=? AND account=? AND dex=? AND coin=?",scope).fetchone()
