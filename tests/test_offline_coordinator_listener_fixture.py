@@ -229,6 +229,22 @@ class OfflineCoordinatorListenerTests(unittest.TestCase):
                     os.path.join(directory,"missing-journal.sqlite"))
             self.assertFalse(os.path.lexists(path))
 
+    @unittest.skipUnless(hasattr(os,"chown") and os.geteuid()==0,
+                         "requires disposable Linux root runner")
+    def test_socket_parent_wrong_owner_denied(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path=os.path.join(directory,"coordinator.sock")
+            os.chown(directory,1,-1)
+            try:
+                with self.assertRaises(PermissionError):
+                    serve_offline_socket_once(
+                        path,{os.getuid():("daily","mainnet",ACCOUNT)},
+                        os.path.join(directory,"missing-replay.sqlite"),
+                        os.path.join(directory,"missing-journal.sqlite"))
+                self.assertFalse(os.path.lexists(path))
+            finally:
+                os.chown(directory,0,-1)
+
     def test_missing_state_never_recreated(self):
         with tempfile.TemporaryDirectory() as directory:
             path=os.path.join(directory,"coordinator.sock")
