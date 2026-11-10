@@ -39,6 +39,13 @@ def serve_offline_socket_once(socket_path,allowed_uids,replay_path,journal_path,
     if os.path.lexists(socket_path):
         raise FileExistsError("refuse to overwrite existing socket path")
     for state_path in (journal_path,replay_path):
+        state_parent=os.path.dirname(os.path.abspath(state_path))
+        parent_info=os.lstat(state_parent)
+        if not stat.S_ISDIR(parent_info.st_mode) or parent_info.st_mode & 0o022:
+            raise PermissionError("offline state parent must be a protected directory")
+        if parent_info.st_uid != os.geteuid():
+            raise PermissionError("offline state parent must belong to coordinator")
+    for state_path in (journal_path,replay_path):
         state=os.lstat(state_path)
         if not stat.S_ISREG(state.st_mode) or state.st_mode & 0o077:
             raise PermissionError("offline state file must be private regular file")
