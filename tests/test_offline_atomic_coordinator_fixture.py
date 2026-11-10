@@ -208,6 +208,19 @@ os._exit(19)
         with self.assertRaises(PermissionError):
             OfflineAtomicCoordinator(os.path.join(link,"atomic.sqlite"))
 
+    def test_replaced_database_inode_holds_without_recreating_claim(self):
+        import shutil
+        replacement=os.path.join(self.temp.name,"replacement.sqlite")
+        shutil.copy2(self.path,replacement)
+        os.chmod(replacement,0o600)
+        os.replace(replacement,self.path)
+        self.assertEqual(self.coordinator.reserve(**self.args),("hold",False))
+        with self.assertRaises(PermissionError):
+            self.coordinator.inspect(environment="mainnet",account=ACCOUNT,
+                                     dex="",coin="SOL")
+        with OfflineAtomicCoordinator(self.path)._connect() as db:
+            self.assertEqual(db.execute("SELECT COUNT(*) FROM claims").fetchone()[0],0)
+
     def test_missing_file_not_recreated(self):
         os.unlink(self.path)
         with self.assertRaises(FileNotFoundError):
