@@ -64,6 +64,48 @@ class OfflineAtomicSocketBridgeTests(unittest.TestCase):
         self.assertEqual(self.exchange(dict(self.payload,coin="bad!")),("hold",False))
         self.assertEqual(self.exchange(self.payload),("reserved_offline_only",False))
 
+    def test_restart_preserves_replay_and_scope_claim(self):
+        self.assertEqual(self.exchange(self.payload),("reserved_offline_only",False))
+        # Each exchange constructs a fresh coordinator, as after a restart.
+        self.assertEqual(self.exchange(self.payload),("hold",False))
+        self.assertEqual(self.exchange(dict(self.payload,nonce="after-restart")),
+                         ("hold",False))
+        self.assertEqual(OfflineAtomicCoordinator(self.db).inspect(
+            environment="mainnet",account=ACCOUNT,dex="",coin="SOL")[0],"daily")
+
+    def test_simultaneous_socket_requests_only_one_claim(self):
+        import concurrent.futures
+        # Use distinct socket paths: each handler is a separate offline
+        # connection, but all transactions compete for the same DB scope.
+        def attempt(index):
+            path=os.path.join(self.temp.name,"parallel-"+str(index)+".sock")
+            with socket.socket(socket.AF_UNIX,socket.SOCK_STREAM) as listener:
+                listener.bind(path)
+                listener.listen(1)
+                output=[]
+                def server():
+                    conn,_=listener.accept()
+                    with conn:
+                        output.append(handle_offline_atomic_socket(
+                            conn,{os.getuid():("daily","mainnet",ACCOUNT)},self.db))
+                worker=threading.Thread(target=server,daemon=True)
+                worker.start()
+                payload=dict(self.payload,nonce="parallel-"+str(index))
+                data=json.dumps(payload).encode()
+                with socket.socket(socket.AF_UNIX,socket.SOCK_STREAM) as client:
+                    client.connect(path)
+                    client.sendall(struct.pack("!I",len(data))+data)
+                worker.join(timeout=10)
+                self.assertFalse(worker.is_alive())
+                return output[0]
+        with concurrent.futures.ThreadPoolExecutor(max_workers=8) as pool:
+            results=list(pool.map(attempt,range(12)))
+        self.assertEqual(results.count(("reserved_offline_only",False)),1)
+        self.assertEqual(results.count(("hold",False)),11)
+        with OfflineAtomicCoordinator(self.db)._connect() as db:
+            self.assertEqual(db.execute("SELECT COUNT(*) FROM claims").fetchone()[0],1)
+            self.assertEqual(db.execute("SELECT COUNT(*) FROM replay_nonces").fetchone()[0],1)
+
     def test_missing_database_holds_without_recreation(self):
         os.unlink(self.db)
         self.assertEqual(self.exchange(self.payload),("hold",False))
