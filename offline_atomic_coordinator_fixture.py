@@ -107,6 +107,16 @@ class OfflineAtomicCoordinator:
             after=os.lstat(self.path)
             if (after.st_dev,after.st_ino)!=self._identity:
                 raise PermissionError("atomic fixture database changed during open")
+            # SQLite exposes the main database filename. Re-stat that file,
+            # rather than assuming our pre-open pathname check was sufficient.
+            main=[row[2] for row in db.execute("PRAGMA database_list")
+                  if row[1]=="main"]
+            if len(main)!=1 or not main[0]:
+                raise PermissionError("atomic fixture opened database unknown")
+            opened=os.stat(main[0],follow_symlinks=False)
+            if (not stat.S_ISREG(opened.st_mode)
+                or (opened.st_dev,opened.st_ino)!=self._identity):
+                raise PermissionError("atomic fixture opened database mismatch")
             return db
         except Exception:
             db.close()
