@@ -192,6 +192,24 @@ class OfflineCoordinatorListenerTests(unittest.TestCase):
             self.assertTrue(os.path.islink(linked))
             self.assertTrue(os.path.isfile(journal))
 
+    def test_world_writable_database_parent_rejected(self):
+        with tempfile.TemporaryDirectory() as directory:
+            unsafe=os.path.join(directory,"unsafe-state")
+            os.mkdir(unsafe)
+            os.chmod(unsafe,0o777)
+            journal=os.path.join(unsafe,"journal.sqlite")
+            replay=os.path.join(unsafe,"replay.sqlite")
+            OfflineRestartJournal(journal,create=True)
+            OfflinePersistentReplayLedger(replay,create=True)
+            os.chmod(journal,0o600)
+            os.chmod(replay,0o600)
+            path=os.path.join(directory,"coordinator.sock")
+            with self.assertRaises(PermissionError):
+                serve_offline_socket_once(
+                    path,{os.getuid():("daily","mainnet",ACCOUNT)},
+                    replay,journal)
+            self.assertFalse(os.path.lexists(path))
+
     def test_missing_state_never_recreated(self):
         with tempfile.TemporaryDirectory() as directory:
             path=os.path.join(directory,"coordinator.sock")
