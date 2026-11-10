@@ -12,6 +12,17 @@ from offline_persistent_replay_ledger import OfflinePersistentReplayLedger
 from offline_sender_restart_journal import OfflineRestartJournal
 from offline_shared_sender_prototype import OfflineSharedSender
 
+def _reject_symlink_ancestors(path):
+    """Reject existing symlinks anywhere in a parent path, not only its leaf."""
+    current=os.path.abspath(path)
+    while True:
+        if stat.S_ISLNK(os.lstat(current).st_mode):
+            raise ValueError("symlinked coordinator path component")
+        parent=os.path.dirname(current)
+        if parent==current:
+            return
+        current=parent
+
 def serve_offline_socket_once(socket_path,allowed_uids,replay_path,journal_path,
                               ready=None,timeout=2):
     """Accept exactly one request; never recreate missing state or unlink paths."""
@@ -31,6 +42,7 @@ def serve_offline_socket_once(socket_path,allowed_uids,replay_path,journal_path,
     if any(bot not in ("daily","intraday","aggressive") for bot in bots):
         raise ValueError("unknown bot identity")
     parent=os.path.dirname(os.path.abspath(socket_path))
+    _reject_symlink_ancestors(parent)
     if os.path.islink(parent) or not stat.S_ISDIR(os.stat(parent).st_mode):
         raise ValueError("invalid socket directory")
     # Private coordinator-owned directory; a real service needs managed ACLs.
@@ -42,6 +54,7 @@ def serve_offline_socket_once(socket_path,allowed_uids,replay_path,journal_path,
         raise FileExistsError("refuse to overwrite existing socket path")
     for state_path in (journal_path,replay_path):
         state_parent=os.path.dirname(os.path.abspath(state_path))
+        _reject_symlink_ancestors(state_parent)
         parent_info=os.lstat(state_parent)
         if not stat.S_ISDIR(parent_info.st_mode) or parent_info.st_mode & 0o022:
             raise PermissionError("offline state parent must be a protected directory")
