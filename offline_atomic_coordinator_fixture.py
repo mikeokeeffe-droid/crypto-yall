@@ -37,9 +37,28 @@ class OfflineAtomicCoordinator:
             version=db.execute("SELECT schema_version,next_fence FROM metadata").fetchall()
             if len(version)!=1 or version[0][0]!=1 or version[0][1]<1:
                 raise sqlite3.DatabaseError("invalid atomic fixture metadata")
-            for name in ("replay_nonces","claims"):
-                if not db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?",(name,)).fetchone():
-                    raise sqlite3.DatabaseError("missing atomic fixture table")
+            expected={
+                "replay_nonces":("principal","nonce"),
+                "claims":("environment","account","dex","coin","bot",
+                          "token","cloid","fence","state"),
+                "metadata":("schema_version","next_fence"),
+            }
+            for name,columns in expected.items():
+                actual=tuple(row[1] for row in db.execute("PRAGMA table_info("+name+")"))
+                if actual!=columns:
+                    raise sqlite3.DatabaseError("invalid atomic fixture schema: "+name)
+            # Column names alone are insufficient: a recreated table without
+            # uniqueness constraints would permit duplicate replay or claims.
+            for table,unique_columns in (
+                ("replay_nonces",{"principal","nonce"}),
+                ("claims",{"environment","account","dex","coin"})):
+                indexes=db.execute("PRAGMA index_list("+table+")").fetchall()
+                unique_sets=[
+                    {row[2] for row in db.execute("PRAGMA index_info("+index[1]+")")}
+                    for index in indexes if index[2]
+                ]
+                if unique_columns not in unique_sets:
+                    raise sqlite3.DatabaseError("missing atomic fixture uniqueness: "+table)
 
     def _connect(self):
         uri=Path(self.path).absolute().as_uri()+"?mode=rw"
