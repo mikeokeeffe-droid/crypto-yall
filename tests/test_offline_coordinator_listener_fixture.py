@@ -385,6 +385,21 @@ class OfflineCoordinatorListenerTests(unittest.TestCase):
             self.assertIsNone(OfflineRestartJournal(journal).inspect(
                 environment="mainnet",account=ACCOUNT,dex="",coin="SOL"))
 
+    def test_missing_journal_does_not_create_state_or_socket(self):
+        with tempfile.TemporaryDirectory() as directory:
+            journal=os.path.join(directory,"missing-journal.sqlite")
+            replay=os.path.join(directory,"replay.sqlite")
+            path=os.path.join(directory,"coordinator.sock")
+            OfflinePersistentReplayLedger(replay,create=True)
+            os.chmod(replay,0o600)
+            with self.assertRaises(FileNotFoundError):
+                serve_offline_socket_once(
+                    path,{os.getuid():("daily","mainnet",ACCOUNT)},
+                    replay,journal)
+            self.assertFalse(os.path.lexists(journal))
+            self.assertFalse(os.path.lexists(path))
+            self.assertTrue(os.path.isfile(replay))
+
     def test_missing_state_never_recreated(self):
         with tempfile.TemporaryDirectory() as directory:
             path=os.path.join(directory,"coordinator.sock")
