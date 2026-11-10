@@ -297,6 +297,39 @@ class OfflineCoordinatorListenerTests(unittest.TestCase):
                     journal)
             self.assertFalse(os.path.lexists(path))
 
+    def test_socket_path_replacement_not_deleted_on_timeout(self):
+        """A swapped pathname must survive listener cleanup; no order authority."""
+        with tempfile.TemporaryDirectory() as directory:
+            journal=os.path.join(directory,"journal.sqlite")
+            replay=os.path.join(directory,"replay.sqlite")
+            path=os.path.join(directory,"coordinator.sock")
+            OfflineRestartJournal(journal,create=True)
+            OfflinePersistentReplayLedger(replay,create=True)
+            os.chmod(journal,0o600)
+            os.chmod(replay,0o600)
+            ready=threading.Event()
+            errors=[]
+            def serve():
+                try:
+                    serve_offline_socket_once(
+                        path,{os.getuid():("daily","mainnet",ACCOUNT)},
+                        replay,journal,ready=ready,timeout=0.3)
+                except socket.timeout:
+                    errors.append("timeout")
+            worker=threading.Thread(target=serve)
+            worker.start()
+            self.assertTrue(ready.wait(5))
+            os.unlink(path)
+            with open(path,"w") as replacement:
+                replacement.write("preserve replacement")
+            worker.join(5)
+            self.assertFalse(worker.is_alive())
+            self.assertEqual(errors,["timeout"])
+            with open(path) as replacement:
+                self.assertEqual(replacement.read(),"preserve replacement")
+            self.assertIsNone(OfflineRestartJournal(journal).inspect(
+                environment="mainnet",account=ACCOUNT,dex="",coin="SOL"))
+
     def test_missing_state_never_recreated(self):
         with tempfile.TemporaryDirectory() as directory:
             path=os.path.join(directory,"coordinator.sock")
