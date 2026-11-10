@@ -16,6 +16,16 @@ def serve_offline_socket_once(socket_path,allowed_uids,replay_path,journal_path,
     """Accept exactly one request; never recreate missing state or unlink paths."""
     if not isinstance(allowed_uids,dict) or not allowed_uids:
         raise ValueError("explicit UID allowlist required")
+    if any(type(uid) is not int or uid < 0 or
+           type(identity) is not tuple or len(identity) != 3 or
+           any(type(value) is not str or not value for value in identity)
+           for uid,identity in allowed_uids.items()):
+        raise ValueError("invalid UID identity mapping")
+    bots=[identity[0] for identity in allowed_uids.values()]
+    if len(set(bots)) != len(bots):
+        raise ValueError("each bot must have its own Linux UID")
+    if any(bot not in ("daily","intraday","aggressive") for bot in bots):
+        raise ValueError("unknown bot identity")
     parent=os.path.dirname(os.path.abspath(socket_path))
     if os.path.islink(parent) or not stat.S_ISDIR(os.stat(parent).st_mode):
         raise ValueError("invalid socket directory")
