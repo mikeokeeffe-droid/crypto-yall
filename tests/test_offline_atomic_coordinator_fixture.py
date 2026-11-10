@@ -221,6 +221,20 @@ os._exit(19)
         with OfflineAtomicCoordinator(self.path)._connect() as db:
             self.assertEqual(db.execute("SELECT COUNT(*) FROM claims").fetchone()[0],0)
 
+    def test_replaced_parent_directory_holds_existing_coordinator(self):
+        moved=os.path.join(os.path.dirname(self.temp.name),"old-atomic-parent")
+        # Rename within the same filesystem and replace the original directory.
+        os.rename(self.temp.name,moved)
+        try:
+            os.mkdir(self.temp.name,0o700)
+            self.assertEqual(self.coordinator.reserve(**self.args),("hold",False))
+            with self.assertRaises(PermissionError):
+                self.coordinator.inspect(environment="mainnet",account=ACCOUNT,
+                                         dex="",coin="SOL")
+        finally:
+            os.rmdir(self.temp.name)
+            os.rename(moved,self.temp.name)
+
     def test_missing_file_not_recreated(self):
         os.unlink(self.path)
         with self.assertRaises(FileNotFoundError):
