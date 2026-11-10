@@ -113,6 +113,43 @@ class OfflineCoordinatorListenerTests(unittest.TestCase):
             self.assertIsNotNone(OfflineRestartJournal(journal).inspect(
                 environment="mainnet",account=ACCOUNT,dex="",coin="SOL"))
 
+    def test_replayed_nonce_holds_after_listener_restart(self):
+        with tempfile.TemporaryDirectory() as directory:
+            journal=os.path.join(directory,"journal.sqlite")
+            replay=os.path.join(directory,"replay.sqlite")
+            path=os.path.join(directory,"coordinator.sock")
+            OfflineRestartJournal(journal,create=True)
+            OfflinePersistentReplayLedger(replay,create=True)
+            os.chmod(journal,0o600)
+            os.chmod(replay,0o600)
+            allowed={os.getuid():("daily","mainnet",ACCOUNT)}
+            decisions=[]
+            for _ in range(2):
+                ready=threading.Event()
+                results=[]
+                def serve():
+                    results.append(serve_offline_socket_once(
+                        path,allowed,replay,journal,ready=ready))
+                thread=threading.Thread(target=serve)
+                thread.start()
+                self.assertTrue(ready.wait(5))
+                payload=dict(operation="request_entry",requested_bot="daily",
+                             environment="mainnet",account=ACCOUNT,dex="",
+                             coin="SOL",nonce="same-after-restart")
+                data=json.dumps(payload).encode()
+                with socket.socket(socket.AF_UNIX,socket.SOCK_STREAM) as client:
+                    client.connect(path)
+                    client.sendall(struct.pack("!I",len(data))+data)
+                thread.join(5)
+                self.assertFalse(thread.is_alive())
+                self.assertEqual(len(results),1)
+                decisions.extend(results)
+                self.assertFalse(os.path.lexists(path))
+            self.assertEqual(decisions,[("reserved_offline_only",False),
+                                        ("hold",False)])
+            self.assertIsNotNone(OfflineRestartJournal(journal).inspect(
+                environment="mainnet",account=ACCOUNT,dex="",coin="SOL"))
+
     def test_existing_socket_path_not_overwritten(self):
         with tempfile.TemporaryDirectory() as directory:
             path=os.path.join(directory,"coordinator.sock")
