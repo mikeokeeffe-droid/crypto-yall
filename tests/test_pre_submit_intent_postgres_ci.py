@@ -300,5 +300,73 @@ with psycopg.connect(
         self.assertEqual(after, before)
 
 
+
+    def _uncommitted_transaction_lock_timeout(self, *, owner_commits):
+        """A second LOGIN cannot slip past a pending same-scope transaction.
+
+        All SQL and credentials are confined to disposable safety_test CI.
+        Never interprets a DB claim as permission to place an exchange order.
+        """
+        from psycopg.errors import LockNotAvailable
+
+        first_token = uuid.uuid4()
+        with self.bot("daily") as first:
+            created = first.execute(
+                "select recorded,intent_id,fencing "
+                "from public.ci_record_pre_submit_intent("
+                "%s,%s,%s,%s,%s,%s,%s,%s)",
+                ("mainnet", ADDRESS, "", "SOL", "daily",
+                 first_token, "open_long", "2"),
+            ).fetchone()
+            self.assertEqual(created[:2], (True, first_token))
+            # Keep first transaction uncommitted while a different bot
+            # attempts the same unique scope with a short lock timeout.
+            with self.bot("intraday", autocommit=True) as competing:
+                competing.execute("set lock_timeout = '400ms'")
+                with self.assertRaises(LockNotAvailable):
+                    competing.execute(
+                        "select recorded,intent_id,fencing "
+                        "from public.ci_record_pre_submit_intent("
+                        "%s,%s,%s,%s,%s,%s,%s,%s)",
+                        ("mainnet", ADDRESS, "", "SOL", "intraday",
+                         uuid.uuid4(), "open_short", "1"),
+                    )
+            if owner_commits:
+                first.commit()
+            else:
+                first.rollback()
+
+        # A new session, representing recovery after the timeout:
+        # committed owner must win permanently; rolled-back owner did not
+        # claim anything and a fresh valid request is permitted in CI.
+        retry = self.record(
+            "intraday", action="open_short", size="1",
+            token=uuid.uuid4(),
+        )
+        self.assertEqual(retry[0], not owner_commits)
+        if owner_commits:
+            self.assertEqual(retry, (False, None, None))
+        else:
+            self.assertIsNotNone(retry[1])
+        with self.admin() as db:
+            rows = db.execute(
+                "select c.bot,c.token,i.bot,i.intent_token,i.action "
+                "from public.ci_scoped_entry_claims c "
+                "join public.ci_scoped_entry_intents i "
+                "on i.intent_token=c.token"
+            ).fetchall()
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0][0], "daily" if owner_commits else "intraday")
+        self.assertEqual(rows[0][2], rows[0][0])
+        self.assertEqual(rows[0][3], rows[0][1])
+        self.assertEqual(rows[0][4], "open_long" if owner_commits else "open_short")
+
+    def test_scoped_lock_timeout_then_owner_commit_blocks_retry(self):
+        self._uncommitted_transaction_lock_timeout(owner_commits=True)
+
+    def test_scoped_lock_timeout_then_owner_rollback_allows_one_retry(self):
+        self._uncommitted_transaction_lock_timeout(owner_commits=False)
+
+
 if __name__ == "__main__":
     unittest.main()
