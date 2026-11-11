@@ -9,7 +9,9 @@ Run ONLY with sudo in a disposable GitHub Actions runner.
 import json
 import os
 import pwd
+import shutil
 import stat
+from pathlib import Path
 import subprocess
 import sys
 import tempfile
@@ -103,7 +105,7 @@ class IsolatedOfflineCollectorUidTests(unittest.TestCase):
         return selected
 
     @staticmethod
-    def _run_as(user,source,*arguments):
+    def _run_as(user,source,*arguments,code_dir):
         def drop():
             os.setgroups([])
             os.setgid(user.pw_gid)
@@ -111,13 +113,13 @@ class IsolatedOfflineCollectorUidTests(unittest.TestCase):
         # No GitHub tokens, database credentials, exchange keys or user env.
         env={
             "PATH":os.environ.get("PATH","/usr/bin:/bin"),
-            "PYTHONPATH":os.getcwd(),
+            "PYTHONPATH":code_dir,
             "PYTHONDONTWRITEBYTECODE":"1",
         }
         return subprocess.run(
             [sys.executable,"-c",source,*map(str,arguments)],
             env=env,preexec_fn=drop,capture_output=True,
-            text=True,timeout=15,check=False,cwd=os.getcwd(),
+            text=True,timeout=15,check=False,cwd=code_dir,
         )
 
     def test_collector_and_three_bots_have_distinct_uid_file_boundary(self):
@@ -126,10 +128,38 @@ class IsolatedOfflineCollectorUidTests(unittest.TestCase):
             len({x.pw_uid for x in (collector,*bots)}),4,
         )
         with tempfile.TemporaryDirectory(prefix="offline-collector-ci-") as root:
-            os.chown(root,collector.pw_uid,collector.pw_gid)
-            os.chmod(root,0o700)
-            path=os.path.join(root,"synthetic-receipts.json")
-            result=self._run_as(collector,COLLECTOR_CHILD,path)
+            # Repository checkout parents may not be traversable by other UIDs.
+            # Stage ONLY the pure offline modules to an immutable, root-owned
+            # read-only code directory, separate from the collector evidence.
+            os.chmod(root,0o755)
+            code_dir=os.path.join(root,"read-only-modules")
+            evidence_dir=os.path.join(root,"collector-evidence")
+            os.mkdir(code_dir,0o755)
+            os.chmod(code_dir,0o755)
+            module_names=(
+                "offline_readonly_collector_contract.py",
+                "offline_readonly_collector_runner.py",
+                "offline_ci_info_capture_integrity.py",
+                "offline_hyperliquid_json_boundary.py",
+                "offline_hyperliquid_wire_review.py",
+                "offline_hyperliquid_cloid_order_review.py",
+                "offline_hyperliquid_transport_plan.py",
+                "offline_hyperliquid_http_envelope.py",
+            )
+            repo=Path(__file__).resolve().parents[1]
+            for name in module_names:
+                destination=os.path.join(code_dir,name)
+                shutil.copyfile(repo / name,destination)
+                os.chmod(destination,0o644)
+                self.assertEqual(os.stat(destination).st_uid,0)
+                self.assertEqual(stat.S_IMODE(os.stat(destination).st_mode),0o644)
+            os.mkdir(evidence_dir,0o700)
+            os.chown(evidence_dir,collector.pw_uid,collector.pw_gid)
+            os.chmod(evidence_dir,0o700)
+            path=os.path.join(evidence_dir,"synthetic-receipts.json")
+            result=self._run_as(
+                collector,COLLECTOR_CHILD,path,code_dir=code_dir,
+            )
             self.assertEqual(result.returncode,0,result.stderr)
             message=json.loads(result.stdout)
             self.assertEqual(message,{
@@ -142,14 +172,16 @@ class IsolatedOfflineCollectorUidTests(unittest.TestCase):
             metadata=os.stat(path)
             self.assertEqual(metadata.st_uid,collector.pw_uid)
             self.assertEqual(stat.S_IMODE(metadata.st_mode),0o600)
-            self.assertEqual(stat.S_IMODE(os.stat(root).st_mode),0o700)
+            self.assertEqual(stat.S_IMODE(os.stat(evidence_dir).st_mode),0o700)
             with open(path,"rb") as original:
                 evidence=original.read()
             self.assertIn(b'"tid":42',evidence)
 
             for bot in bots:
                 with self.subTest(bot_uid=bot.pw_uid):
-                    attempt=self._run_as(bot,BOT_CHILD,root,path)
+                    attempt=self._run_as(
+                        bot,BOT_CHILD,evidence_dir,path,code_dir=code_dir,
+                    )
                     self.assertEqual(
                         attempt.returncode,0,
                         attempt.stdout+" "+attempt.stderr,
