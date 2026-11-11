@@ -125,7 +125,7 @@ class OfflineCollectorContractTests(unittest.TestCase):
         self.assertEqual(
             inspect_fixture_response_offline(
                 plan=q,envelope=good,now_ms=1200,
-            ).status,"review_only",
+            ).status,"hold",
         )
         for bad_plan in (
             replace(q,request_json='{"type":"exchange"}'),
