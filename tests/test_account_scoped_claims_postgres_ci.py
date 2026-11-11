@@ -305,7 +305,7 @@ class ScopedEntryAdmissionTests(unittest.TestCase):
                 with self.assertRaises(InsufficientPrivilege):
                     client.execute(
                         "create function public.ci_shadow_privilege_probe() "
-                        "returns integer language sql as $select 1$"
+                        "returns integer language sql as 'select 1'"
                     )
                 # Group-role membership may allow SET ROLE, but must not
                 # let the bot impersonate a different session_user.
