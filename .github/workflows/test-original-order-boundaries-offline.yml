@@ -23,6 +23,8 @@ on:
       - 'offline_framed_unix_coordinator_fixture.py'
       - 'offline_atomic_socket_bridge_fixture.py'
       - 'tests/test_offline_atomic_socket_bridge_fixture.py'
+      - 'offline_original_bot_intent_adapter.py'
+      - 'tests/test_offline_original_bot_intent_adapter.py'
       - 'offline_atomic_coordinator_fixture.py'
       - 'tests/test_offline_atomic_coordinator_fixture.py'
       - 'offline_coordinator_listener_fixture.py'
@@ -158,6 +160,7 @@ jobs:
       - name: Exercise fake exchanges only (no secrets, no clients, no orders)
         run: |
           python -m unittest discover -s tests -p 'test_offline_atomic_socket_bridge_fixture.py' -v
+          python -m unittest discover -s tests -p 'test_offline_original_bot_intent_adapter.py' -v
           python -m unittest discover -s tests -p 'test_offline_atomic_coordinator_fixture.py' -v
           python -m unittest discover -s tests -p 'test_original_order_boundaries_offline.py' -v
           python -m unittest discover -s tests -p 'test_position_increase_claim_invariant_offline.py' -v
