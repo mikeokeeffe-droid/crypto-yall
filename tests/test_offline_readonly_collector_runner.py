@@ -51,7 +51,7 @@ class OfflineCollectorRunnerTests(unittest.TestCase):
             content_type="application/json", body=body,
         ), **changes)
 
-    def run(self, *, plan=None, fixture_result=None,
+    def review_capture(self, *, plan=None, fixture_result=None,
             captured_at_ms=1150, now_ms=1200, pinned_intent=None):
         return run_offline_info_capture(
             plan=plan or self.fills_plan,
@@ -61,7 +61,7 @@ class OfflineCollectorRunnerTests(unittest.TestCase):
         )
 
     def test_valid_documented_fill_fixture_is_review_only(self):
-        result=self.run()
+        result=self.review_capture()
         self.assertEqual(result.state, "review_only")
         self.assertIsNotNone(result.response_sha256)
         self.assertFalse(result.origin_authenticated)
@@ -81,7 +81,7 @@ class OfflineCollectorRunnerTests(unittest.TestCase):
                 },
             },
         }
-        result = self.run(
+        result = self.review_capture(
             plan=self.order_plan, pinned_intent=self.intent,
             fixture_result=self.fixture(
                 body=json.dumps(response).encode(),
@@ -94,14 +94,14 @@ class OfflineCollectorRunnerTests(unittest.TestCase):
         self.assertFalse(result.ownership_verified)
 
     def test_order_without_intent_or_with_foreign_intent_holds(self):
-        self.assertEqual(self.run(
+        self.assertEqual(self.review_capture(
             plan=self.order_plan,
         ).state, "hold")
         foreign = dict(self.intent, account="0x" + "2" * 40)
-        self.assertFalse(self.run(
+        self.assertFalse(self.review_capture(
             plan=self.order_plan, pinned_intent=foreign,
         ).structurally_consistent)
-        self.assertEqual(self.run(pinned_intent=self.intent).state, "hold")
+        self.assertEqual(self.review_capture(pinned_intent=self.intent).state, "hold")
 
     def test_network_errors_redirects_proxies_rate_limits_and_tls_hold(self):
         cases = (
@@ -118,7 +118,7 @@ class OfflineCollectorRunnerTests(unittest.TestCase):
         )
         for change in cases:
             with self.subTest(change=change):
-                result = self.run(fixture_result=self.fixture(**change))
+                result = self.review_capture(fixture_result=self.fixture(**change))
                 self.assertEqual(result.state, "hold")
                 self.assertFalse(result.submit_authorized)
 
@@ -135,22 +135,22 @@ class OfflineCollectorRunnerTests(unittest.TestCase):
         )
         for body in inputs:
             with self.subTest(size=len(body)):
-                result = self.run(fixture_result=self.fixture(body=body))
+                result = self.review_capture(fixture_result=self.fixture(body=body))
                 self.assertEqual(result.state, "hold")
                 self.assertFalse(result.submit_authorized)
 
     def test_stale_capture_and_wrong_plan_hold(self):
         self.assertEqual(
-            self.run(captured_at_ms=100, now_ms=70000).state,
+            self.review_capture(captured_at_ms=100, now_ms=70000).state,
             "hold",
         )
         self.assertEqual(
-            self.run(captured_at_ms=1300, now_ms=1200).state,
+            self.review_capture(captured_at_ms=1300, now_ms=1200).state,
             "hold",
         )
         other_plan = replace(self.fills_plan,
                              endpoint="https://invalid.example/info")
-        self.assertEqual(self.run(plan=other_plan).state, "hold")
+        self.assertEqual(self.review_capture(plan=other_plan).state, "hold")
 
     def test_runner_has_no_http_or_exchange_client(self):
         import offline_readonly_collector_runner as module
