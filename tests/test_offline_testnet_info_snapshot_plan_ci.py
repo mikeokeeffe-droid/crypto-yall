@@ -194,7 +194,7 @@ class OfflineSnapshotRequestTests(unittest.TestCase):
                 )
                 self.assertEqual(r.state,"hold")
                 self.assertFalse(r.submit_authorized)
-        for clock in (0,1000,31001):
+        for clock in (0,999,31001):
             with self.subTest(clock=clock):
                 r=review_offline_testnet_snapshot_capture(
                     plan=plan,expected_account=ACCOUNT,
