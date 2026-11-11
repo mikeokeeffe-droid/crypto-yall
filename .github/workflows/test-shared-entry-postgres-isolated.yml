@@ -20,6 +20,7 @@ on:
       - 'tests/test_offline_original_bot_socket_bridge_ci.py'
       - 'offline_original_bot_process_listener_ci.py'
       - 'tests/test_offline_original_bot_process_listener_ci.py'
+      - 'tests/test_offline_original_bot_distinct_uid_postgres_ci.py'
       - 'tests/test_account_scoped_claims_postgres_ci.py'
       - 'tests/test_readonly_reconciler_login_ci.py'
       - 'restricted_shared_entry_postgres_ci.py'
@@ -83,6 +84,26 @@ jobs:
           python -m unittest discover -s tests -p 'test_offline_original_bot_postgres_bridge_ci.py' -v
           python -m unittest discover -s tests -p 'test_offline_original_bot_socket_bridge_ci.py' -v
           python -m unittest discover -s tests -p 'test_offline_original_bot_process_listener_ci.py' -v
+      - name: Check three real Linux bot UIDs against disposable PostgreSQL
+        run: |
+          set -euo pipefail
+          sudo -n env PATH="$PATH" PYTHONPATH="$PWD" \
+            ISOLATED_POSTGRES_CI=1 PGDATABASE=safety_test PGHOST=localhost \
+            PGPASSWORD="$PGPASSWORD" \
+            python -m unittest discover -s tests \
+              -p 'test_offline_original_bot_distinct_uid_postgres_ci.py' -v \
+              2>&1 | tee /tmp/three-real-uid-pg.log
+          grep -q 'Ran 1 test' /tmp/three-real-uid-pg.log
+          grep -q '^OK
+          python -m unittest discover -s tests -p 'test_uncertain_order_lifecycle_ci.py' -v
+          python -m unittest discover -s tests -p 'test_reconciliation_permission_boundary_ci.py' -v
+          python -m unittest discover -s tests -p 'test_stale_handoff_cas_ci.py' -v
+          python -m unittest discover -s tests -p 'test_readonly_reconciler_login_ci.py' -v
+ /tmp/three-real-uid-pg.log
+          if grep -Eq 'skipped|SKIP' /tmp/three-real-uid-pg.log; then
+            echo 'Distinct-UID test was skipped — fail closed'
+            exit 1
+          fi
           python -m unittest discover -s tests -p 'test_uncertain_order_lifecycle_ci.py' -v
           python -m unittest discover -s tests -p 'test_reconciliation_permission_boundary_ci.py' -v
           python -m unittest discover -s tests -p 'test_stale_handoff_cas_ci.py' -v
