@@ -200,6 +200,15 @@ class OfflineAtomicSocketBridgeTests(unittest.TestCase):
         with open(self.db,"rb") as file:
             self.assertEqual(file.read(),b"not a sqlite database")
 
+    def test_replaced_database_is_rejected_by_pinned_coordinator(self):
+        replacement=os.path.join(self.temp.name,"replacement.sqlite")
+        OfflineAtomicCoordinator(replacement,create=True)
+        os.replace(replacement,self.db)
+        self.assertEqual(self.exchange(self.payload),("hold",False))
+        with OfflineAtomicCoordinator(self.db)._connect() as db:
+            self.assertEqual(db.execute("SELECT COUNT(*) FROM claims").fetchone()[0],0)
+            self.assertEqual(db.execute("SELECT COUNT(*) FROM replay_nonces").fetchone()[0],0)
+
     def test_missing_database_holds_without_recreation(self):
         os.unlink(self.db)
         self.assertEqual(self.exchange(self.payload),("hold",False))
