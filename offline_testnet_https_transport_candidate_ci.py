@@ -11,10 +11,6 @@ independent review BEFORE any future edit to enable execution. Never import
 this from original executors or run it with live credentials.
 """
 from dataclasses import dataclass
-import hashlib
-import http.client
-import ssl
-import time
 
 from offline_testnet_info_snapshot_plan_ci import (
     OfflineSnapshotInfoRequest,
@@ -50,9 +46,9 @@ def review_candidate_http_response_offline(*, status, content_type,
             or content_type.lower() != "application/json"
             or content_encoding not in ("", "identity", None)
             or type(response_bytes) is not bytes
-            or not 0 < len(response_bytes) <= expected_response_limit
             or type(expected_response_limit) is not int
-            or expected_response_limit != 262144):
+            or expected_response_limit != 262144
+            or not 0 < len(response_bytes) <= expected_response_limit):
         return False
     return True
 
@@ -87,19 +83,5 @@ def collect_testnet_info_candidate_offline(*, plan, expected_account,
     )
 
 
-def _review_only_https_mechanics_not_callable(plan):
-    """Uncalled implementation sketch for security review, not an entrypoint.
-
-    No proxy inheritance (http.client ignores HTTP_PROXY); verified TLS,
-    fixed host/path and close-on-error. This STILL lacks network-level egress
-    enforcement and independent source audit, so must not be enabled by CI.
-    """
-    # This function is private and never invoked anywhere in this branch.
-    # A future reviewer should require an isolated service, not reuse bot
-    # process permissions. It returns HOLD even if someone calls it directly.
-    preflight = preflight_testnet_info_transport_offline(
-        plan=plan, expected_account=None, expected_request_type=None,
-    )
-    if preflight.state != "dry_run_only":
-        return OfflineHTTPSCandidateResult()
-    return OfflineHTTPSCandidateResult()
+# No network-capable transport is provided here. A future real connector is
+# a separate reviewed change, not a switch on this candidate module.
