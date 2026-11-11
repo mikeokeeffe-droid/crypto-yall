@@ -250,5 +250,95 @@ class ScopedEntryAdmissionTests(unittest.TestCase):
                 ).fetchone()[0], 0)
 
 
+    def test_bots_cannot_escalate_roles_or_shadow_privileged_functions(self):
+        """Restricted logins cannot gain admin/peer authority or CREATE in public.
+
+        The scoped admission SECURITY DEFINER functions also must have a
+        pinned search_path; this is a disposable PostgreSQL guard, not a
+        production Supabase permission audit.
+        """
+        signatures = (
+            "public.ci_claim_scoped_entry(text,text,text,text,text,uuid)",
+            "public.ci_record_pre_submit_intent("
+            "text,text,text,text,text,uuid,text,numeric)",
+        )
+        with self.admin() as administrator:
+            for signature in signatures:
+                with self.subTest(function=signature):
+                    row = administrator.execute(
+                        "select prosecdef, proconfig from pg_catalog.pg_proc "
+                        "where oid=pg_catalog.to_regprocedure(%s)",
+                        (signature,),
+                    ).fetchone()
+                    self.assertIsNotNone(row)
+                    self.assertTrue(row[0])
+                    self.assertIn("search_path=pg_catalog, public", row[1])
+            self.assertFalse(administrator.execute(
+                "select has_schema_privilege('public','public','CREATE')"
+            ).fetchone()[0])
+
+        for bot in ("daily", "intraday", "aggressive"):
+            login = "entry_login_" + bot
+            other_bot = next(
+                other for other in ("daily", "intraday", "aggressive")
+                if other != bot
+            )
+            with self.subTest(bot=bot), psycopg.connect(
+                host="localhost", port=5432, dbname="safety_test",
+                user=login, password="disposable-" + bot + "-only",
+                autocommit=True,
+            ) as client:
+                self.assertEqual(
+                    client.execute(
+                        "select session_user,current_user").fetchone(),
+                    (login, login),
+                )
+                self.assertFalse(client.execute(
+                    "select has_schema_privilege(current_user,'public','CREATE')"
+                ).fetchone()[0])
+                for target in ("postgres", "service_role",
+                               "entry_login_" + other_bot):
+                    with self.subTest(target=target):
+                        with self.assertRaises(InsufficientPrivilege):
+                            client.execute("set role " + target)
+                with self.assertRaises(InsufficientPrivilege):
+                    client.execute(
+                        "create table public.ci_shadow_privilege_probe(x integer)"
+                    )
+                with self.assertRaises(InsufficientPrivilege):
+                    client.execute(
+                        "create function public.ci_shadow_privilege_probe() "
+                        "returns integer language sql as $select 1$"
+                    )
+                # Group-role membership may allow SET ROLE, but must not
+                # let the bot impersonate a different session_user.
+                client.execute("set role bot_entry_executor_trial")
+                self.assertEqual(
+                    client.execute(
+                        "select session_user,current_user").fetchone(),
+                    (login, "bot_entry_executor_trial"),
+                )
+                with self.assertRaises(InsufficientPrivilege):
+                    client.execute(
+                        "select * from public.ci_claim_scoped_entry("
+                        "%s,%s,%s,%s,%s,%s)",
+                        ("mainnet", ADDRESS_A, "", "SOL", other_bot,
+                         uuid.uuid4()),
+                    )
+                client.execute("reset role")
+                self.assertEqual(
+                    client.execute(
+                        "select session_user,current_user").fetchone(),
+                    (login, login),
+                )
+        with self.admin() as administrator:
+            self.assertEqual(administrator.execute(
+                "select count(*) from public.ci_scoped_entry_claims"
+            ).fetchone()[0], 0)
+            self.assertEqual(administrator.execute(
+                "select count(*) from public.ci_scoped_entry_intents"
+            ).fetchone()[0], 0)
+
+
 if __name__ == "__main__":
     unittest.main()
