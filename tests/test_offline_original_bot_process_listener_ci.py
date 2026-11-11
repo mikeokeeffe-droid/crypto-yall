@@ -17,6 +17,7 @@ import psycopg
 from offline_original_bot_process_listener_ci import (
     serve_offline_original_entry_requests,
 )
+from offline_original_bot_entry_socket_client_ci import request_offline_entry_via_unix_socket
 
 ACCOUNT = "0x" + "1" * 40
 
@@ -124,6 +125,61 @@ class OriginalBotProcessListenerTests(unittest.TestCase):
                 "join public.ci_scoped_entry_intents i "
                 "on i.intent_token=c.token"
             ).fetchall()
+
+    def test_signer_free_client_reaches_separate_ci_process_without_order_rights(self):
+        if os.getuid() <= 0:
+            self.skipTest("client test requires nonroot CI runner user")
+        process=self._start()
+        reviewed=request_offline_entry_via_unix_socket(
+            socket_path=self.path, expected_coordinator_uid=os.getuid(),
+            verified_bot="daily",
+            trade={"action":"open_long","side":"long","hl_coin":"SOL"},
+            rounded_size="0.025", pinned_environment="mainnet",
+            pinned_account=ACCOUNT,
+        )
+        self._finish(process)
+        self.assertEqual(reviewed.state,"recorded_offline_only")
+        self.assertFalse(reviewed.submit_authorized)
+        rows=self._saved()
+        self.assertEqual(len(rows),1)
+        self.assertEqual(rows[0][0],"daily")
+        self.assertEqual(rows[0][3],"open_long")
+        self.assertEqual(str(rows[0][4]),"0.025")
+
+    def test_signer_free_client_rejects_bad_actions_and_server_identity(self):
+        if os.getuid() <= 0:
+            self.skipTest("client test requires nonroot CI runner user")
+        process=self._start()
+        bad=request_offline_entry_via_unix_socket(
+            socket_path=self.path, expected_coordinator_uid=os.getuid(),
+            verified_bot="daily",
+            trade={"action":"close","side":"long","hl_coin":"SOL"},
+            rounded_size="0.025", pinned_environment="mainnet",
+            pinned_account=ACCOUNT,
+        )
+        mismatch=request_offline_entry_via_unix_socket(
+            socket_path=self.path, expected_coordinator_uid=os.getuid()+1000,
+            verified_bot="daily",
+            trade={"action":"open_long","side":"long","hl_coin":"SOL"},
+            rounded_size="0.025", pinned_environment="mainnet",
+            pinned_account=ACCOUNT,
+        )
+        self.assertEqual(bad.state,"hold")
+        self.assertEqual(mismatch.state,"hold")
+        self.assertFalse(bad.submit_authorized)
+        self.assertFalse(mismatch.submit_authorized)
+        # Neither invalid request consumed the one-shot coordinator.
+        good=request_offline_entry_via_unix_socket(
+            socket_path=self.path, expected_coordinator_uid=os.getuid(),
+            verified_bot="daily",
+            trade={"action":"open_long","side":"long","hl_coin":"SOL"},
+            rounded_size="0.025", pinned_environment="mainnet",
+            pinned_account=ACCOUNT,
+        )
+        self._finish(process)
+        self.assertEqual(good.state,"recorded_offline_only")
+        self.assertFalse(good.submit_authorized)
+        self.assertEqual(len(self._saved()),1)
 
     def test_separate_process_reserves_then_restart_holds(self):
         first = self._start()
