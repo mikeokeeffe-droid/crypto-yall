@@ -135,6 +135,49 @@ class OfflineSignerFreeInfoCompatibilityTests(unittest.TestCase):
             snapshot=snapshot(),
         ))
 
+    def test_object_shaped_hyperliquid_leverage_is_supported(self):
+        for kind,value in (("cross",2),("isolated","3")):
+            with self.subTest(kind=kind):
+                data=snapshot()
+                data["user_state"]["assetPositions"][0]["position"]["leverage"]={
+                    "type":kind,"value":value,
+                }
+                client=make_signer_free_info_fixture(scope=SCOPE,snapshot=data)
+                self.assertIsNotNone(client)
+                positions=helper_from_original("get_open_positions")(
+                    client,ACCOUNT,
+                )
+                self.assertEqual(positions["SOL"]["leverage"],float(value))
+                self.assertFalse(client.submit_authorized)
+        for invalid in ({"type":"cross","value":0},
+                        {"type":"isolated","value":"NaN"},
+                        {"type":"unknown","value":"2"},
+                        {"type":"cross","value":2,"secret":"unsafe"},
+                        True):
+            with self.subTest(invalid=invalid):
+                data=snapshot()
+                data["user_state"]["assetPositions"][0]["position"]["leverage"]=invalid
+                self.assertIsNone(make_signer_free_info_fixture(
+                    scope=SCOPE,snapshot=data,
+                ))
+
+    def test_untrusted_fill_and_funding_history_never_looks_complete(self):
+        client=make_signer_free_info_fixture(scope=SCOPE,snapshot=snapshot())
+        self.assertIsNotNone(client)
+        with self.assertRaises(PermissionError):
+            client.user_fills(ACCOUNT)
+        with self.assertRaises(PermissionError):
+            client.user_fills("0x"+"2"*40)
+        with self.assertRaises(PermissionError):
+            client.user_funding_history(ACCOUNT,1000,2000)
+        with self.assertRaises(PermissionError):
+            client.user_funding_history(ACCOUNT,2000,1000)
+        with self.assertRaises(PermissionError):
+            client.user_funding_history("0x"+"2"*40,1000,2000)
+        self.assertFalse(client.origin_authenticated)
+        self.assertFalse(client.ownership_verified)
+        self.assertFalse(client.submit_authorized)
+
     def test_does_not_load_live_modules_or_offer_order_method(self):
         import sys
         self.assertNotIn("hyperliquid.exchange", sys.modules)
