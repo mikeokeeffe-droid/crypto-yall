@@ -134,5 +134,120 @@ class DurableScopedIntentTests(unittest.TestCase):
                 "select count(*) from public.ci_scoped_entry_intents"
             ).fetchone()[0],0)
 
+
+    def _abrupt_child_claim(self, *, commit):
+        """Use one disposable PostgreSQL session and exit without an ACK."""
+        import subprocess
+        import sys
+
+        token = uuid.uuid4()
+        script = """
+import os, sys, uuid
+import psycopg
+
+# This code is run only by the disposable safety_test CI suite.
+assert os.environ.get('ISOLATED_POSTGRES_CI') == '1'
+assert os.environ.get('PGDATABASE') == 'safety_test'
+with psycopg.connect(
+    host='localhost', port=5432, dbname='safety_test',
+    user='entry_login_daily', password='disposable-daily-only',
+) as db:
+    result = db.execute(
+        'select recorded from public.ci_record_pre_submit_intent('
+        '%s,%s,%s,%s,%s,%s,%s,%s)',
+        ('mainnet', sys.argv[1], '', 'SOL', 'daily',
+         uuid.UUID(sys.argv[2]), 'open_long', '2'),
+    ).fetchone()
+    assert result == (True,), result
+    if sys.argv[3] == 'commit':
+        db.commit()
+    # Abrupt exit: no context-manager cleanup or client acknowledgement.
+    # For 'abort', PostgreSQL must roll back the open transaction.
+    os._exit(61 if sys.argv[3] == 'commit' else 62)
+"""
+        mode = "commit" if commit else "abort"
+        child = subprocess.run(
+            [sys.executable, "-c", script, ADDRESS, str(token), mode],
+            check=False, capture_output=True, text=True, timeout=15,
+        )
+        self.assertEqual(child.returncode, 61 if commit else 62,
+                         child.stdout + child.stderr)
+        return token
+
+    def _three_bot_recovery_race(self):
+        """Three separate restricted PostgreSQL logins compete after restart."""
+        from threading import Barrier
+
+        bots = ("daily", "intraday", "aggressive")
+        ready = Barrier(len(bots))
+
+        def attempt(bot):
+            ready.wait(timeout=10)
+            return bot, self.record(bot, token=uuid.uuid4())
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=3) as pool:
+            return list(pool.map(attempt, bots))
+
+    def test_crash_before_commit_rolls_back_intent_then_one_bot_wins(self):
+        """Uncommitted transaction must not leave a ghost claim or nonce."""
+        self._abrupt_child_claim(commit=False)
+        with self.admin() as db:
+            self.assertEqual(
+                db.execute(
+                    "select count(*) from public.ci_scoped_entry_claims"
+                ).fetchone()[0], 0)
+            self.assertEqual(
+                db.execute(
+                    "select count(*) from public.ci_scoped_entry_intents"
+                ).fetchone()[0], 0)
+        decisions = self._three_bot_recovery_race()
+        winners = [bot for bot, row in decisions if row[0]]
+        self.assertEqual(len(winners), 1, decisions)
+        self.assertEqual(sum(row == (False, None, None)
+                             for _, row in decisions), 2, decisions)
+        with self.admin() as db:
+            rows = db.execute(
+                "select c.bot,c.token,i.bot,i.intent_token "
+                "from public.ci_scoped_entry_claims c "
+                "join public.ci_scoped_entry_intents i "
+                "on i.intent_token=c.token"
+            ).fetchall()
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0][0], winners[0])
+        self.assertEqual(rows[0][2], winners[0])
+        self.assertEqual(rows[0][1], rows[0][3])
+
+    def test_crash_after_commit_without_ack_blocks_all_three_bots(self):
+        """Committed intent survives client death; no replacement is allowed."""
+        original_token = self._abrupt_child_claim(commit=True)
+        with self.admin() as db:
+            before = db.execute(
+                "select c.bot,c.token,c.fence_token,i.intent_token,"
+                "i.action,i.requested_size "
+                "from public.ci_scoped_entry_claims c "
+                "join public.ci_scoped_entry_intents i "
+                "on i.intent_token=c.token"
+            ).fetchall()
+        self.assertEqual(len(before), 1)
+        self.assertEqual(before[0][0], "daily")
+        self.assertEqual(before[0][1], original_token)
+        self.assertEqual(before[0][3], original_token)
+        self.assertEqual(before[0][4], "open_long")
+        decisions = self._three_bot_recovery_race()
+        self.assertEqual(
+            [row for _, row in decisions],
+            [(False, None, None)] * 3,
+        )
+        with self.admin() as db:
+            after = db.execute(
+                "select c.bot,c.token,c.fence_token,i.intent_token,"
+                "i.action,i.requested_size "
+                "from public.ci_scoped_entry_claims c "
+                "join public.ci_scoped_entry_intents i "
+                "on i.intent_token=c.token"
+            ).fetchall()
+        self.assertEqual(after, before)
+
+
 if __name__ == "__main__":
     unittest.main()
