@@ -18,6 +18,8 @@ on:
       - 'offline_ci_pg_fake_sender.py'
       - 'tests/test_offline_ci_pg_fake_sender.py'
       - 'tests/test_ci_pg_fake_sender_process_crashes.py'
+      - 'offline_ci_pg_sender_reconciliation.py'
+      - 'tests/test_offline_ci_pg_sender_reconciliation.py'
       - 'offline_original_bot_intent_adapter.py'
       - 'offline_original_bot_postgres_bridge_ci.py'
       - 'tests/test_offline_original_bot_postgres_bridge_ci.py'
@@ -91,6 +93,7 @@ jobs:
           python -m unittest discover -s tests -p 'test_ci_sender_journal_postgres.py' -v
           python -m unittest discover -s tests -p 'test_offline_ci_pg_fake_sender.py' -v
           python -m unittest discover -s tests -p 'test_ci_pg_fake_sender_process_crashes.py' -v
+          python -m unittest discover -s tests -p 'test_offline_ci_pg_sender_reconciliation.py' -v
           python -m unittest discover -s tests -p 'test_offline_original_bot_postgres_bridge_ci.py' -v
           python -m unittest discover -s tests -p 'test_offline_original_bot_socket_bridge_ci.py' -v
           python -m unittest discover -s tests -p 'test_offline_original_bot_process_listener_ci.py' -v
