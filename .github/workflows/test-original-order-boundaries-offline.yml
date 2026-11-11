@@ -27,6 +27,7 @@ on:
       - 'tests/test_offline_original_bot_intent_adapter.py'
       - 'offline_atomic_fake_dispatch_ci.py'
       - 'tests/test_offline_atomic_fake_dispatch_ci.py'
+      - 'tests/test_offline_atomic_fake_multiprocess_ci.py'
       - 'offline_atomic_coordinator_fixture.py'
       - 'tests/test_offline_atomic_coordinator_fixture.py'
       - 'offline_coordinator_listener_fixture.py'
@@ -165,6 +166,7 @@ jobs:
           python -m unittest discover -s tests -p 'test_offline_original_bot_intent_adapter.py' -v
           python -m unittest discover -s tests -p 'test_offline_atomic_coordinator_fixture.py' -v
           python -m unittest discover -s tests -p 'test_offline_atomic_fake_dispatch_ci.py' -v
+          python -m unittest discover -s tests -p 'test_offline_atomic_fake_multiprocess_ci.py' -v
           python -m unittest discover -s tests -p 'test_original_order_boundaries_offline.py' -v
           python -m unittest discover -s tests -p 'test_position_increase_claim_invariant_offline.py' -v
           python -m unittest discover -s tests -p 'test_original_kill_switch_exit_audit_offline.py' -v
