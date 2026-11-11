@@ -31,8 +31,9 @@ class OfflineSenderJournalTests(unittest.TestCase):
     def login(self, who):
         return psycopg.connect(
             host="localhost", port=5432, dbname="safety_test",
-            user=who, password=("disposable-" + who.removeprefix("entry_login_")
-                                + "-only"),
+            user=who, password=("disposable-sender-only" if who == "ci_sender_worker"
+                      else "disposable-" + who.removeprefix("entry_login_")
+                      + "-only"),
             autocommit=True,
         )
 
