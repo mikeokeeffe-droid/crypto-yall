@@ -12,7 +12,9 @@ on:
       - 'db/restricted_entry_proof_ci_only.sql'
       - 'db/account_scoped_claims_ci_only.sql'
       - 'db/pre_submit_intent_ci_only.sql'
+      - 'db/ci_sender_journal_review_only.sql'
       - 'tests/test_pre_submit_intent_postgres_ci.py'
+      - 'tests/test_ci_sender_journal_postgres.py'
       - 'offline_original_bot_intent_adapter.py'
       - 'offline_original_bot_postgres_bridge_ci.py'
       - 'tests/test_offline_original_bot_postgres_bridge_ci.py'
@@ -75,12 +77,15 @@ jobs:
         run: psql -v ON_ERROR_STOP=1 -f db/account_scoped_claims_ci_only.sql
       - name: Create disposable atomic pre-submit intent model
         run: psql -v ON_ERROR_STOP=1 -f db/pre_submit_intent_ci_only.sql
+      - name: Create review-only sender roles and durable fake dispatch schema
+        run: psql -v ON_ERROR_STOP=1 -f db/ci_sender_journal_review_only.sql
       - name: Test real concurrent claims and fresh-process restart
         run: |
           python -m unittest discover -s tests -p 'test_shared_entry_postgres_isolated.py' -v
           python -m unittest discover -s tests -p 'test_restricted_entry_logins_ci.py' -v
           python -m unittest discover -s tests -p 'test_account_scoped_claims_postgres_ci.py' -v
           python -m unittest discover -s tests -p 'test_pre_submit_intent_postgres_ci.py' -v
+          python -m unittest discover -s tests -p 'test_ci_sender_journal_postgres.py' -v
           python -m unittest discover -s tests -p 'test_offline_original_bot_postgres_bridge_ci.py' -v
           python -m unittest discover -s tests -p 'test_offline_original_bot_socket_bridge_ci.py' -v
           python -m unittest discover -s tests -p 'test_offline_original_bot_process_listener_ci.py' -v
