@@ -209,6 +209,27 @@ class OfflineAtomicSocketBridgeTests(unittest.TestCase):
             self.assertEqual(db.execute("SELECT COUNT(*) FROM claims").fetchone()[0],0)
             self.assertEqual(db.execute("SELECT COUNT(*) FROM replay_nonces").fetchone()[0],0)
 
+    def test_replaced_database_parent_rejected_by_pinned_socket(self):
+        protected=os.path.join(self.temp.name,"protected")
+        os.mkdir(protected,0o700)
+        db=os.path.join(protected,"state.sqlite")
+        coordinator=OfflineAtomicCoordinator(db,create=True)
+        old_coordinator=self.coordinator
+        self.coordinator=coordinator
+        try:
+            moved=os.path.join(self.temp.name,"moved-parent")
+            os.rename(protected,moved)
+            os.mkdir(protected,0o700)
+            OfflineAtomicCoordinator(db,create=True)
+            self.assertEqual(self.exchange(self.payload),("hold",False))
+            with OfflineAtomicCoordinator(db)._connect() as opened:
+                self.assertEqual(opened.execute(
+                    "SELECT COUNT(*) FROM claims").fetchone()[0],0)
+                self.assertEqual(opened.execute(
+                    "SELECT COUNT(*) FROM replay_nonces").fetchone()[0],0)
+        finally:
+            self.coordinator=old_coordinator
+
     def test_missing_database_holds_without_recreation(self):
         os.unlink(self.db)
         self.assertEqual(self.exchange(self.payload),("hold",False))
