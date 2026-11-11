@@ -17,7 +17,7 @@ class OfflineAtomicSocketBridgeTests(unittest.TestCase):
         self.temp=tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         self.db=os.path.join(self.temp.name,"atomic.sqlite")
-        OfflineAtomicCoordinator(self.db,create=True)
+        self.coordinator=OfflineAtomicCoordinator(self.db,create=True)
         self.payload=dict(operation="request_entry",requested_bot="daily",
                           environment="mainnet",account=ACCOUNT,dex="",
                           coin="SOL",nonce="n1")
@@ -35,7 +35,7 @@ class OfflineAtomicSocketBridgeTests(unittest.TestCase):
                 with conn:
                     output.append(handle_offline_atomic_socket(
                         conn,{os.getuid():("daily","mainnet",ACCOUNT)}
-                        if allowed is None else allowed,self.db))
+                        if allowed is None else allowed,self.coordinator))
             worker=threading.Thread(target=server,daemon=True)
             worker.start()
             data=json.dumps(payload).encode("utf-8")
@@ -87,7 +87,7 @@ class OfflineAtomicSocketBridgeTests(unittest.TestCase):
                     conn,_=listener.accept()
                     with conn:
                         output.append(handle_offline_atomic_socket(
-                            conn,{os.getuid():("daily","mainnet",ACCOUNT)},self.db))
+                            conn,{os.getuid():("daily","mainnet",ACCOUNT)},self.coordinator))
                 worker=threading.Thread(target=server,daemon=True)
                 worker.start()
                 payload=dict(self.payload,nonce="parallel-"+str(index))
@@ -118,7 +118,7 @@ class OfflineAtomicSocketBridgeTests(unittest.TestCase):
                 conn,_=listener.accept()
                 with conn:
                     output.append(handle_offline_atomic_socket(
-                        conn,{os.getuid():("daily","mainnet",ACCOUNT)},self.db))
+                        conn,{os.getuid():("daily","mainnet",ACCOUNT)},self.coordinator))
             worker=threading.Thread(target=server,daemon=True)
             worker.start()
             data=json.dumps(self.payload).encode("utf-8")
@@ -156,7 +156,7 @@ class OfflineAtomicSocketBridgeTests(unittest.TestCase):
                         conn,_=listener.accept()
                         with conn:
                             output.append(handle_offline_atomic_socket(
-                                conn,{os.getuid():("daily","mainnet",ACCOUNT)},self.db))
+                                conn,{os.getuid():("daily","mainnet",ACCOUNT)},self.coordinator))
                     worker=threading.Thread(target=server,daemon=True)
                     worker.start()
                     with socket.socket(socket.AF_UNIX,socket.SOCK_STREAM) as client:
