@@ -14,6 +14,7 @@ import unittest
 import psycopg
 
 from offline_original_bot_socket_bridge_ci import handle_offline_original_entry_socket
+from offline_original_bot_intent_adapter import prepare_signer_free_entry_handoff_offline
 
 ACCOUNT = "0x" + "1" * 40
 BOTS = ("daily", "intraday", "aggressive")
@@ -180,6 +181,30 @@ class OriginalBotSocketBridgeTests(unittest.TestCase):
             self.assertEqual(db.execute(
                 "select count(*) from public.ci_scoped_entry_intents"
             ).fetchone()[0], 1)
+
+
+    def test_signer_free_bot_wire_works_with_existing_restricted_controller(self):
+        for bot, coin in (("daily","SOL"),("intraday","AVAX"),
+                          ("aggressive","LINK")):
+            with self.subTest(bot=bot):
+                message=prepare_signer_free_entry_handoff_offline(
+                    verified_bot=bot,
+                    trade={"action":"open_long","side":"long","hl_coin":coin},
+                    rounded_size="0.025",
+                    pinned_environment="mainnet",pinned_account=ACCOUNT,
+                )
+                self.assertEqual(message.state,"request_only")
+                self.assertFalse(message.submit_authorized)
+                reply=self.request(bot=bot,wire=message.request_json.encode())
+                self.assertEqual(reply.state,"reserved_offline_only")
+                self.assertFalse(reply.submit_authorized)
+        with self.admin() as db:
+            rows=db.execute("select coin,bot,action from "
+                            "public.ci_scoped_entry_intents order by coin").fetchall()
+        self.assertEqual(rows,[("AVAX","intraday","open_long"),
+                               ("LINK","aggressive","open_long"),
+                               ("SOL","daily","open_long")])
+
 
 
 if __name__ == "__main__":
