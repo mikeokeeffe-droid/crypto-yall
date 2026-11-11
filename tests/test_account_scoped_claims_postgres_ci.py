@@ -170,5 +170,85 @@ class ScopedEntryAdmissionTests(unittest.TestCase):
             ).fetchone()[0],"uncertain")
 
 
+    def test_untrusted_login_cannot_bypass_scoped_entry_permissions(self):
+        """Unrelated CI-only login cannot call definer RPCs or touch claims.
+
+        Real PostgreSQL privilege denial complements the per-bot checks.
+        This disposable account has NO exchange or production credentials.
+        """
+        outsider = "ci_untrusted_scoped_probe"
+        password = "disposable-untrusted-probe-only"
+        signatures = (
+            "public.ci_claim_scoped_entry(text,text,text,text,text,uuid)",
+            "public.ci_record_pre_submit_intent("
+            "text,text,text,text,text,uuid,text,numeric)",
+        )
+        with self.admin() as db:
+            for role in ("anon", "authenticated", "service_role"):
+                for signature in signatures:
+                    with self.subTest(role=role, function=signature):
+                        self.assertFalse(db.execute(
+                            "select has_function_privilege(%s,%s,'EXECUTE')",
+                            (role, signature),
+                        ).fetchone()[0])
+            db.execute(
+                "create role ci_untrusted_scoped_probe "
+                "login noinherit password 'disposable-untrusted-probe-only'"
+            )
+            db.execute("grant usage on schema public to ci_untrusted_scoped_probe")
+        try:
+            with psycopg.connect(
+                host="localhost", port=5432, dbname="safety_test",
+                user=outsider, password=password, autocommit=True,
+            ) as attacker:
+                self.assertEqual(
+                    attacker.execute(
+                        "select session_user,current_user").fetchone(),
+                    (outsider, outsider),
+                )
+                with self.assertRaises(InsufficientPrivilege):
+                    attacker.execute(
+                        "select * from public.ci_claim_scoped_entry("
+                        "%s,%s,%s,%s,%s,%s)",
+                        ("mainnet", ADDRESS_A, "", "SOL", "daily",
+                         uuid.uuid4()),
+                    )
+                with self.assertRaises(InsufficientPrivilege):
+                    attacker.execute(
+                        "select * from public.ci_record_pre_submit_intent("
+                        "%s,%s,%s,%s,%s,%s,%s,%s)",
+                        ("mainnet", ADDRESS_A, "", "SOL", "daily",
+                         uuid.uuid4(), "open_long", "1"),
+                    )
+                for table in (
+                    "public.ci_scoped_executor_accounts",
+                    "public.ci_scoped_entry_claims",
+                    "public.ci_scoped_entry_intents",
+                    "public.bot_entry_executor_identities",
+                ):
+                    with self.subTest(table=table):
+                        with self.assertRaises(InsufficientPrivilege):
+                            attacker.execute("select * from " + table)
+                with self.assertRaises(InsufficientPrivilege):
+                    attacker.execute("set role entry_login_daily")
+                with self.assertRaises(InsufficientPrivilege):
+                    attacker.execute("set role postgres")
+        finally:
+            with self.admin() as db:
+                db.execute(
+                    "revoke usage on schema public from ci_untrusted_scoped_probe"
+                )
+                db.execute("drop role ci_untrusted_scoped_probe")
+        with self.admin() as db:
+            self.assertEqual(
+                db.execute(
+                    "select count(*) from public.ci_scoped_entry_claims"
+                ).fetchone()[0], 0)
+            self.assertEqual(
+                db.execute(
+                    "select count(*) from public.ci_scoped_entry_intents"
+                ).fetchone()[0], 0)
+
+
 if __name__ == "__main__":
     unittest.main()
