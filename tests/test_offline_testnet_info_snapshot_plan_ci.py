@@ -5,6 +5,7 @@ import unittest
 
 from offline_testnet_info_snapshot_plan_ci import (
     build_offline_testnet_snapshot_request,
+    preflight_testnet_info_transport_offline,
 )
 
 ACCOUNT = "0x" + "1" * 40
@@ -65,6 +66,69 @@ class OfflineSnapshotRequestTests(unittest.TestCase):
         self.assertFalse(hasattr(r,"market_close"))
         self.assertNotIn("private",r.request_json)
         self.assertNotIn("/exchange",r.endpoint)
+
+
+    def test_network_disabled_transport_preflight(self):
+        import hashlib
+        for kind, weight in (
+            ("clearinghouseState", 2),
+            ("openOrders", 20),
+            ("allMids", 2),
+            ("meta", 20),
+            ("spotClearinghouseState", 2),
+        ):
+            with self.subTest(kind=kind):
+                plan = self.plan(kind)
+                preflight = preflight_testnet_info_transport_offline(
+                    plan=plan, expected_account=ACCOUNT,
+                    expected_request_type=kind,
+                )
+                self.assertEqual(preflight.state, "dry_run_only")
+                self.assertEqual(preflight.method, "POST")
+                self.assertEqual(preflight.endpoint,
+                                 "https://api.hyperliquid-testnet.xyz/info")
+                self.assertEqual(preflight.estimated_ip_weight, weight)
+                self.assertEqual(preflight.timeout_ms, 4000)
+                self.assertEqual(preflight.max_response_bytes, 262144)
+                self.assertEqual(
+                    preflight.canonical_request_sha256,
+                    hashlib.sha256(plan.request_json.encode()).hexdigest(),
+                )
+                for field in (
+                    "redirects_allowed", "inherited_proxies_allowed",
+                    "automatic_retries_allowed", "network_authorized",
+                    "origin_authenticated", "history_complete",
+                    "ownership_verified", "submit_authorized",
+                ):
+                    self.assertFalse(getattr(preflight, field))
+
+    def test_preflight_rejects_network_request_spoofing_and_replay_scope(self):
+        from dataclasses import replace
+        plan = self.plan("openOrders")
+        cases = [
+            {"plan": plan, "allow_network": True},
+            {"plan": plan, "expected_account": "0x" + "2" * 40},
+            {"plan": plan, "expected_request_type": "market_open"},
+            {"plan": replace(plan, endpoint="https://attacker.invalid/info")},
+            {"plan": replace(plan, request_json='{"type":"exchange"}')},
+            {"plan": replace(plan, network_authorized=True)},
+            {"plan": replace(plan, origin_authenticated=True)},
+            {"plan": replace(plan, submit_authorized=True)},
+            {"plan": replace(plan, request_type="allMids")},
+        ]
+        for changes in cases:
+            with self.subTest(changes=changes):
+                args = {
+                    "plan": plan, "expected_account": ACCOUNT,
+                    "expected_request_type": "openOrders",
+                }
+                args.update(changes)
+                result = preflight_testnet_info_transport_offline(**args)
+                self.assertEqual(result.state, "hold")
+                self.assertIsNone(result.endpoint)
+                self.assertFalse(result.network_authorized)
+                self.assertFalse(result.submit_authorized)
+
 
 
 if __name__ == "__main__":
