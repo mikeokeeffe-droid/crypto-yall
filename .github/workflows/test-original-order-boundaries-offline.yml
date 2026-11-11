@@ -26,6 +26,8 @@ on:
       - 'offline_original_bot_intent_adapter.py'
       - 'offline_signer_free_info_fixture_ci.py'
       - 'tests/test_offline_signer_free_info_fixture_ci.py'
+      - 'offline_signer_free_info_service_ci.py'
+      - 'tests/test_offline_signer_free_info_service_ci.py'
       - 'tests/test_offline_original_bot_intent_adapter.py'
       - 'offline_atomic_fake_dispatch_ci.py'
       - 'tests/test_offline_atomic_fake_dispatch_ci.py'
@@ -187,6 +189,7 @@ jobs:
           python -m unittest discover -s tests -p 'test_offline_atomic_socket_bridge_fixture.py' -v
           python -m unittest discover -s tests -p 'test_offline_original_bot_intent_adapter.py' -v
           python -m unittest discover -s tests -p 'test_offline_signer_free_info_fixture_ci.py' -v
+          python -m unittest discover -s tests -p 'test_offline_signer_free_info_service_ci.py' -v
           python -m unittest discover -s tests -p 'test_offline_atomic_coordinator_fixture.py' -v
           python -m unittest discover -s tests -p 'test_offline_atomic_fake_dispatch_ci.py' -v
           python -m unittest discover -s tests -p 'test_offline_atomic_fake_multiprocess_ci.py' -v
