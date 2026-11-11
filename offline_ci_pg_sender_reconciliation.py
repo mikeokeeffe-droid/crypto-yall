@@ -20,6 +20,7 @@ class OfflineSenderEvidenceReview:
     reason: str
     submit_authorized: bool = False
     ownership_verified: bool = False
+    structurally_consistent: bool = False
 
 
 def review_sender_fake_evidence(*, reviewer_connection_factory, token, fence,
@@ -126,4 +127,7 @@ def review_sender_fake_evidence(*, reviewer_connection_factory, token, fence,
         total += qty
     if total != requested:
         return hold("missing, partial or oversized synthetic fill")
-    return hold("synthetic consistency only; exchange origin and ownership unverified")
+    return OfflineSenderEvidenceReview(
+        "hold", "synthetic consistency only; exchange origin and ownership unverified",
+        structurally_consistent=True,
+    )
