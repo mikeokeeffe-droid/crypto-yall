@@ -14,7 +14,7 @@ ACCOUNT="0x"+"1"*40
 CLOID="0x"+"a"*32
 TOKEN=uuid.UUID("12345678-1234-4234-8234-123456789abc")
 BODY_ORDER=b'{"status":"fixture"}'
-BODY_FILLS=b'[{"tid":42}]'
+BODY_FILLS=json.dumps([{"coin":"SOL","oid":902,"tid":42,"time":1100,"side":"B","dir":"Open Long","hash":"0x"+"a"*64,"sz":"0.025","px":"100"}],separators=(",",":")).encode("utf-8")
 
 
 class OfflineCollectorContractTests(unittest.TestCase):
@@ -65,6 +65,36 @@ class OfflineCollectorContractTests(unittest.TestCase):
         self.assertFalse(result.history_complete)
         self.assertFalse(result.ownership_verified)
         self.assertFalse(result.submit_authorized)
+
+    def test_cloid_status_capture_cannot_invent_order_mapping(self):
+        q=self.plan()
+        capture=self.capture(q)
+        result=inspect_fixture_response_offline(
+            plan=q,envelope=capture,now_ms=1200,
+        )
+        self.assertEqual(result.status,"hold")
+        self.assertIn("CLOID-to-OID",result.reason)
+        self.assertFalse(result.submit_authorized)
+
+    def test_invalid_fill_schema_or_wrong_time_holds(self):
+        q=self.plan("userFillsByTime",start_ms=1000,end_ms=1500)
+        original=json.loads(BODY_FILLS)
+        cases=[
+            [{"tid":42}],
+            [dict(original[0],time=1501)],
+            [dict(original[0],coin="sol")],
+            [dict(original[0],sz="-1")],
+            [original[0],original[0]],
+        ]
+        for records in cases:
+            with self.subTest(records=records):
+                raw=json.dumps(records,separators=(",",":")).encode()
+                envelope=self.capture(q,raw=raw)
+                result=inspect_fixture_response_offline(
+                    plan=q,envelope=envelope,now_ms=1200,
+                )
+                self.assertEqual(result.status,"hold")
+                self.assertFalse(result.submit_authorized)
 
     def test_scope_and_query_allowlist_fail_closed(self):
         bad_scopes=(
