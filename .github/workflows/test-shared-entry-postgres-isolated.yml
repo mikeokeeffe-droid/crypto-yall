@@ -31,6 +31,7 @@ on:
       - 'offline_original_bot_socket_bridge_ci.py'
       - 'tests/test_offline_original_bot_socket_bridge_ci.py'
       - 'offline_original_bot_process_listener_ci.py'
+      - 'offline_original_bot_entry_socket_client_ci.py'
       - 'tests/test_offline_original_bot_process_listener_ci.py'
       - 'tests/test_offline_original_bot_distinct_uid_postgres_ci.py'
       - 'tests/test_account_scoped_claims_postgres_ci.py'
