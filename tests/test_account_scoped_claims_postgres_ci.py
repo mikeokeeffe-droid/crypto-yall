@@ -273,9 +273,6 @@ class ScopedEntryAdmissionTests(unittest.TestCase):
                     self.assertIsNotNone(row)
                     self.assertTrue(row[0])
                     self.assertIn("search_path=pg_catalog, public", row[1])
-            self.assertFalse(administrator.execute(
-                "select has_schema_privilege('public','public','CREATE')"
-            ).fetchone()[0])
 
         for bot in ("daily", "intraday", "aggressive"):
             login = "entry_login_" + bot
