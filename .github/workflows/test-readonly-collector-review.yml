@@ -28,3 +28,13 @@ jobs:
         run: python -m unittest collector_review.test_runtime_identity_review -v
       - name: Static offline systemd isolation review (no deployment)
         run: python -m unittest collector_review.test_offline_systemd_unit -v
+      - name: Verify systemd unit syntax without installing or starting
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -x /usr/bin/systemd-analyze
+          tmpdir="$(mktemp -d)"
+          trap 'rm -rf "$tmpdir"' EXIT
+          cp collector_review/deployment/testnet-collector-offline-review.service.example "$tmpdir/testnet-collector-offline-review.service"
+          systemd-analyze verify "$tmpdir/testnet-collector-offline-review.service"
+
