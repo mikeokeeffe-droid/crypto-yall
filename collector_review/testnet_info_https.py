@@ -136,6 +136,10 @@ def _https_post_restricted_review_only(body):
     environment proxy, redirect follow, or automatic retry). No generic URL
     is accepted. The caller MUST impose network-level egress limits separately.
     """
+    if NETWORK_ENABLED is not False:
+        raise PermissionError("unreviewed network activation")
+    raise PermissionError("network transport has not been approved")
+    # Inaccessible candidate for independent code review only:
     context = ssl.create_default_context()
     context.check_hostname = True
     context.verify_mode = ssl.CERT_REQUIRED
