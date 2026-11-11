@@ -1,11 +1,14 @@
 """Offline-only testnet read query plans; no HTTP, wallet, database or orders."""
 from dataclasses import replace
 import json
+import hashlib
+from offline_readonly_collector_runner import OfflineFixtureTransportResult
 import unittest
 
 from offline_testnet_info_snapshot_plan_ci import (
     build_offline_testnet_snapshot_request,
     preflight_testnet_info_transport_offline,
+    review_offline_testnet_snapshot_capture,
 )
 
 ACCOUNT = "0x" + "1" * 40
@@ -129,6 +132,77 @@ class OfflineSnapshotRequestTests(unittest.TestCase):
                 self.assertFalse(result.network_authorized)
                 self.assertFalse(result.submit_authorized)
 
+
+
+    def test_synthetic_response_boundary_is_never_trusted_or_authorizing(self):
+        bodies = {
+            "clearinghouseState": {"marginSummary":{"accountValue":"10"},
+                                   "assetPositions":[]},
+            "spotClearinghouseState": {"balances":[]},
+            "openOrders": [],
+            "allMids": {"SOL":"100"},
+            "meta": {"universe":[]},
+        }
+        endpoint="https://api.hyperliquid-testnet.xyz/info"
+        for kind, body in bodies.items():
+            with self.subTest(kind=kind):
+                plan=self.plan(kind)
+                raw=json.dumps(body,separators=(",",":")).encode()
+                fixture=OfflineFixtureTransportResult(
+                    status_code=200, final_url=endpoint,elapsed_ms=100,
+                    content_type="application/json",body=raw,
+                )
+                r=review_offline_testnet_snapshot_capture(
+                    plan=plan,expected_account=ACCOUNT,
+                    expected_request_type=kind,fixture_result=fixture,
+                    captured_at_ms=1000,now_ms=1100,
+                )
+                self.assertEqual(r.state,"fixture_only")
+                self.assertEqual(r.response_sha256,hashlib.sha256(raw).hexdigest())
+                self.assertEqual(r.request_sha256,
+                                 hashlib.sha256(plan.request_json.encode()).hexdigest())
+                self.assertFalse(r.origin_authenticated)
+                self.assertFalse(r.history_complete)
+                self.assertFalse(r.ownership_verified)
+                self.assertFalse(r.submit_authorized)
+
+    def test_synthetic_response_rejects_endpoint_tampering_and_bad_frames(self):
+        plan=self.plan("openOrders")
+        endpoint="https://api.hyperliquid-testnet.xyz/info"
+        def fixture(body=b"[]",**kw):
+            args=dict(status_code=200,final_url=endpoint,elapsed_ms=100,
+                      content_type="application/json",body=body)
+            args.update(kw)
+            return OfflineFixtureTransportResult(**args)
+        cases=[
+            fixture(status_code=429),fixture(status_code=500),
+            fixture(redirect_count=1),
+            fixture(final_url="https://evil.invalid/info"),
+            fixture(tls_verified=False),fixture(proxy_used=True),
+            fixture(network_authorized=True),fixture(network_error="timeout"),
+            fixture(elapsed_ms=4100),fixture(body=b""),
+            fixture(body=b'{"x":1,"x":2}'),
+            fixture(body=b'{"x":NaN}'),fixture(body=b'{"x":1}'),
+            fixture(body=b" " * 262145),fixture(body=b"[{},0]"),
+        ]
+        for item in cases:
+            with self.subTest(item=str(item)[:100]):
+                r=review_offline_testnet_snapshot_capture(
+                    plan=plan,expected_account=ACCOUNT,
+                    expected_request_type="openOrders",fixture_result=item,
+                    captured_at_ms=1000,now_ms=1100,
+                )
+                self.assertEqual(r.state,"hold")
+                self.assertFalse(r.submit_authorized)
+        for clock in (0,1000,31001):
+            with self.subTest(clock=clock):
+                r=review_offline_testnet_snapshot_capture(
+                    plan=plan,expected_account=ACCOUNT,
+                    expected_request_type="openOrders",
+                    fixture_result=fixture(),captured_at_ms=1000,
+                    now_ms=clock,
+                )
+                self.assertEqual(r.state,"hold")
 
 
 if __name__ == "__main__":
