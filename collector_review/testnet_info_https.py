@@ -9,6 +9,7 @@ deployment the process must be isolated without trading keys, with externally
 enforced egress/identity permissions and independently pinned testnet account.
 """
 from dataclasses import dataclass
+from decimal import Decimal, InvalidOperation
 import hashlib
 import http.client
 import json
@@ -73,6 +74,100 @@ def _reject_constant(value):
     raise ValueError("non-finite JSON")
 
 
+def _valid_number(value, *, allow_negative=False, positive=False):
+    if type(value) is not str or not value or value.strip() != value:
+        return False
+    try:
+        n = Decimal(value)
+    except (InvalidOperation, ValueError):
+        return False
+    return n.is_finite() and (allow_negative or n >= 0) and (not positive or n > 0)
+
+
+def _valid_coin(value):
+    return (type(value) is str and 0 < len(value) <= 64
+            and re.fullmatch(r"[A-Za-z0-9@._:/-]+", value, re.ASCII) is not None)
+
+
+def _valid_account_snapshot(payload):
+    if (type(payload) is not dict
+            or type(payload.get("marginSummary")) is not dict
+            or type(payload.get("assetPositions")) is not list
+            or not _valid_number(payload["marginSummary"].get("accountValue"),
+                                 allow_negative=True)):
+        return False
+    coins = set()
+    for record in payload["assetPositions"]:
+        if type(record) is not dict or type(record.get("position")) is not dict:
+            return False
+        pos = record["position"]
+        coin = pos.get("coin")
+        if (not _valid_coin(coin) or coin in coins
+                or not _valid_number(pos.get("szi"), allow_negative=True)):
+            return False
+        coins.add(coin)
+    return True
+
+
+def _valid_spot_snapshot(payload):
+    if type(payload) is not dict or type(payload.get("balances")) is not list:
+        return False
+    coins = set()
+    for item in payload["balances"]:
+        if type(item) is not dict:
+            return False
+        coin = item.get("coin")
+        if (not _valid_coin(coin) or coin in coins
+                or not _valid_number(item.get("total"))
+                or not _valid_number(item.get("hold"))):
+            return False
+        if Decimal(item["hold"]) > Decimal(item["total"]):
+            return False
+        coins.add(coin)
+    return True
+
+
+def _valid_open_orders(payload):
+    if type(payload) is not list or len(payload) > 1000:
+        return False
+    oids = set()
+    for order in payload:
+        if type(order) is not dict:
+            return False
+        oid = order.get("oid")
+        if (type(oid) is not int or oid <= 0 or oid in oids
+                or type(order.get("timestamp")) is not int
+                or order["timestamp"] <= 0
+                or not _valid_coin(order.get("coin"))
+                or order.get("side") not in ("A", "B")
+                or not _valid_number(order.get("sz"))
+                or not _valid_number(order.get("limitPx"), positive=True)):
+            return False
+        oids.add(oid)
+    return True
+
+
+def _valid_market_mids(payload):
+    return (type(payload) is dict and 0 < len(payload) <= 10000
+            and all(_valid_coin(coin) and _valid_number(price, positive=True)
+                    for coin, price in payload.items()))
+
+
+def _valid_meta(payload):
+    if type(payload) is not dict or type(payload.get("universe")) is not list:
+        return False
+    coins = set()
+    for item in payload["universe"]:
+        if type(item) is not dict:
+            return False
+        coin, decimals = item.get("name"), item.get("szDecimals")
+        if (not _valid_coin(coin) or coin in coins
+                or type(decimals) is not int or not 0 <= decimals <= 8):
+            return False
+        coins.add(coin)
+    return True
+
+
 def review_untrusted_http_capture(*, account, kind, sent_body, raw_body,
                                   status_code, content_type, content_encoding,
                                   elapsed_ms):
@@ -101,21 +196,14 @@ def review_untrusted_http_capture(*, account, kind, sent_body, raw_body,
     except (UnicodeError, ValueError, TypeError):
         return ReadReview("hold", "malformed or ambiguous JSON",
                           request_sha256=req_hash)
-    if kind == "clearinghouseState":
-        valid = (type(payload) is dict
-                 and type(payload.get("marginSummary")) is dict
-                 and type(payload.get("assetPositions")) is list)
-    elif kind == "spotClearinghouseState":
-        valid = type(payload) is dict and type(payload.get("balances")) is list
-    elif kind == "openOrders":
-        valid = (type(payload) is list and len(payload) <= 1000
-                 and all(type(o) is dict for o in payload))
-    elif kind == "allMids":
-        valid = (type(payload) is dict and 0 < len(payload) <= 10000
-                 and all(type(k) is str and type(v) is str
-                         for k, v in payload.items()))
-    else:
-        valid = type(payload) is dict and type(payload.get("universe")) is list
+    validators = {
+        "clearinghouseState": _valid_account_snapshot,
+        "spotClearinghouseState": _valid_spot_snapshot,
+        "openOrders": _valid_open_orders,
+        "allMids": _valid_market_mids,
+        "meta": _valid_meta,
+    }
+    valid = validators[kind](payload)
     if not valid:
         return ReadReview("hold", "unexpected /info response shape",
                           request_sha256=req_hash)
