@@ -20,10 +20,11 @@ class DurableScopedIntentTests(unittest.TestCase):
                                user="postgres", password=os.environ["PGPASSWORD"],
                                autocommit=True)
 
-    def bot(self, name):
+    def bot(self, name, *, autocommit=False):
         return psycopg.connect(host="localhost", port=5432, dbname="safety_test",
                                user="entry_login_" + name,
-                               password="disposable-" + name + "-only")
+                               password="disposable-" + name + "-only",
+                               autocommit=autocommit)
 
     def setUp(self):
         with self.admin() as db:
@@ -123,6 +124,56 @@ class DurableScopedIntentTests(unittest.TestCase):
             self.assertEqual(db.execute(
                 "select count(*) from public.ci_scoped_entry_claims"
             ).fetchone()[0],0)
+
+
+    def test_real_sql_denials_preserve_committed_scoped_claim(self):
+        """Each restricted bot must fail to read/edit/delete another's claim.
+
+        Test actual PostgreSQL permissions, not only grant-catalog queries.
+        A successful RPC must not confer direct table ownership or DML.
+        """
+        token = uuid.uuid4()
+        self.assertTrue(self.record("daily", token=token)[0])
+        with self.admin() as db:
+            baseline = db.execute(
+                "select c.bot,c.token,c.status,c.fence_token,"
+                "i.bot,i.action,i.requested_size,i.status "
+                "from public.ci_scoped_entry_claims c "
+                "join public.ci_scoped_entry_intents i "
+                "on i.intent_token=c.token"
+            ).fetchall()
+        self.assertEqual(len(baseline), 1)
+
+        attempts = (
+            ("select * from public.ci_scoped_entry_claims", ()),
+            ("select * from public.ci_scoped_entry_intents", ()),
+            ("select * from public.ci_scoped_executor_accounts", ()),
+            ("update public.ci_scoped_entry_claims set status='filled' "
+             "where token=%s", (token,)),
+            ("delete from public.ci_scoped_entry_claims "
+             "where token=%s", (token,)),
+            ("update public.ci_scoped_entry_intents set requested_size=999 "
+             "where intent_token=%s", (token,)),
+            ("delete from public.ci_scoped_entry_intents "
+             "where intent_token=%s", (token,)),
+        )
+
+        for bot in ("daily", "intraday", "aggressive"):
+            with self.subTest(bot=bot), self.bot(bot, autocommit=True) as db:
+                for sql, params in attempts:
+                    with self.subTest(statement=sql.split()[0], table=sql.split()[3] if len(sql.split()) > 3 else sql):
+                        with self.assertRaises(InsufficientPrivilege):
+                            db.execute(sql, params)
+
+        with self.admin() as db:
+            after = db.execute(
+                "select c.bot,c.token,c.status,c.fence_token,"
+                "i.bot,i.action,i.requested_size,i.status "
+                "from public.ci_scoped_entry_claims c "
+                "join public.ci_scoped_entry_intents i "
+                "on i.intent_token=c.token"
+            ).fetchall()
+        self.assertEqual(after, baseline)
 
     def test_undocumented_action_cannot_create_intent(self):
         for action in ("pyramid_long","close","open"):
