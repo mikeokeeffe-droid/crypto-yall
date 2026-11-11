@@ -26,6 +26,25 @@ def _nonnegative(raw):
     return number.is_finite() and number >= 0
 
 
+def _positive_leverage(raw):
+    """Accept a numeric text leverage or documented object-shaped leverage.
+
+    Hyperliquid userState position leverage may be {"type":"cross",
+    "value":2}, not just the original fixture's simple "2" string.
+    """
+    if type(raw) is str:
+        return _nonnegative(raw) and Decimal(raw) > 0
+    if type(raw) is dict and set(raw) == {"type", "value"}:
+        value=raw["value"]
+        if raw["type"] not in ("cross", "isolated"):
+            return False
+        if type(value) is int:
+            return value > 0
+        if type(value) is str:
+            return _nonnegative(value) and Decimal(value) > 0
+    return False
+
+
 def _signed_number(raw):
     if type(raw) is not str or not raw or raw.strip() != raw:
         return False
@@ -87,6 +106,21 @@ class OfflineSignerFreeInfoFixture:
             raise PermissionError("unapproved spot account")
         return deepcopy(self._spot_state)
 
+    def user_fills(self, address):
+        if type(address) is not str or address != self._scope.account:
+            raise PermissionError("unapproved fills account")
+        # Missing or partial synthetic history is NOT proof of zero fills.
+        raise PermissionError("trusted, complete order-fill history unavailable")
+
+    def user_funding_history(self, address, start_time_ms, end_time_ms):
+        if type(address) is not str or address != self._scope.account:
+            raise PermissionError("unapproved funding account")
+        if (type(start_time_ms) is not int
+                or type(end_time_ms) is not int
+                or start_time_ms <= 0 or end_time_ms < start_time_ms):
+            raise PermissionError("invalid requested funding time window")
+        raise PermissionError("trusted, complete funding history unavailable")
+
     def all_mids(self):
         return deepcopy(self._mids)
 
@@ -144,8 +178,7 @@ def make_signer_free_info_fixture(*, scope, snapshot):
                 or not _signed_number(pos["szi"])
                 or not _nonnegative(pos["entryPx"])
                 or not _signed_number(pos["unrealizedPnl"])
-                or not _nonnegative(pos["leverage"])
-                or Decimal(pos["leverage"]) == 0
+                or not _positive_leverage(pos["leverage"])
                 or pos["coin"] in coins):
             return None
         coins.add(pos["coin"])
