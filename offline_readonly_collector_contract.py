@@ -14,6 +14,7 @@ import uuid
 from offline_ci_info_capture_integrity import review_synthetic_info_capture
 from offline_hyperliquid_json_boundary import inspect_json_payload_offline
 from offline_hyperliquid_wire_review import parse_fills_by_time_offline
+from offline_hyperliquid_cloid_order_review import review_cloid_order_lineage_offline
 
 _ENDPOINTS = {
     "mainnet": "https://api.hyperliquid.xyz/info",
@@ -66,6 +67,8 @@ class OfflineCaptureReview:
     history_complete: bool = False
     ownership_verified: bool = False
     submit_authorized: bool = False
+    structurally_consistent: bool = False
+    observed_oid: int | None = None
 
 
 def build_offline_info_plan(*, scope, request_type, start_ms=None, end_ms=None):
@@ -229,4 +232,75 @@ def inspect_fixture_response_offline(*, plan, envelope, now_ms):
         "synthetic fill records and request digest consistent only; actual "
         "transport, exchange history and position ownership unverified",
         response_sha256=checked.response_sha256,
+    )
+
+
+def review_cloid_order_capture_offline(*, plan, envelope, intent, now_ms):
+    """Join a precommitted intent with a *synthetic* CLOID orderStatus capture.
+
+    One reviewer checks that the captured bytes match the pinned request and
+    that the returned CLOID, OID, side, size and timestamps match the recorded
+    intent. This remains HOLD: fixtures cannot authenticate TLS, prove the
+    exchange's order history, or establish position ownership.
+    """
+    def hold(reason, coherent=False, oid=None):
+        return OfflineCaptureReview(
+            status="hold", reason=reason, structurally_consistent=coherent,
+            observed_oid=oid,
+        )
+
+    if (type(plan) is not OfflineInfoPlan
+            or plan.status != "query_only" or plan.network_authorized
+            or plan.request_type != "orderStatus"
+            or plan != build_offline_info_plan(
+                scope=plan.scope, request_type="orderStatus",
+            )
+            or type(envelope) is not OfflineFixtureEnvelope
+            or envelope.network_authorized
+            or type(intent) is not dict
+            or type(now_ms) is not int
+            or envelope.request_sha256 != hashlib.sha256(
+                plan.request_json.encode("utf-8")
+            ).hexdigest()):
+        return hold("invalid or changed pinned CLOID request")
+
+    scope = plan.scope
+    if (intent.get("environment") != scope.environment
+            or intent.get("account") != scope.account
+            or intent.get("dex") != scope.dex
+            or intent.get("cloid") != scope.cloid
+            or intent.get("intent_token") != str(scope.token)
+            or type(intent.get("fence_token")) is not int
+            or intent["fence_token"] != scope.fence):
+        return hold("durable synthetic order intent does not match request")
+
+    captured = review_synthetic_info_capture(
+        manifest=envelope.manifest, raw_response=envelope.raw_response,
+        expected_environment=scope.environment,
+        expected_account=scope.account, expected_token=scope.token,
+        expected_fence=scope.fence, expected_cloid=scope.cloid,
+        expected_request_type="orderStatus", now_ms=now_ms,
+    )
+    if captured.state != "review_only":
+        return hold(captured.reason)
+
+    parsed = inspect_json_payload_offline(
+        raw=envelope.raw_response, kind="orderStatus",
+    )
+    if parsed.status != "parsed_untrusted":
+        return hold("invalid synthetic orderStatus response")
+    try:
+        query = json.loads(plan.request_json)
+    except (ValueError, TypeError):
+        return hold("invalid pinned order query")
+    order = review_cloid_order_lineage_offline(
+        intent=intent, request=query, response=parsed.payload,
+        captured_at_ms=envelope.manifest["captured_at_ms"],
+    )
+    if not order.structurally_consistent:
+        return hold(order.reason)
+    return hold(
+        "synthetic CLOID and OID linkage consistent; source authenticity, "
+        "fill coverage and position ownership still unverified",
+        coherent=True, oid=order.observed_oid,
     )
