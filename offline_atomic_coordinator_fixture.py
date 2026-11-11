@@ -151,6 +151,48 @@ class OfflineAtomicCoordinator:
         except (sqlite3.Error,OSError):
             return ("hold",False)
 
+
+    def mark_fake_dispatch_unknown(self, *, environment, account, dex, coin,
+                                   token, fence):
+        """One durable pre-fake CAS; return stored CLOID only on commit.
+
+        Sender-only test fixture method. No SDK, signer, order or network.
+        The marked scope stays blocked across crash, timeout and restart.
+        """
+        scope = OfflineSharedSender._scope(environment, account, dex, coin)
+        if (scope is None or type(token) is not str
+                or type(fence) is not int or fence <= 0):
+            return None
+        try:
+            with self._connect() as db:
+                db.execute("BEGIN IMMEDIATE")
+                try:
+                    row = db.execute(
+                        "SELECT cloid FROM claims WHERE environment=? "
+                        "AND account=? AND dex=? AND coin=? "
+                        "AND token=? AND fence=? AND state='reserved'",
+                        (*scope, token, fence),
+                    ).fetchone()
+                    if row is None:
+                        db.rollback()
+                        return None
+                    updated = db.execute(
+                        "UPDATE claims SET state='dispatch_unknown' "
+                        "WHERE environment=? AND account=? AND dex=? AND coin=? "
+                        "AND token=? AND fence=? AND state='reserved'",
+                        (*scope, token, fence),
+                    ).rowcount
+                    if updated != 1:
+                        db.rollback()
+                        return None
+                    db.commit()
+                    return row[0]
+                except Exception:
+                    db.rollback()
+                    return None
+        except (sqlite3.Error, OSError):
+            return None
+
     def inspect(self,*,environment,account,dex,coin):
         scope=OfflineSharedSender._scope(environment,account,dex,coin)
         if scope is None:
