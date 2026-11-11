@@ -9,6 +9,7 @@ Pyramid adds and closes are intentionally unsupported until their separate
 ownership/quantity policies are reviewed. Original strategies are untouched.
 """
 from dataclasses import dataclass
+import json
 from decimal import Decimal, InvalidOperation
 import re
 
@@ -71,3 +72,101 @@ def project_original_entry(*, verified_bot, trade, rounded_size,
         verified_bot, action, coin, rounded_size,
         pinned_environment, pinned_account,
     )
+
+
+@dataclass(frozen=True)
+class OfflineSignerFreeEntryHandoff:
+    """A *request* to an independent coordinator; never an order permit."""
+    state: str = "hold"
+    request_json: str | None = None
+    reason: str = "not approved"
+    submit_authorized: bool = False
+
+
+@dataclass(frozen=True)
+class OfflineEntryAckReview:
+    state: str = "hold"
+    reason: str = "no trusted coordinator acknowledgement"
+    submit_authorized: bool = False
+
+
+def prepare_signer_free_entry_handoff_offline(
+    *, verified_bot, trade, rounded_size, pinned_environment,
+    pinned_account, pinned_dex=""
+):
+    """Compose the existing CI Unix-socket entry protocol without a signer.
+
+    Reuse the original intent projection and forward only decision fields.
+    Bot identity, account, DEX, environment, keys and DB roles MUST NOT be
+    client-supplied on the wire; the CI server authenticates the peer and
+    independently pins the scope. The 'verified' parameters are only test
+    harness inputs here and are not actual workload authentication.
+
+    Pyramids, closes and leverage mutations deliberately HOLD, not silently
+    converted into a new entry. No SDK, socket, network or DB access occurs.
+    """
+    projected = project_original_entry(
+        verified_bot=verified_bot, trade=trade,
+        rounded_size=rounded_size,
+        pinned_environment=pinned_environment,
+        pinned_account=pinned_account, pinned_dex=pinned_dex,
+    )
+    if projected is None or projected.submit_authorized:
+        return OfflineSignerFreeEntryHandoff(
+            reason="unapproved action, account scope or exact rounded size"
+        )
+    side = "long" if projected.action == "open_long" else "short"
+    payload = {
+        "operation": "request_entry",
+        "action": projected.action,
+        "side": side,
+        "hl_coin": projected.coin,
+        "rounded_size": projected.size,
+    }
+    wire = json.dumps(payload, sort_keys=True, separators=(",", ":"))
+    if len(wire.encode("utf-8")) > 1024:
+        return OfflineSignerFreeEntryHandoff(reason="oversized offline entry request")
+    return OfflineSignerFreeEntryHandoff(
+        state="request_only",
+        request_json=wire,
+        reason="send only to separately authenticated disposable CI coordinator; "
+               "no direct exchange submission or ownership",
+    )
+
+
+def review_signer_free_entry_ack_offline(*, reply_bytes):
+    """Classify an untrusted CI-only coordinator reply without granting orders.
+
+    An attacker-controlled or changed reply cannot turn the bot back into
+    an exchange sender. Even a successful offline reservation is NOT a trade.
+    """
+    def hold(why):
+        return OfflineEntryAckReview(reason=why)
+
+    if type(reply_bytes) is not bytes or not 0 < len(reply_bytes) <= 1024:
+        return hold("invalid coordinator reply")
+    def no_duplicate_keys(pairs):
+        parsed = {}
+        for key, value in pairs:
+            if key in parsed:
+                raise ValueError("duplicate coordinator response field")
+            parsed[key] = value
+        return parsed
+    try:
+        response = json.loads(
+            reply_bytes.decode("utf-8"), object_pairs_hook=no_duplicate_keys,
+        )
+    except (UnicodeError, ValueError):
+        return hold("malformed or duplicate coordinator response")
+    if (type(response) is not dict
+            or set(response) != {"state", "submit_authorized"}
+            or response["submit_authorized"] is not False):
+        return hold("coordinator response is not a non-authorizing reply")
+    if response["state"] == "reserved_offline_only":
+        return OfflineEntryAckReview(
+            state="recorded_offline_only",
+            reason="CI reservation recorded; direct exchange submission forbidden",
+        )
+    if response["state"] == "hold":
+        return hold("coordinator held the request")
+    return hold("unknown offline coordinator response state")
