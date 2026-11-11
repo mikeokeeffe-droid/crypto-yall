@@ -8,6 +8,7 @@ import uuid
 from offline_readonly_collector_contract import (
     OfflineCollectorScope, build_offline_info_plan,
     record_fixture_response_offline, inspect_fixture_response_offline,
+    review_cloid_order_capture_offline,
 )
 
 ACCOUNT="0x"+"1"*40
@@ -171,6 +172,74 @@ class OfflineCollectorContractTests(unittest.TestCase):
         self.assertIsNone(self.capture(
             replace(q,network_authorized=True),
         ))
+
+
+    def _cloid_lineage(self):
+        return {
+            "bot":"daily", "environment":"mainnet", "account":ACCOUNT,
+            "dex":"", "coin":"SOL", "action":"open_long",
+            "requested_size":"2", "intent_token":str(TOKEN),
+            "fence_token":4, "cloid":CLOID, "submitted_at_ms":1000,
+        }
+
+    def _cloid_response(self):
+        return {
+            "status":"order",
+            "order":{
+                "status":"filled","statusTimestamp":1100,
+                "order":{
+                    "coin":"SOL","side":"B","oid":1001,"cloid":CLOID,
+                    "origSz":"2","sz":"0","reduceOnly":False,
+                    "timestamp":1050,
+                },
+            },
+        }
+
+    def test_offline_cloid_lineage_yields_only_hold_with_observed_oid(self):
+        plan=self.plan()
+        raw=json.dumps(self._cloid_response(),separators=(",",":")).encode()
+        cap=self.capture(plan,raw=raw,stamp=1150)
+        result=review_cloid_order_capture_offline(
+            plan=plan,envelope=cap,intent=self._cloid_lineage(),
+            now_ms=1200,
+        )
+        self.assertEqual(result.status,"hold")
+        self.assertTrue(result.structurally_consistent)
+        self.assertEqual(result.observed_oid,1001)
+        self.assertFalse(result.origin_authenticated)
+        self.assertFalse(result.ownership_verified)
+        self.assertFalse(result.submit_authorized)
+
+    def test_cloid_lineage_wrong_identity_and_altered_capture_hold(self):
+        plan=self.plan()
+        raw=json.dumps(self._cloid_response(),separators=(",",":")).encode()
+        cap=self.capture(plan,raw=raw,stamp=1150)
+        for change in ({"account":"0x"+"2"*40},
+                       {"cloid":"0x"+"c"*32},
+                       {"fence_token":5},
+                       {"requested_size":"3"},
+                       {"action":"open_short"}):
+            with self.subTest(change=change):
+                result=review_cloid_order_capture_offline(
+                    plan=plan,envelope=cap,
+                    intent=dict(self._cloid_lineage(),**change),
+                    now_ms=1200,
+                )
+                self.assertFalse(result.structurally_consistent)
+                self.assertFalse(result.submit_authorized)
+        altered=replace(cap,raw_response=b'{"status":"unknownOid"}')
+        self.assertFalse(review_cloid_order_capture_offline(
+            plan=plan,envelope=altered,intent=self._cloid_lineage(),
+            now_ms=1200,
+        ).structurally_consistent)
+        fake_order=self._cloid_response()
+        fake_order["order"]["order"]["oid"]=False
+        fake_raw=json.dumps(fake_order).encode()
+        fake_cap=self.capture(plan,raw=fake_raw,stamp=1150)
+        self.assertFalse(review_cloid_order_capture_offline(
+            plan=plan,envelope=fake_cap,intent=self._cloid_lineage(),
+            now_ms=1200,
+        ).structurally_consistent)
 
     def test_collector_has_no_network_or_signer_capability(self):
         import offline_readonly_collector_contract as module
