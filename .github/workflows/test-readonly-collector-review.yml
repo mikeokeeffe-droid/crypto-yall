@@ -22,3 +22,5 @@ jobs:
           python-version: '3.12'
       - name: Offline-only collector policy tests (no secrets or exchange calls)
         run: python -m unittest collector_review.test_testnet_info_https -v
+      - name: Offline-only synthetic hash-chain integrity tests
+        run: python -m unittest collector_review.test_offline_capture_audit -v
