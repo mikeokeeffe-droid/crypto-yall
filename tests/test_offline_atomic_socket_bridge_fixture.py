@@ -172,6 +172,27 @@ class OfflineAtomicSocketBridgeTests(unittest.TestCase):
             self.assertEqual(db.execute("SELECT COUNT(*) FROM replay_nonces").fetchone()[0],0)
         self.assertEqual(self.exchange(self.payload),("reserved_offline_only",False))
 
+    def test_invalid_payload_shapes_never_write_state(self):
+        cases=[
+            dict(self.payload,unexpected="field"),
+            {key:value for key,value in self.payload.items() if key!="nonce"},
+            dict(self.payload,nonce=7),
+            dict(self.payload,nonce=""),
+            dict(self.payload,nonce="x"*129),
+            dict(self.payload,operation="cancel_order"),
+            dict(self.payload,requested_bot="aggressive"),
+            dict(self.payload,account="0x"+"2"*40),
+            dict(self.payload,environment="testnet"),
+            dict(self.payload,coin=[]),
+        ]
+        for index,payload in enumerate(cases):
+            with self.subTest(index=index):
+                self.assertEqual(self.exchange(payload),("hold",False))
+        with OfflineAtomicCoordinator(self.db)._connect() as db:
+            self.assertEqual(db.execute("SELECT COUNT(*) FROM claims").fetchone()[0],0)
+            self.assertEqual(db.execute("SELECT COUNT(*) FROM replay_nonces").fetchone()[0],0)
+        self.assertEqual(self.exchange(self.payload),("reserved_offline_only",False))
+
     def test_missing_database_holds_without_recreation(self):
         os.unlink(self.db)
         self.assertEqual(self.exchange(self.payload),("hold",False))
