@@ -230,6 +230,18 @@ class OfflineAtomicSocketBridgeTests(unittest.TestCase):
         finally:
             self.coordinator=old_coordinator
 
+    def test_symlink_replacement_rejected_by_pinned_socket(self):
+        original=os.path.join(self.temp.name,"original.sqlite")
+        os.rename(self.db,original)
+        os.symlink(original,self.db)
+        self.assertEqual(self.exchange(self.payload),("hold",False))
+        self.assertTrue(os.path.islink(self.db))
+        with OfflineAtomicCoordinator(original)._connect() as opened:
+            self.assertEqual(opened.execute(
+                "SELECT COUNT(*) FROM claims").fetchone()[0],0)
+            self.assertEqual(opened.execute(
+                "SELECT COUNT(*) FROM replay_nonces").fetchone()[0],0)
+
     def test_missing_database_holds_without_recreation(self):
         os.unlink(self.db)
         self.assertEqual(self.exchange(self.payload),("hold",False))
