@@ -58,11 +58,18 @@ def analyze_offline_collector_source(source, label):
                         violations.append((node.lineno, "urllib.parse", alias.name))
         elif isinstance(node, ast.Call):
             fn = node.func
-            name = fn.id if isinstance(fn, ast.Name) else (
-                fn.attr if isinstance(fn, ast.Attribute) else ""
-            )
-            if name.lower() in DENIED_CALLS:
-                violations.append((node.lineno, "call", name))
+            if isinstance(fn, ast.Name):
+                # Dynamic-code builtins are dangerous only as bare calls:
+                # compile(...), not the regular-expression re.compile(...).
+                name = fn.id
+                if name.lower() in DENIED_CALLS:
+                    violations.append((node.lineno, "call", name))
+            elif isinstance(fn, ast.Attribute):
+                name = fn.attr
+                if name.lower() in DENIED_CALLS - {
+                    "compile", "eval", "exec", "__import__",
+                }:
+                    violations.append((node.lineno, "call", name))
     return violations
 
 
@@ -86,6 +93,7 @@ class OfflineCollectorNoNetworkImportGuard(unittest.TestCase):
             "client.market_close('SOL')",
             "exchange.update_leverage(2, 'SOL', True)",
             "exec('pass')",
+            "compile('1+1', 'probe', 'eval')",
             "__import__('requests')",
             "from urllib.parse import urljoin",
         )
@@ -97,6 +105,9 @@ class OfflineCollectorNoNetworkImportGuard(unittest.TestCase):
                 )
         self.assertEqual(analyze_offline_collector_source(
             "from urllib.parse import urlsplit", "allowed_parser",
+        ), [])
+        self.assertEqual(analyze_offline_collector_source(
+            "import re\npattern = re.compile(r'[A-Z]+')", "allowed_regex",
         ), [])
 
 
