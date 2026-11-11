@@ -12,6 +12,8 @@ import re
 import uuid
 
 from offline_ci_info_capture_integrity import review_synthetic_info_capture
+from offline_hyperliquid_json_boundary import inspect_json_payload_offline
+from offline_hyperliquid_wire_review import parse_fills_by_time_offline
 
 _ENDPOINTS = {
     "mainnet": "https://api.hyperliquid.xyz/info",
@@ -193,9 +195,38 @@ def inspect_fixture_response_offline(*, plan, envelope, now_ms):
     )
     if checked.state != "review_only":
         return hold(checked.reason)
+
+    # A CLOID lookup is NOT a proven CLOID-to-OID link. The current fixture
+    # contract has no independently captured, immutable OID mapping and the
+    # existing strict order parser requires an OID-based query. Do not invent
+    # the mapping by trusting an oid from the returned JSON.
+    if plan.request_type == "orderStatus":
+        return hold(
+            "CLOID lookup lacks independently validated CLOID-to-OID mapping"
+        )
+
+    # Check the actual documented fill fields, not just JSON array shape.
+    # Even well-formed receipts remain untrusted and may omit history.
+    decoded = inspect_json_payload_offline(
+        raw=envelope.raw_response, kind="userFillsByTime",
+    )
+    if decoded.status != "parsed_untrusted":
+        return hold("invalid read-only fill response JSON")
+    try:
+        request = json.loads(plan.request_json)
+    except (ValueError, TypeError):
+        return hold("malformed pinned fill request")
+    fills = parse_fills_by_time_offline(
+        request=request, response=decoded.payload,
+        account=plan.scope.account,
+        start_ms=plan.start_ms, end_ms=plan.end_ms, cap=2000,
+    )
+    if fills.status != "parsed_untrusted":
+        return hold("fill record identity, window or cap invalid: " + fills.reason)
+
     return OfflineCaptureReview(
         "review_only",
-        "synthetic request/response digests consistent only; actual transport, "
-        "exchange history and position ownership unverified",
+        "synthetic fill records and request digest consistent only; actual "
+        "transport, exchange history and position ownership unverified",
         response_sha256=checked.response_sha256,
     )
