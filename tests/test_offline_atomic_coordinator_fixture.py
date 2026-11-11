@@ -241,5 +241,117 @@ os._exit(19)
             OfflineAtomicCoordinator(self.path)
         self.assertFalse(os.path.exists(self.path))
 
+
+    def test_real_process_exit_before_commit_three_bots_race_after_recovery(self):
+        """Abrupt death with uncommitted state must not leave a ghost claim."""
+        import subprocess
+        import sys
+        import threading
+        from concurrent.futures import ThreadPoolExecutor
+
+        script = """
+import os, sqlite3, sys
+from pathlib import Path
+uri = Path(sys.argv[1]).absolute().as_uri() + '?mode=rw'
+db = sqlite3.connect(uri, uri=True, isolation_level=None)
+db.execute('BEGIN IMMEDIATE')
+db.execute('INSERT INTO replay_nonces VALUES(?,?)', ('uid:daily', 'lost-before-commit'))
+db.execute('INSERT INTO claims VALUES(?,?,?,?,?,?,?,?,?)',
+           ('mainnet', sys.argv[2], '', 'SOL', 'daily', 'uncommitted-token',
+            '0x' + 'c' * 32, 1, 'reserved'))
+db.execute('UPDATE metadata SET next_fence=2')
+os._exit(31)
+"""
+        child = subprocess.run(
+            [sys.executable, "-c", script, self.path, ACCOUNT],
+            check=False, timeout=10,
+        )
+        self.assertEqual(child.returncode, 31)
+        bots = ("daily", "intraday", "aggressive")
+        barrier = threading.Barrier(len(bots))
+
+        def attempt(bot):
+            coordinator = OfflineAtomicCoordinator(self.path)
+            barrier.wait(timeout=10)
+            return bot, coordinator.reserve(
+                principal="uid:" + bot, nonce="after-crash:" + bot,
+                bot=bot, environment="mainnet", account=ACCOUNT,
+                dex="", coin="SOL",
+            )
+
+        with ThreadPoolExecutor(max_workers=3) as pool:
+            decisions = list(pool.map(attempt, bots))
+        winners = [bot for bot, result in decisions
+                   if result == ("reserved_offline_only", False)]
+        self.assertEqual(len(winners), 1, decisions)
+        self.assertEqual(
+            sum(result == ("hold", False) for _, result in decisions), 2,
+        )
+        recovered = OfflineAtomicCoordinator(self.path)
+        claim = recovered.inspect(
+            environment="mainnet", account=ACCOUNT, dex="", coin="SOL")
+        self.assertEqual(claim[0], winners[0])
+        self.assertEqual(claim[3], 1)
+        with recovered._connect() as db:
+            self.assertEqual(
+                db.execute("SELECT COUNT(*) FROM claims").fetchone()[0], 1)
+            self.assertEqual(
+                db.execute("SELECT COUNT(*) FROM replay_nonces").fetchone()[0], 1)
+            self.assertEqual(
+                db.execute("SELECT next_fence FROM metadata").fetchone()[0], 2)
+
+    def test_real_process_exit_after_commit_three_bots_stay_blocked(self):
+        """Lost acknowledgement must not permit a replacement claim on restart."""
+        import subprocess
+        import sys
+        import threading
+        from concurrent.futures import ThreadPoolExecutor
+
+        script = """
+import os, sys
+from offline_atomic_coordinator_fixture import OfflineAtomicCoordinator
+coordinator = OfflineAtomicCoordinator(sys.argv[1])
+result = coordinator.reserve(
+    principal='uid:daily', nonce='lost-ack', bot='daily',
+    environment='mainnet', account=sys.argv[2], dex='', coin='SOL',
+)
+assert result == ('reserved_offline_only', False), result
+os._exit(32)
+"""
+        child = subprocess.run(
+            [sys.executable, "-c", script, self.path, ACCOUNT],
+            check=False, timeout=10,
+        )
+        self.assertEqual(child.returncode, 32)
+        original = OfflineAtomicCoordinator(self.path).inspect(
+            environment="mainnet", account=ACCOUNT, dex="", coin="SOL")
+        self.assertEqual(original[0], "daily")
+        bots = ("daily", "intraday", "aggressive")
+        barrier = threading.Barrier(len(bots))
+
+        def attempt(bot):
+            coordinator = OfflineAtomicCoordinator(self.path)
+            barrier.wait(timeout=10)
+            return coordinator.reserve(
+                principal="uid:" + bot, nonce="retry-after-ack:" + bot,
+                bot=bot, environment="mainnet", account=ACCOUNT,
+                dex="", coin="SOL",
+            )
+
+        with ThreadPoolExecutor(max_workers=3) as pool:
+            decisions = list(pool.map(attempt, bots))
+        self.assertEqual(decisions, [("hold", False)] * 3)
+        recovered = OfflineAtomicCoordinator(self.path)
+        self.assertEqual(recovered.inspect(
+            environment="mainnet", account=ACCOUNT, dex="", coin="SOL"),
+            original)
+        with recovered._connect() as db:
+            self.assertEqual(
+                db.execute("SELECT COUNT(*) FROM claims").fetchone()[0], 1)
+            self.assertEqual(
+                db.execute("SELECT COUNT(*) FROM replay_nonces").fetchone()[0], 1)
+            self.assertEqual(
+                db.execute("SELECT next_fence FROM metadata").fetchone()[0], 2)
+
 if __name__=="__main__":
     unittest.main()
