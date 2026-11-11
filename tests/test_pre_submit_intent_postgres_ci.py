@@ -368,5 +368,66 @@ with psycopg.connect(
         self._uncommitted_transaction_lock_timeout(owner_commits=False)
 
 
+
+    def test_forced_backend_termination_rolls_back_and_three_bots_compete(self):
+        """A terminated uncommitted DB session must not leave a phantom lock.
+
+        PostgreSQL 16's pg_terminate_backend(pid, timeout_ms) waits for the
+        backend to exit; only the disposable CI admin can terminate it.
+        No exchange submission has occurred in this test.
+        """
+        token = uuid.uuid4()
+        owner = self.bot("daily")
+        try:
+            pid = owner.execute("select pg_backend_pid()").fetchone()[0]
+            claimed = owner.execute(
+                "select recorded,intent_id,fencing "
+                "from public.ci_record_pre_submit_intent("
+                "%s,%s,%s,%s,%s,%s,%s,%s)",
+                ("mainnet", ADDRESS, "", "SOL", "daily",
+                 token, "open_long", "2"),
+            ).fetchone()
+            self.assertEqual(claimed[:2], (True, token))
+
+            # This independent superuser session forcibly ends the still
+            # uncommitted owner transaction. No client-side commit or retry.
+            with self.admin() as administrator:
+                ended = administrator.execute(
+                    "select pg_terminate_backend(%s, 5000)",
+                    (pid,),
+                ).fetchone()[0]
+                self.assertTrue(ended)
+        finally:
+            owner.close()
+
+        with self.admin() as db:
+            self.assertEqual(db.execute(
+                "select count(*) from public.ci_scoped_entry_claims"
+            ).fetchone()[0], 0)
+            self.assertEqual(db.execute(
+                "select count(*) from public.ci_scoped_entry_intents"
+            ).fetchone()[0], 0)
+
+        # Each retry creates a fresh SQL session using its own restricted bot
+        # LOGIN. The DB must commit exactly one atomic scoped claim + intent.
+        decisions = self._three_bot_recovery_race()
+        winners = [bot for bot, result in decisions if result[0]]
+        self.assertEqual(len(winners), 1, decisions)
+        self.assertEqual(
+            sum(result == (False, None, None)
+                for _, result in decisions), 2, decisions)
+        with self.admin() as db:
+            rows = db.execute(
+                "select c.bot,c.token,i.bot,i.intent_token "
+                "from public.ci_scoped_entry_claims c "
+                "join public.ci_scoped_entry_intents i "
+                "on c.token=i.intent_token"
+            ).fetchall()
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0][0], winners[0])
+        self.assertEqual(rows[0][2], winners[0])
+        self.assertEqual(rows[0][1], rows[0][3])
+
+
 if __name__ == "__main__":
     unittest.main()
