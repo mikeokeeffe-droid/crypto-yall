@@ -12,7 +12,8 @@ from offline_unix_peer_identity_fixture import offline_peer_identity
 from offline_framed_unix_coordinator_fixture import MAX_FRAME,_read_exact
 from offline_shared_sender_prototype import OfflineSharedSender
 
-def handle_offline_atomic_socket(connection,allowed_uids,database_path):
+def handle_offline_atomic_socket(connection,allowed_uids,coordinator):
+    """Require a coordinator pinned at service startup; never reopen by path."""
     try:
         connection.settimeout(1)
         identity=offline_peer_identity(connection,allowed_uids)
@@ -37,7 +38,8 @@ def handle_offline_atomic_socket(connection,allowed_uids,database_path):
             return ("hold",False)
         uid=struct.unpack("3i",connection.getsockopt(
             socket.SOL_SOCKET,socket.SO_PEERCRED,struct.calcsize("3i")))[1]
-        coordinator=OfflineAtomicCoordinator(database_path)
+        if type(coordinator) is not OfflineAtomicCoordinator:
+            return ("hold",False)
         return coordinator.reserve(
             principal=str(uid)+":"+bot,nonce=payload["nonce"],bot=bot,
             environment=environment,account=account,
