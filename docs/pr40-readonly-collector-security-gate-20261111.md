@@ -47,3 +47,48 @@ Sources:
 A single missing historical interval, uncertain API retention, same-ms fill tie, unexpected order, ambiguous response, missing pre-submit baseline, identity mismatch, unexpected network destination, loss of audit integrity, or a failed CI check is **NO-GO** for releasing a lock, retrying a trade, attributing position ownership, or closing a position automatically.
 
 **Decision:** PR #40 stays **draft/unmerged**; original executors, live Actions workflows, Hyperliquid keys, production database and permissions remain unchanged. The next step should be a focused independent collector review—not further synthetic check-count inflation.
+
+
+## 11 November 2026 — Read-only collector network cutover design checkpoint
+
+**Reviewed PR head:** \`1398408\` (all four CI checks green before this documentation change). This section supersedes earlier phrases implying that green synthetic CI or a local Unix socket is actual exchange transport authorization. **Live NO-GO; testnet network calls not approved or made.**
+
+### Verified pieces and exact gap
+
+- \`offline_testnet_info_snapshot_plan_ci.py\` prepares only five canonical **testnet** \`POST /info\` body types: \`clearinghouseState\`, \`openOrders\`, \`allMids\`, \`meta\`, \`spotClearinghouseState\`. It cannot send a request.
+- \`offline_readonly_collector_contract.py\` prepares only pinned \`orderStatus\` and bounded \`userFillsByTime\` capture plans; existing synthetic capture digests are **not** TLS/exchange origin authentication or history completeness.
+- \`offline_documented_info_projection_ci.py\` projects documented-shape fake account responses into the signer-free helper snapshot. It discards extra fields; it does not authenticate inputs. \`offline_signer_free_info_service_ci.py\` serves one synthetic snapshot by a **same-host Unix socket**, not a network collector.
+- The three original executors still call the trading-signing \`get_client()\`; direct \`market_open\`, \`update_leverage\`, \`market_close\` remain live-code paths, unchanged.
+- **Architecture correction:** the bots run as GitHub Actions workers, typically in *separate ephemeral runner environments*. A Unix domain socket on a dedicated host is **not** remotely reachable from those jobs. A future remote data handoff must therefore be separately designed and authenticated; do not mistake the passing local socket tests for a deployable architecture.
+
+### Minimal proposed production topology (future, not built)
+
+1. One **independent collector process/service** on an isolated host holds a pinned, operator-approved **testnet** *effective account address* and performs only read-only \`POST\` calls to the exact \`https://api.hyperliquid-testnet.xyz/info\`. It never receives API-agent signing keys, exchange order capability, or database write privileges for trading state.
+2. The collector emits independently generated capture evidence: canonical request bytes/hash, expected pinned account/type/time range, actual transport origin/TLS observations, HTTP status, response bytes/hash, collector clock, bounded retry/rate evidence, and append-only sequence identity. A self-declared "origin=hyperliquid" JSON field is never sufficient. A read-only account address is a lookup key, **not proof the operator owns it**.
+3. A future isolated **read-only snapshot distribution** channel serves minimal validated market/account data to ephemeral GitHub Actions bot jobs. Delivery requires an independently authenticated service identity and freshness/replay checks; data must carry **no authorization** to submit, close, adopt, release or retry orders. Options (not approved) include narrowly scoped authenticated HTTPS read or a separately ACL-protected append-only store. A direct Unix socket is appropriate only between **co-located** processes.
+4. The independent reconciler reviews evidence against account-wide open orders, actual OID/CLOID history, unique fill IDs, position netting and the durable pre-submit baseline; truncated or partial responses stay HOLD. Position ownership and close authorization remain separate, later projects.
+
+### Network and runtime controls required before the first real read
+
+| Control | Release evidence needed |
+| --- | --- |
+| Scope pin | Operator explicitly selects a separate **testnet** master/sub-account, exact default perp DEX and exchange host; never infer a live account from \`HL_ACCOUNT_ADDRESS\` or an API agent wallet |
+| Read-only host | TLS certificate and hostname verification with pinned exact hostname and \`/info\` path; disable proxy inheritance, cross-origin redirects, arbitrary URL/host/headers, and automatic non-idempotent HTTP retries |
+| Egress | Independently audited OS/container/cloud egress rule allows only the required HTTPS origin/destination; no \`/exchange\` path reachable through **application policy**; recognize that destination egress rules alone cannot enforce HTTP paths at an encrypted destination |
+| No trade authority | Collector lacks any \`HL_PRIVATE_KEY\`, API signing material, exchange SDK trading client or credentials for writing production trading state; distinct runtime principal and read-only ACLs are audited as the effective process, not only in Python tests |
+| Fixed request budgets | Explicitly allowlisted \`type\` and fields, fixed account, serialized bounded request rates, timeouts, max body sizes, 429/5xx => HOLD and no implicit "zero orders" conclusion |
+| Account history | A response containing 2,000 fills is **saturated**; Hyperliquid exposes only the most recent 10,000 fills for this query. Inclusive bounds and same-millisecond ties require deduplication, window continuity and durable archive or HOLD |
+| Authenticity and freshness | Audit metadata gathered by the trusted collector from the actual transport; independently authenticated remote data handoff to bots; reject stale, altered, gapped or replayed captures |
+| Operations | Peer review, fail-closed stop/rollback, no mutation of original bots, explicit subsequent approval before a **single** designated testnet account read; production approval separately required |
+
+**Rate budget reminder:** Official rate limits specify a shared IP-weight budget (currently documented as 1,200/min); \`allMids\`, \`clearinghouseState\`, \`orderStatus\` and \`spotClearinghouseState\` have weight 2, while many other \`info\` requests have weight 20 and fill calls add returned-item weights. Re-check before network activation; do not poll on the assumption that all reads are free.
+
+**Documentation verified:** 
+- https://hyperliquid.gitbook.io/hyperliquid-docs/for-developers/api/info-endpoint
+- https://hyperliquid.gitbook.io/hyperliquid-docs/for-developers/api/info-endpoint/perpetuals
+- https://hyperliquid.gitbook.io/hyperliquid-docs/for-developers/api/info-endpoint/spot
+- https://hyperliquid.gitbook.io/hyperliquid-docs/for-developers/api/rate-limits-and-user-limits
+
+### Hard decision and next approval boundary
+
+**Review decision:** the next code review should be a **small separate, security-reviewed collector transport implementation**, not more synthetic ownership fixtures in the 500+-commit draft PR. Do **not** enable real HTTP by changing a fixture flag, wire a real account into fake capture assertions, import \`hyperliquid.exchange\`, grant capture SQL permissions via a workaround, or merge PR #40 as a shortcut. Real testnet reads require a designated testnet account and operator authorization after the transport and runtime controls are reviewed. No mainnet reads, no signed API, no orders, no production deployment are included in this step.
