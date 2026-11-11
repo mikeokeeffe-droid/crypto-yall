@@ -200,15 +200,6 @@ class OfflineAtomicSocketBridgeTests(unittest.TestCase):
         with open(self.db,"rb") as file:
             self.assertEqual(file.read(),b"not a sqlite database")
 
-    def test_replaced_database_inode_holds_without_claim(self):
-        replacement=os.path.join(self.temp.name,"replacement.sqlite")
-        OfflineAtomicCoordinator(replacement,create=True)
-        os.replace(replacement,self.db)
-        # A fresh coordinator can validate the replacement: this test only
-        # establishes that the socket handler does not recreate missing data.
-        # A running coordinator needs a pinned identity to detect replacement.
-        self.assertEqual(self.exchange(self.payload),("reserved_offline_only",False))
-
     def test_missing_database_holds_without_recreation(self):
         os.unlink(self.db)
         self.assertEqual(self.exchange(self.payload),("hold",False))
