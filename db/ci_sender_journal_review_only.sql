@@ -155,3 +155,14 @@ revoke all on function public.ci_sender_mark_unknown(uuid,bigint)
        entry_login_daily, entry_login_intraday, entry_login_aggressive;
 grant execute on function public.ci_sender_mark_unknown(uuid,bigint)
   to ci_sender_worker;
+
+-- Synthetic reconciliation reviewer: isolated read-only test login.
+-- This role receives no entry, send, release, ownership or close RPCs.
+-- Its table reads are CI-only; no production or Hyperliquid access.
+create role ci_sender_reviewer login password 'disposable-reviewer-only';
+grant usage on schema public to ci_sender_reviewer;
+grant select on public.ci_sender_intents, public.ci_sender_attempts
+  to ci_sender_reviewer;
+revoke insert, update, delete, truncate, references, trigger
+  on public.ci_sender_intents, public.ci_sender_attempts
+  from ci_sender_reviewer;
