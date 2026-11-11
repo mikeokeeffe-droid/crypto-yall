@@ -92,5 +92,80 @@ class CollectorReviewTests(unittest.TestCase):
                 self.assertFalse(outcome.submit_authorized)
 
 
+    def test_documented_shaped_account_orders_and_market_fixtures(self):
+        fixtures = {
+            "clearinghouseState": {
+                "marginSummary": {"accountValue": "150.2"},
+                "assetPositions": [{"type": "oneWay", "position": {
+                    "coin": "SOL", "szi": "-0.02",
+                    "entryPx": "130", "unrealizedPnl": "-1",
+                }}],
+            },
+            "spotClearinghouseState": {
+                "balances": [{"coin": "USDC", "total": "15", "hold": "1"}],
+            },
+            "openOrders": [{
+                "coin": "SOL", "oid": 123, "timestamp": 1700000000000,
+                "side": "B", "sz": "0.5", "limitPx": "120",
+            }],
+            "allMids": {"SOL": "130.25", "@12": "0.045"},
+            "meta": {"universe": [{"name": "SOL", "szDecimals": 3}]},
+        }
+        for kind, response in fixtures.items():
+            with self.subTest(kind=kind):
+                body = collector.prepare_testnet_info_body(
+                    account=ACCOUNT, kind=kind)
+                result = collector.review_untrusted_http_capture(
+                    account=ACCOUNT, kind=kind, sent_body=body,
+                    raw_body=json.dumps(response).encode(),
+                    status_code=200, content_type="application/json",
+                    content_encoding=None, elapsed_ms=100)
+                self.assertEqual(result.state, "fixture_only")
+                self.assertFalse(result.origin_authenticated)
+                self.assertFalse(result.ownership_verified)
+                self.assertFalse(result.submit_authorized)
+
+    def test_incomplete_and_nonfinite_account_orders_market_hold(self):
+        cases = {
+            "clearinghouseState": [
+                {"marginSummary": {"accountValue": "NaN"}, "assetPositions": []},
+                {"marginSummary": {"accountValue": "5"}, "assetPositions": [
+                    {"position": {"coin": "SOL", "szi": "nan"}}]},
+                {"marginSummary": {"accountValue": "5"}, "assetPositions": [
+                    {"position": {"coin": "SOL", "szi": "1"}},
+                    {"position": {"coin": "SOL", "szi": "-1"}}]},
+            ],
+            "spotClearinghouseState": [
+                {"balances": [{"coin": "USDC", "total": "1", "hold": "2"}]},
+                {"balances": [{"coin": "USDC", "total": "5"}]},
+            ],
+            "openOrders": [
+                [{}],
+                [{"coin": "SOL", "oid": True, "timestamp": 1700000000000,
+                  "side": "B", "sz": "1", "limitPx": "100"}],
+                [{"coin": "SOL", "oid": 1, "timestamp": 1700000000000,
+                  "side": "B", "sz": "-1", "limitPx": "100"}],
+            ],
+            "allMids": [{"SOL": "Infinity"}, {"SOL": "-1"}],
+            "meta": [
+                {"universe": [{"name": "SOL", "szDecimals": True}]},
+                {"universe": [{"name": "SOL", "szDecimals": 3},
+                              {"name": "SOL", "szDecimals": 3}]},
+            ],
+        }
+        for kind, payloads in cases.items():
+            for payload in payloads:
+                with self.subTest(kind=kind, payload=payload):
+                    body=collector.prepare_testnet_info_body(
+                        account=ACCOUNT,kind=kind)
+                    result=collector.review_untrusted_http_capture(
+                        account=ACCOUNT,kind=kind,sent_body=body,
+                        raw_body=json.dumps(payload).encode(),
+                        status_code=200,content_type="application/json",
+                        content_encoding=None,elapsed_ms=200)
+                    self.assertEqual(result.state,"hold")
+                    self.assertFalse(result.submit_authorized)
+
+
 if __name__ == "__main__":
     unittest.main()
