@@ -100,6 +100,8 @@ on:
       - 'offline_hyperliquid_capture_provenance.py'
       - 'offline_ci_info_capture_integrity.py'
       - 'tests/test_offline_ci_info_capture_integrity.py'
+      - 'offline_readonly_collector_contract.py'
+      - 'tests/test_offline_readonly_collector_contract.py'
       - 'tests/test_offline_hyperliquid_capture_provenance.py'
       - 'offline_hyperliquid_http_envelope.py'
       - 'tests/test_offline_hyperliquid_http_envelope.py'
@@ -227,6 +229,7 @@ jobs:
           python -m unittest discover -s tests -p 'test_offline_hyperliquid_scoped_fixture_review.py' -v
           python -m unittest discover -s tests -p 'test_offline_hyperliquid_capture_provenance.py' -v
           python -m unittest discover -s tests -p 'test_offline_ci_info_capture_integrity.py' -v
+          python -m unittest discover -s tests -p 'test_offline_readonly_collector_contract.py' -v
           python -m unittest discover -s tests -p 'test_offline_hyperliquid_http_envelope.py' -v
           python -m unittest discover -s tests -p 'test_offline_hyperliquid_json_boundary.py' -v
           python -m unittest discover -s tests -p 'test_offline_hyperliquid_order_fill_conflicts.py' -v
