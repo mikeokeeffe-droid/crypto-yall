@@ -1,8 +1,10 @@
 """Offline original bot decision -> immutable review-only entry tests."""
 import unittest
+import json
 from dataclasses import FrozenInstanceError
 
-from offline_original_bot_intent_adapter import project_original_entry
+from offline_original_bot_intent_adapter import (project_original_entry,
+    prepare_signer_free_entry_handoff_offline, review_signer_free_entry_ack_offline)
 
 ACCOUNT = "0x" + "1" * 40
 BOTS = ("daily", "intraday", "aggressive")
@@ -100,6 +102,64 @@ class OriginalBotIntentAdapterTests(unittest.TestCase):
         self.assertNotIn("hyperliquid_executor", sys.modules)
         self.assertNotIn("intraday_executor", sys.modules)
         self.assertNotIn("aggressive_executor", sys.modules)
+
+
+    def test_signer_free_entry_request_is_only_a_request(self):
+        for bot in BOTS:
+            for action, side in (("open_long", "long"), ("open_short", "short")):
+                with self.subTest(bot=bot, action=action):
+                    result=prepare_signer_free_entry_handoff_offline(
+                        verified_bot=bot,
+                        trade={"action":action,"side":side,"hl_coin":"SOL"},
+                        rounded_size="0.025",pinned_environment="mainnet",
+                        pinned_account=ACCOUNT,
+                    )
+                    self.assertEqual(result.state,"request_only")
+                    self.assertFalse(result.submit_authorized)
+                    self.assertEqual(json.loads(result.request_json),{
+                        "operation":"request_entry","action":action,"side":side,
+                        "hl_coin":"SOL","rounded_size":"0.025",
+                    })
+                    for forbidden in ("bot","account","environment","dex",
+                                      "cloid","token","wallet","private_key"):
+                        self.assertNotIn(forbidden,json.loads(result.request_json))
+
+    def test_signer_free_handoff_denies_closes_pyramids_and_spoofing(self):
+        for action,side in (("close","long"),("pyramid_long","long"),
+                            ("pyramid_short","short"),("update_leverage","long")):
+            with self.subTest(action=action):
+                result=prepare_signer_free_entry_handoff_offline(
+                    verified_bot="aggressive",
+                    trade={"action":action,"side":side,"hl_coin":"SOL"},
+                    rounded_size="0.025",pinned_environment="mainnet",
+                    pinned_account=ACCOUNT,
+                )
+                self.assertEqual(result.state,"hold")
+                self.assertIsNone(result.request_json)
+        spoof=prepare_signer_free_entry_handoff_offline(
+            verified_bot="daily",
+            trade={"action":"open_long","side":"long","hl_coin":"SOL",
+                   "account":ACCOUNT},
+            rounded_size="0.025",pinned_environment="mainnet",
+            pinned_account=ACCOUNT,
+        )
+        self.assertEqual(spoof.state,"hold")
+
+    def test_signer_free_ack_cannot_authorize_exchange_submissions(self):
+        for payload, expected in (
+            (b'{"state":"reserved_offline_only","submit_authorized":false}',
+             "recorded_offline_only"),
+            (b'{"state":"hold","submit_authorized":false}',"hold"),
+            (b'{"state":"reserved_offline_only","submit_authorized":true}',"hold"),
+            (b'{"state":"reserved_offline_only","submit_authorized":false,"oid":10}',"hold"),
+            (b'{"state":"reserved_offline_only","state":"hold","submit_authorized":false}',"hold"),
+            (b'not json',"hold"),
+            (b'{}',"hold"),
+        ):
+            with self.subTest(payload=payload):
+                result=review_signer_free_entry_ack_offline(reply_bytes=payload)
+                self.assertEqual(result.state,expected)
+                self.assertFalse(result.submit_authorized)
 
 
 if __name__ == "__main__":
