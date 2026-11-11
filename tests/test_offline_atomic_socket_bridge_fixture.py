@@ -136,6 +136,42 @@ class OfflineAtomicSocketBridgeTests(unittest.TestCase):
             self.assertEqual(db.execute("SELECT COUNT(*) FROM claims").fetchone()[0],1)
             self.assertEqual(db.execute("SELECT COUNT(*) FROM replay_nonces").fetchone()[0],1)
 
+    def test_malformed_frames_do_not_consume_state(self):
+        cases=[
+            b"",
+            struct.pack("!I",0),
+            struct.pack("!I",4097),
+            struct.pack("!I",9)+b"{}",
+            struct.pack("!I",3)+b"bad",
+            struct.pack("!I",2)+b"[]",
+        ]
+        for index,wire in enumerate(cases):
+            with self.subTest(index=index):
+                path=os.path.join(self.temp.name,"bad-"+str(index)+".sock")
+                with socket.socket(socket.AF_UNIX,socket.SOCK_STREAM) as listener:
+                    listener.bind(path)
+                    listener.listen(1)
+                    output=[]
+                    def server():
+                        conn,_=listener.accept()
+                        with conn:
+                            output.append(handle_offline_atomic_socket(
+                                conn,{os.getuid():("daily","mainnet",ACCOUNT)},self.db))
+                    worker=threading.Thread(target=server,daemon=True)
+                    worker.start()
+                    with socket.socket(socket.AF_UNIX,socket.SOCK_STREAM) as client:
+                        client.connect(path)
+                        if wire:
+                            client.sendall(wire)
+                        client.shutdown(socket.SHUT_WR)
+                    worker.join(timeout=5)
+                    self.assertFalse(worker.is_alive())
+                    self.assertEqual(output,[("hold",False)])
+        with OfflineAtomicCoordinator(self.db)._connect() as db:
+            self.assertEqual(db.execute("SELECT COUNT(*) FROM claims").fetchone()[0],0)
+            self.assertEqual(db.execute("SELECT COUNT(*) FROM replay_nonces").fetchone()[0],0)
+        self.assertEqual(self.exchange(self.payload),("reserved_offline_only",False))
+
     def test_missing_database_holds_without_recreation(self):
         os.unlink(self.db)
         self.assertEqual(self.exchange(self.payload),("hold",False))
