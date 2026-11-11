@@ -26,3 +26,5 @@ jobs:
         run: python -m unittest collector_review.test_offline_capture_audit -v
       - name: Offline-only runtime identity and credential boundary tests
         run: python -m unittest collector_review.test_runtime_identity_review -v
+      - name: Static offline systemd isolation review (no deployment)
+        run: python -m unittest collector_review.test_offline_systemd_unit -v
