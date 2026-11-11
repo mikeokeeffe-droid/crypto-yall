@@ -60,7 +60,10 @@ class OfflineSystemdUnitReview(unittest.TestCase):
                           "ExecStartPost", "RootDirectory",
                           "ReadWritePaths", "BindPaths"):
             self.assertNotIn(forbidden, s)
-        self.assertNotIn("[Install]", text)
+        # Strip comments before checking for the actual INI section header.
+        actual_lines = [line.strip() for line in text.splitlines()
+                        if not line.lstrip().startswith(("#", ";"))]
+        self.assertNotIn("[Install]", actual_lines)
 
     def test_static_guard_detects_removed_isolation(self):
         text=UNIT.read_text(encoding="utf-8")
