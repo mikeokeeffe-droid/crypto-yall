@@ -42,7 +42,8 @@ class OfflineAtomicSocketBridgeTests(unittest.TestCase):
             with socket.socket(socket.AF_UNIX,socket.SOCK_STREAM) as client:
                 client.connect(path)
                 client.sendall(struct.pack("!I",len(data))+data)
-            worker.join(timeout=5)
+            # SQLite busy timeout is five seconds; allow the worker to finish.
+            worker.join(timeout=10)
             self.assertFalse(worker.is_alive())
             return output[0]
 
