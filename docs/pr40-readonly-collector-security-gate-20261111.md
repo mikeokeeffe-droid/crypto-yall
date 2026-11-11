@@ -92,3 +92,34 @@ A single missing historical interval, uncertain API retention, same-ms fill tie,
 ### Hard decision and next approval boundary
 
 **Review decision:** the next code review should be a **small separate, security-reviewed collector transport implementation**, not more synthetic ownership fixtures in the 500+-commit draft PR. Do **not** enable real HTTP by changing a fixture flag, wire a real account into fake capture assertions, import \`hyperliquid.exchange\`, grant capture SQL permissions via a workaround, or merge PR #40 as a shortcut. Real testnet reads require a designated testnet account and operator authorization after the transport and runtime controls are reviewed. No mainnet reads, no signed API, no orders, no production deployment are included in this step.
+
+
+## Read-only network implementation audit — 11 Nov 2026 (PR head eab34b1)
+
+**Review outcome: STOP / NO TESTNET REQUEST YET.** All four offline CI workflows passed on \`eab34b1\`; they are **not** evidence of a completed HTTPS collector. The original Daily, Intraday, and Aggressive executors remain unchanged. This audit does not approve a real Hyperliquid call, testnet activity, secret access, new database permissions, PR merge, or a live deployment.
+
+### What source code actually does
+
+| File | Verified present functionality | Not implemented |
+| --- | --- | --- |
+| \`offline_testnet_info_snapshot_plan_ci.py\` | Pure plans for five pinned testnet-only \`/info\` query bodies; fixed rate-weight preflight; checks **caller-supplied** fake response envelopes | HTTP connection, actual TLS verification, DNS/proxy/redirect enforcement, authenticated capture log |
+| \`offline_readonly_collector_contract.py\` | Pure \`orderStatus\` and bounded \`userFillsByTime\` request/capture review; untrusted fixture hashing | Actual exchange-origin proof, complete history, independently verified OID/CLOID/position ownership |
+| \`offline_testnet_https_transport_candidate_ci.py\` | An **inert public stub** that always returns HOLD; intentionally has *no* HTTP, SSL, socket or request implementation | The first real read-only HTTPS request; cannot be activated by a flag or CI setting |
+| \`offline_signer_free_info_service_ci.py\` | Same-host Unix socket carrying a synthetic, unsigned snapshot under CI test identity | Authenticated remote delivery from a collector host to ephemeral GitHub Actions bot runners |
+| \`tests/test_offline_collector_network_import_guard_ci.py\` | Source-level check for risky imports/calls in seven **offline** modules | OS/container egress restriction, runtime permissions, complete dependency audit |
+
+**Key correction:** do not describe the existing stub as a working or already-built HTTPS transport. It is only a disabled interface. Additional synthetic CI cases alone cannot satisfy gate C3/C4.
+
+### Required small *separate* reviewed implementation to unblock step 1
+
+1. **Designated testnet effective account:** Obtain an operator-approved **public** testnet master/sub-account address. Do not reuse mainnet \`HL_ACCOUNT_ADDRESS\` or an API-agent signer address by default. A public address alone is a lookup identifier, not account-ownership proof.
+2. **Collector runtime and networking:** Isolate a dedicated service with no \`HL_PRIVATE_KEY\`, \`hyperliquid.exchange\`, direct order endpoints, production DB write credentials or bot execution access. Verify actual effective UID/container permissions and egress at runtime. HTTPS to a fixed official *testnet* hostname, port 443, \`POST /info\` only, no redirects, proxy inheritance or arbitrary URL/headers.
+3. **Operational request bounds:** Enforce TLS certificate/hostname checks; a pinned canonical body/type/account; 4s timeout and 256 KiB cap; strict JSON/content encoding validation; fixed rate budget and no blind retries. HTTP 429, 5xx, TLS mismatch, unexpected address, partial content, response truncation and ambiguous result => HOLD. A network permit must not be an environment variable or caller boolean alone.
+4. **Source-backed capture:** Record the **actual** request and response bytes/hashes, endpoint, exchange account, HTTP/TLS observations, observed clock, request sequence, failure state and durable audit trail from inside the independently authenticated collector. A matching digest of untrusted fixture bytes does not prove exchange origin. Ensure external reviewers can validate capture provenance without giving bots order rights.
+5. **Snapshot distribution across runners:** A hosted collector's Unix socket cannot be reached by a remote GitHub-hosted Actions worker. Design a separately authenticated, least-privilege read-only HTTPS endpoint or ACL-controlled snapshot store with anti-replay, scope pinning and freshness. Bot jobs must not receive exchange signing or production database write permissions.
+6. **No ownership upgrade:** \`openOrders\`, \`clearinghouseState\` and \`userFillsByTime\` must be joined with a durable independently observed pre-send baseline, bounded inclusive pagination, same-ms duplicate handling, other manual/agent activity and account-wide position changes. Unattributed or incomplete histories => HOLD, with no auto-close, claim-release, retry or position adoption.
+7. **Review and one-shot permission gate:** Put real network implementation in a **small separately reviewable change**; test it first with a deliberately nonnetwork fake transport and explicit OS-level egress-denial checks. Before the first actual \`POST /info\` request, obtain separate user approval for the exact public testnet account, intended request type, scope and collector host. Document rollback and audit handling. No live exchange or trading permission is implied.
+
+**Acceptance evidence for step 1:** A separately approved testnet-only \`/info\` request performed by an isolated read-only process with independently verified TLS/HTTP provenance, a timestamped bounded response and demonstrated lack of any trading capability. This proves only that the read-only collector works; it does **not** authorize the central order sender, reconcile all history, or permit live trading.
+
+**Next engineering action:** Stop expanding PR #40's overlapping offline test fixtures. Review the dedicated collector runtime/transport design separately, then request a public testnet account and explicit permission *before* any network read. The original bots, live workflows, credentials, and production account stay untouched. **LIVE NO-GO.**
