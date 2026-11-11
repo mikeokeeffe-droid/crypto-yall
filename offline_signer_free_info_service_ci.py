@@ -74,17 +74,21 @@ def _socket_path_is_private(path, expected_uid, *, bound=False):
             or len(os.fsencode(path)) > 100
             or type(expected_uid) is not int or expected_uid < 0):
         return False
-    directory = os.lstat(os.path.dirname(path))
-    if (not stat.S_ISDIR(directory.st_mode)
-            or directory.st_uid != expected_uid
-            or stat.S_IMODE(directory.st_mode) != 0o700):
-        return False
-    if bound:
-        sock = os.lstat(path)
-        if (not stat.S_ISSOCK(sock.st_mode)
-                or sock.st_uid != expected_uid
-                or stat.S_IMODE(sock.st_mode) != 0o600):
+    try:
+        directory = os.lstat(os.path.dirname(path))
+        if (not stat.S_ISDIR(directory.st_mode)
+                or directory.st_uid != expected_uid
+                or stat.S_IMODE(directory.st_mode) != 0o700):
             return False
+        if bound:
+            sock = os.lstat(path)
+            if (not stat.S_ISSOCK(sock.st_mode)
+                    or sock.st_uid != expected_uid
+                    or stat.S_IMODE(sock.st_mode) != 0o600):
+                return False
+    except OSError:
+        # Absent/unreadable service must HOLD, not crash or enable fallback.
+        return False
     return True
 
 
