@@ -24,3 +24,5 @@ jobs:
         run: python -m unittest collector_review.test_testnet_info_https -v
       - name: Offline-only synthetic hash-chain integrity tests
         run: python -m unittest collector_review.test_offline_capture_audit -v
+      - name: Offline-only runtime identity and credential boundary tests
+        run: python -m unittest collector_review.test_runtime_identity_review -v
