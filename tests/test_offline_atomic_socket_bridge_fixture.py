@@ -242,6 +242,19 @@ class OfflineAtomicSocketBridgeTests(unittest.TestCase):
             self.assertEqual(opened.execute(
                 "SELECT COUNT(*) FROM replay_nonces").fetchone()[0],0)
 
+    def test_database_lock_timeout_holds_without_state_write(self):
+        import sqlite3
+        with sqlite3.connect(self.db,timeout=1,isolation_level=None) as locked:
+            locked.execute("BEGIN EXCLUSIVE")
+            self.assertEqual(self.exchange(self.payload),("hold",False))
+            locked.rollback()
+        with OfflineAtomicCoordinator(self.db)._connect() as opened:
+            self.assertEqual(opened.execute(
+                "SELECT COUNT(*) FROM claims").fetchone()[0],0)
+            self.assertEqual(opened.execute(
+                "SELECT COUNT(*) FROM replay_nonces").fetchone()[0],0)
+        self.assertEqual(self.exchange(self.payload),("reserved_offline_only",False))
+
     def test_missing_database_holds_without_recreation(self):
         os.unlink(self.db)
         self.assertEqual(self.exchange(self.payload),("hold",False))
