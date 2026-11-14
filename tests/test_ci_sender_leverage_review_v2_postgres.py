@@ -92,6 +92,14 @@ class SenderV2LeverageReviewTests(unittest.TestCase):
                                  "set requested_leverage=3")
                 with self.assertRaises(InsufficientPrivilege):
                     conn.execute("delete from public.ci_sender_v2_reviews")
+        # Legacy bot logins must NOT be able to invoke the V2 review RPC;
+        # only coordinator-owned principals may hold its disposable SQL keys.
+        for bot in BOTS:
+            with self.subTest(legacy_bot=bot), self.connect("entry_login_" + bot) as conn:
+                with self.assertRaises(InsufficientPrivilege):
+                    conn.execute(
+                        "select * from public.ci_sender_v2_record_review("
+                        "%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)", self.args(bot))
         with self.connect("ci_sender_worker") as conn:
             with self.assertRaises(InsufficientPrivilege):
                 conn.execute(
