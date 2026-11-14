@@ -117,6 +117,18 @@ class HostIsolationProbeTests(unittest.TestCase):
         self.assertEqual(count, 20)
         self.assertEqual(len(tokens), 8)
 
+    def test_systemd_memory_pressure_names_are_allowed_but_secrets_hold(self):
+        allowed=("PATH", "LANG", "MEMORY_PRESSURE_WATCH",
+                 "MEMORY_PRESSURE_WRITE")
+        self.assertEqual(review(environment_names=allowed).state,
+                         "host_candidate")
+        self.assertEqual(
+            review(environment_names=allowed + ("HL_PRIVATE_KEY",)).state,
+            "hold")
+        self.assertEqual(
+            review(environment_names=allowed + ("UNEXPECTED_VAR",)).state,
+            "hold")
+
     def test_standard_systemd_shell_name_is_allowed_but_unknown_names_hold(self):
         self.assertEqual(
             review(environment_names=("PATH", "LANG", "SHELL")).state,
