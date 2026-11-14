@@ -24,6 +24,8 @@ jobs:
         run: python -m unittest collector_review.test_testnet_info_https -v
       - name: Offline-only order and history planning (no network)
         run: python -m unittest collector_review.test_offline_history_query_plan -v
+      - name: Offline-only untrusted fill funding and order response review
+        run: python -m unittest collector_review.test_offline_history_response_review -v
       - name: Offline-only synthetic hash-chain integrity tests
         run: python -m unittest collector_review.test_offline_capture_audit -v
       - name: Offline-only runtime identity and credential boundary tests
