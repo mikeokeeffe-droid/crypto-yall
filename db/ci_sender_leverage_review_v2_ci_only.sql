@@ -4,6 +4,42 @@
 -- This is deliberately separate from existing V1 sender schema because V1
 -- has no leverage or margin-mode field. No migration of V1 is implied.
 
+-- Separate coordinator-only SQL principals from the legacy bot entry logins.
+-- All passwords below are disposable CI fixtures, never production secrets.
+create role ci_v2_coordinator_daily login
+  password 'disposable-v2-coordinator-daily-only';
+create role ci_v2_coordinator_intraday login
+  password 'disposable-v2-coordinator-intraday-only';
+create role ci_v2_coordinator_aggressive login
+  password 'disposable-v2-coordinator-aggressive-only';
+grant usage on schema public to
+  ci_v2_coordinator_daily,ci_v2_coordinator_intraday,
+  ci_v2_coordinator_aggressive;
+
+create table public.ci_v2_coordinator_scopes (
+  bot text primary key check (bot in ('daily','intraday','aggressive')),
+  db_login name not null unique,
+  environment text not null check (environment='mainnet'),
+  effective_account text not null check (
+    effective_account ~ '^0x[0-9a-f]{40}$'
+  )
+);
+insert into public.ci_v2_coordinator_scopes
+  (bot,db_login,environment,effective_account)
+values
+  ('daily','ci_v2_coordinator_daily','mainnet',
+   '0x1111111111111111111111111111111111111111'),
+  ('intraday','ci_v2_coordinator_intraday','mainnet',
+   '0x1111111111111111111111111111111111111111'),
+  ('aggressive','ci_v2_coordinator_aggressive','mainnet',
+   '0x1111111111111111111111111111111111111111');
+revoke all on public.ci_v2_coordinator_scopes from
+  public,anon,authenticated,service_role,
+  bot_entry_executor_trial,ci_sender_entry_api,ci_sender_worker,
+  ci_sender_reviewer,entry_login_daily,entry_login_intraday,
+  entry_login_aggressive,ci_v2_coordinator_daily,
+  ci_v2_coordinator_intraday,ci_v2_coordinator_aggressive;
+
 create table public.ci_sender_v2_reviews (
   token uuid primary key,
   request_id uuid not null unique,
@@ -35,7 +71,9 @@ revoke all on public.ci_sender_v2_reviews
   from public,anon,authenticated,service_role,
        bot_entry_executor_trial,ci_sender_entry_api,
        ci_sender_worker,ci_sender_reviewer,
-       entry_login_daily,entry_login_intraday,entry_login_aggressive;
+       entry_login_daily,entry_login_intraday,entry_login_aggressive,
+       ci_v2_coordinator_daily,ci_v2_coordinator_intraday,
+       ci_v2_coordinator_aggressive;
 
 -- The actual PostgreSQL session_user AND configured account scope pin the
 -- bot. A claim is an immutable, non-executable review snapshot. The v2
@@ -64,10 +102,8 @@ begin
      or p_margin_mode is distinct from 'cross'
      or p_request_id is null
      or not exists (
-       select 1 from public.bot_entry_executor_identities e
-       join public.ci_scoped_executor_accounts a
-         on a.db_login=e.db_login
-       where e.bot=p_bot and e.db_login=session_user::name
+       select 1 from public.ci_v2_coordinator_scopes a
+       where a.bot=p_bot and a.db_login=session_user::name
          and a.environment=p_environment
          and a.effective_account=p_account
      )
@@ -97,10 +133,13 @@ $$;
 revoke execute on function public.ci_sender_v2_record_review(
   text,text,text,text,text,text,numeric,integer,text,uuid
 ) from public,anon,authenticated,service_role,
-       bot_entry_executor_trial,ci_sender_worker,ci_sender_reviewer;
+       bot_entry_executor_trial,ci_sender_entry_api,
+       ci_sender_worker,ci_sender_reviewer,
+       entry_login_daily,entry_login_intraday,entry_login_aggressive;
 grant execute on function public.ci_sender_v2_record_review(
   text,text,text,text,text,text,numeric,integer,text,uuid
-) to ci_sender_entry_api;
+) to ci_v2_coordinator_daily,ci_v2_coordinator_intraday,
+     ci_v2_coordinator_aggressive;
 grant select on public.ci_sender_v2_reviews to ci_sender_reviewer;
 
 -- Intentional absence: no update/release/mark-unknown/dispatch functions on
