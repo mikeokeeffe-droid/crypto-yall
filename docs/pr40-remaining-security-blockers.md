@@ -15,61 +15,22 @@
 | P1 | Non-production integration verification | Test real process/DB permission boundaries and failure injection without any production exchange orders |
 | P1 | Independent sign-off | Security and trading-risk review plus explicit approval before any deployment |
 
-## What has actually been tested — update 14 November 2026
+## Verified offline milestone — 14 November 2026
 
-- The independent group-gated socket fixture uses three actual Linux UIDs
-  and a temporary supplemental socket group to compete for one synthetic
-  account/DEX/coin scope. Exactly one reservation succeeds; disallowed UIDs,
-  bot impersonation, and direct reads of the coordinator-private SQLite
-  journal fail. This was verified through GitHub's completed offline CI
-  workflow at commit `3d30fc62ae4f43ffef2ccc5b67eeade40182ef31`.
-- Separate disposable PostgreSQL roles, process-bound admission, synthetic
-  sender/journal/fill checks, stale-fence tests, and signer-free Info/entry
-  interface fixtures also pass CI. These do **not** make the three original
-  executors signer-free or establish real exchange order provenance.
-- The group-gated test constructs a temporary socket and invokes the
-  offline journal handler. It is **not** the original PostgreSQL process
-  listener deployed under three real bot service identities. In fact,
-  `offline_original_bot_process_listener_ci.py` deliberately creates a
-  **0600** socket under a coordinator-private directory, and
-  `offline_original_bot_entry_socket_client_ci.py` requires **0700**
-  parent + **0600** socket ownership by the coordinator UID. That
-  combination is same-UID-only and cannot serve independently identified
-  bot UIDs. This mismatch remains a real implementation blocker.
-- The original `get_client()` still reads `HL_PRIVATE_KEY` and
-  instantiates a signer-backed Exchange in all three bots through imports.
-  A passing AST characterization test explicitly records this as
-  **unresolved**, not a secure state.
+- GitHub Actions on commit `61dc7aaf65881be0ab6de654c8fa566936f6d166` completed successfully: original bot order boundaries, Code Safety Check, disposable PostgreSQL and Supabase State Adapter tests. The group-gated real coordinator/listener step ran successfully in the PostgreSQL workflow.
+- The **disposable** `offline_original_bot_process_listener_ci.py` and `offline_original_bot_entry_socket_client_ci.py` now have an explicit opt-in, root-only CI socket-group mode. Three **distinct Linux UIDs** connect to the actual one-shot listener under a temporary 0710 coordinator-owned directory / 0660 socket. The server uses kernel `SO_PEERCRED` to bind each UID to its fixed bot, account and environment, while a restricted PostgreSQL login is used only by the coordinator.
+- CI demonstrates one winner and two HOLDs for the same synthetic account/coin, rejection of an unauthorized UID **with or without** access to the socket group, and preservation of the existing pending SQL reservation after the listener exits and restarts. The response never authorizes a trade.
+- Earlier disposable SQLite file access checks also demonstrate denial of direct journal reads under another UID. They are **separate** fixtures: the PostgreSQL listener test is not proof of deployed SQL credential isolation.
+- Synthetic Info and request-only adapters work without exchange signing; the existing three production executor modules **still import a signer-backed `get_client()`** and retain their trading mutation call sites.
 
-## Next implementation milestone (not yet complete)
+## Next implementation gate — not complete
 
-**Bridge the group/OS identity boundary into the real *disposable* coordinator
-listener and signer-free client pair** with one consistent reviewed IPC
-permission contract: three individually pinned bot UIDs may reach only
-the entry-request socket; unauthorized UIDs and spoofing remain HOLD;
-all bot UIDs lack direct journal / DB writer credentials; exactly one
-reservation persists on crash/restart. Preserve fail-closed syntax,
-framing, nonce, schema validation and process-level tests.
+**Replace signing-capable bot initialization and direct order dispatch with a reviewed signer-free client and a separately privileged, single account-scoped writer.** Keep all three strategy calculations unchanged; cover entries, Aggressive pyramid adds, leverage updates, and every close path including unsized fallbacks. The sender must persist immutable intent, CLOID, fence and dispatch-unknown state before any possible order side effect. It must fail closed when journal, authentication or independent reconciliation fails.
 
-Do not assume group membership alone proves identity: the server must
-validate Linux peer credentials on each accepted connection and bind each
-UID to a fixed bot/account/environment, with independent restrictions
-on how workloads obtain membership. No real signing or exchange endpoint
-may exist in this disposable integration.
+Required evidence is **deployment-level**, not another green synthetic fixture: (1) bot workloads have no access to `HL_PRIVATE_KEY` or usable order-signing endpoint; (2) individually authenticated bot identities cannot access the sender's protected journal or SQL write roles; (3) signed mutations have exactly one independently audited dispatch choke point; (4) independent Hyperliquid order/fill/current-position evidence establishes ownership or preserves HOLD; (5) bounded reduce-only protective close and emergency STOP behavior are independently reviewed and tested; (6) a coordinated all-three migration and rollback are approved.
 
-After this, the larger unresolved work is a separately privileged
-single writer, real workload secret isolation, exchange-backed
-reconciliation, bounded reduce-only close, operational recovery, and
-independent security/trading-risk approval. These cannot be satisfied by
-more synthetic snapshots alone.
+Do not assume socket-group membership itself is bot authentication, or that a pass on disposable, root-run Linux CI proves the server's real operational isolation, secrets, egress, account provenance or production-readiness. No production signer, testnet integration, rollout or real trading permission is created by these tests.
 
 ## Critical interpretation
 
-Green CI for a disposable permission boundary does **not** mean a deployed
-secure sender exists. The group-gated fixture runs with temporary identities
-and storage; it does not prove service-level credential revocation,
-production PostgreSQL permissions, egress restrictions or safe real orders.
-
-**Keep PR #40 DRAFT / LIVE NO-GO.** Do not merge, deploy, change production
-secrets, modify original live bots, access real Hyperliquid APIs or place
-orders without a separate explicit approval.
+**PR #40 stays DRAFT / LIVE NO-GO.** Do not merge, deploy, change trading secrets, alter the original executors or live workflows, connect real Hyperliquid trade endpoints or place orders without a later explicit review and authorization.
