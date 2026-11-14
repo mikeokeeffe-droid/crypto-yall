@@ -184,15 +184,30 @@ def _funding(payload, start, end):
 
 
 def inspect_history_fixture_response_offline(
-    *, plan, raw_body, status_code, content_type, content_encoding=None,
+    *, plan, pinned_scope, pinned_request_type,
+    pinned_oid=None, pinned_start_ms=None, pinned_end_ms=None,
+    raw_body, status_code, content_type, content_encoding=None,
 ):
-    """Review bounded HTTP-shape fields supplied by a caller; NEVER send.
+    """Check fixture bytes against INDEPENDENTLY pinned request criteria.
 
-    'fixture_only' establishes JSON structure relative to a planned request,
-    NOT a TLS observation or account-history completeness. There is no
-    network-enabled function in this module.
+    The caller must supply the expected scope, operation, order identifier or
+    exact time bounds from a separately reviewed configuration; they cannot
+    be inferred from the untrusted response or the received plan itself.
+    This pure offline test cannot verify that the caller actually obtained
+    those pins independently. Neither a match nor a digest authenticates the
+    exchange, completes account history, or grants any trading authority.
     """
     held = OfflineHistoryResponseReview()
+    if (type(pinned_scope) is not OfflineHistoryQueryScope
+            or type(pinned_request_type) is not str):
+        return held
+    expected = plan_testnet_history_query_offline(
+        scope=pinned_scope, request_type=pinned_request_type,
+        oid=pinned_oid, start_ms=pinned_start_ms,
+        end_ms=pinned_end_ms,
+    )
+    if (expected.state != "plan_only" or plan != expected):
+        return held
     if (type(plan) is not OfflineHistoryQueryPlan
             or plan.state != "plan_only"
             or plan.network_authorized or plan.transport_verified
@@ -208,16 +223,9 @@ def inspect_history_fixture_response_offline(
         return held
     try:
         req = json.loads(plan.request_body, object_pairs_hook=_unique_pairs)
-        scope = OfflineHistoryQueryScope(
-            account=req["user"], environment="testnet", dex="",
-        )
-        canonical = plan_testnet_history_query_offline(
-            scope=scope, request_type=plan.request_type,
-            oid=req.get("oid"), start_ms=req.get("startTime"),
-            end_ms=req.get("endTime"),
-        )
-        if (canonical != plan or
-                canonical.request_body != plan.request_body):
+        if (req.get("user") != pinned_scope.account
+                or req.get("type") != pinned_request_type
+                or plan.request_body != expected.request_body):
             return held
         payload = json.loads(
             raw_body.decode("utf-8"), object_pairs_hook=_unique_pairs,
