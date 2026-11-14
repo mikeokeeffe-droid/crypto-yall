@@ -68,10 +68,10 @@ class SenderV2LeverageReviewTests(unittest.TestCase):
         self.assertEqual(sum(r[0] is False for r in results), 2)
         rows = self.rows()
         self.assertEqual(len(rows), 1)
-        self.assertEqual(rows[0][0:6],
-                         (rows[0][0], "open_long", 0.025, 2,
-                          "cross", "review_only"))
         self.assertIn(rows[0][0], BOTS)
+        self.assertEqual(rows[0][1], "open_long")
+        self.assertEqual(str(rows[0][2]), "0.025")
+        self.assertEqual(rows[0][3:6], (2, "cross", "review_only"))
         self.assertRegex(rows[0][6], r"^0x[0-9a-f]{32}$")
         self.assertEqual(rows[0][7:9], accepted[0][1:3])
         self.assertEqual(self.record("daily"), (False, None, None))
