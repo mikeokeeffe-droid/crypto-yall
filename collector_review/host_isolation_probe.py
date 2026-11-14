@@ -25,6 +25,8 @@ _ALLOWED_ENV = frozenset((
     "HOME", "PATH", "LANG", "LC_ALL", "LC_CTYPE", "TZ", "USER", "LOGNAME", "SHELL",
     "INVOCATION_ID", "JOURNAL_STREAM", "SYSTEMD_EXEC_PID",
     "PYTHONDONTWRITEBYTECODE", "PYTHONUNBUFFERED",
+    # systemd memory-pressure protocol metadata; names only, never values.
+    "MEMORY_PRESSURE_WATCH", "MEMORY_PRESSURE_WRITE",
 ))
 _REQUIRED_CAPS = ("CapInh", "CapPrm", "CapEff", "CapBnd", "CapAmb")
 _HOST_NETNS_REF = Path("/run/collector-review-host/netns")
