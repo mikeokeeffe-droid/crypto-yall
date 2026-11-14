@@ -96,6 +96,22 @@ class HostIsolationProbeTests(unittest.TestCase):
                 self.assertEqual(review(environment_names=names).state,"hold")
 
 
+    def test_standard_systemd_shell_name_is_allowed_but_unknown_names_hold(self):
+        self.assertEqual(
+            review(environment_names=("PATH", "LANG", "SHELL")).state,
+            "host_candidate",
+        )
+        self.assertEqual(
+            review(environment_names=("PATH", "LANG", "SHELL",
+                                      "HL_PRIVATE_KEY")).state,
+            "hold",
+        )
+        self.assertEqual(
+            review(environment_names=("PATH", "LANG", "SHELL",
+                                      "UNEXPECTED_RUNTIME_VAR")).state,
+            "hold",
+        )
+
     def test_permission_denied_with_missing_host_baseline_fails_closed(self):
         def readlink(path):
             if path == "/proc/self/ns/net":
