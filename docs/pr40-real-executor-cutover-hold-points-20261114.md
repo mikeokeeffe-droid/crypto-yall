@@ -40,3 +40,37 @@
 **Next code-review change should be a deliberately disabled, isolated implementation diff for the original read-only bootstrap with explicit import and credential-negative tests.** It must not be merged or deployed as part of this document change. Keep original trading behavior unchanged until all coordinated cutover and protective-exit requirements are accepted.
 
 **Decision: PR #40 DRAFT — LIVE NO-GO.**
+
+
+## 14 November 2026 — read-only exchange-history prerequisite and PR #41 boundary
+
+**Source inspection:** PR #40 head 79f86f3; separate [draft collector PR #41](https://github.com/mikeokeeffe-droid/crypto-yall/pull/41) head 05e2959. Four PR #40 checks and two PR #41 offline checks were green during this review. These are **not** production or exchange-origin acceptance tests.
+
+### Reviewed dependency and current state
+
+| Original dependency | Offline-only work | Outstanding acceptance |
+| --- | --- | --- |
+| Account and market reads: user_state, spot_user_state, all_mids, meta | Five original read helpers and source-based sizing run against synthetic signer-free Info; PR #41 prepares five pinned testnet query types | Trusted independent read-only HTTPS collector, operator-pinned effective account/DEX, authenticated fresh distribution to ephemeral bot runners |
+| Order status and CLOID-to-OID correlation | PR #40 has request planning and fixture lineage checks | Independently captured scoped orderStatus query and original durable journal matching |
+| Partial fill and trade history | PR #40 has synthetic userFillsByTime coverage; original get_order_fill_totals falls back to None if history unavailable | Real continuous account-wide fills, incl. manual/other-bot activity, same-millisecond ties, API caps and retention; missing evidence means HOLD |
+| Funding history | Original get_position_funding can return zero-valued funding with funding_data_complete=False | Verified funding-history API schema, time-window completeness and origin; a zero fallback is not authentic zero |
+| Current net exposure | Synthetic conservation and paginated fixtures remain unverified | Fresh independently obtained position/open-order evidence, durable pre-submit baseline, full same-coin reconciliation |
+| Network and process boundary | PR #41 disabled collector source, dedicated offline oneshot host probe and negative socket checks | Independent proof of effective secret/path/egress restrictions, collector-origin transport and audit evidence; separate approval for any one-shot testnet read |
+
+**Important scope correction:** PR #41's read-only prototype supports clearinghouseState, openOrders, spotClearinghouseState, allMids and meta only. Its network entrypoint AND internal HTTPS transport helper deny real calls. It does not yet collect orderStatus, fills-by-time or funding history. A passing offline host probe is not a functioning authenticated exchange history service. The local Unix-socket CI service cannot be assumed reachable by remote ephemeral GitHub Actions bot workers.
+
+### Next separately reviewable stages
+
+1. Independently sign off the actual disposable collector host: code SHA, systemd identity, credentials and private-file ACLs, external egress, TLS verification, fixed endpoint and path, audit integrity and stop/rollback. The observed socket-creation denial tests narrow mechanisms only; they do not establish the entire boundary.
+2. Design a **new separately reviewed, still network-disabled collector change** for orderStatus, fill-by-time and funding history, with current official Hyperliquid schemas and rate/retention limits verified. Require independently pinned effective account, DEX, clock, query bounds, replay protection, unique fills, immutable audit and explicit HOLD on gaps or saturated windows.
+3. Only after independent review, request the operator's **explicit approval** for a named PUBLIC TESTNET account, exact one-shot read-only request types, limits and audit retention. Neither PR currently authorizes testnet or mainnet HTTP.
+4. Bind independently captured read-only evidence to an immutable coordinator journal, review current account net position plus all unowned/manual fills, and prove coverage of the pre-submit baseline. The coordinator must not trust metadata supplied by bots or fixture manifests to claim authentication or completeness.
+5. Separately implement and review the exclusive trading sender, bounded reduce-only close policy, uncertain-send recovery, emergency protective position management, and coordinated cutover of all three bots; independent risk/security sign-off required.
+
+### Non-negotiable HOLD conditions
+
+- No pre-submit baseline, lost history, ambiguous CLOID/OID attribution, partial fill windows, unknown/manual intervening order, unproved master/sub-account selection, stale snapshot delivery, missing origin proof or uncertainty after a sender crash.
+- Incomplete original history, synthetic matching digests, caller-claimed completeness, zero-valued fallback funding, and passing Linux socket checks **cannot** become permission to send, close, claim ownership, release a lock or retry an uncertain order.
+- Original Daily, Intraday and Aggressive still depend on signer-backed get_client(). A partial deployment or silent removal of current protective exit coverage is unsafe.
+
+**HOLD DECISION: PR #40 stays DRAFT / LIVE NO-GO. PR #41 stays DRAFT / NETWORK DISABLED.** This update grants no merge, testnet request, real server change, secret access, production database permission, or trade.
