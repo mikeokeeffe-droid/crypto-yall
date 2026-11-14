@@ -106,8 +106,8 @@ def record_v2_draft_for_offline_review(
                 "select current_database(),session_user,current_user"
             ).fetchone()
             if identity != (
-                "safety_test", "entry_login_" + verified_bot,
-                "entry_login_" + verified_bot,
+                "safety_test", "ci_v2_coordinator_" + verified_bot,
+                "ci_v2_coordinator_" + verified_bot,
             ):
                 return held
             row = conn.execute(
