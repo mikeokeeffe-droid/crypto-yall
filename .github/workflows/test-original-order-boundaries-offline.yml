@@ -10,6 +10,7 @@ on:
       - 'tests/test_offline_signer_free_bot_view_ci.py'
       - 'offline_three_bot_mutation_review_ci.py'
       - 'tests/test_offline_three_bot_mutation_review_ci.py'
+      - 'tests/test_original_mutation_source_policy_ci.py'
       - 'tests/test_position_increase_claim_invariant_offline.py'
       - 'tests/test_original_kill_switch_exit_audit_offline.py'
       - 'tests/test_original_close_callsite_audit_offline.py'
@@ -229,6 +230,7 @@ jobs:
           python -m unittest discover -s tests -p 'test_offline_signer_free_adapter_static_guard.py' -v
           python -m unittest discover -s tests -p 'test_offline_signer_free_bot_view_ci.py' -v
           python -m unittest discover -s tests -p 'test_offline_three_bot_mutation_review_ci.py' -v
+          python -m unittest discover -s tests -p 'test_original_mutation_source_policy_ci.py' -v
           python -m unittest discover -s tests -p 'test_position_increase_claim_invariant_offline.py' -v
           python -m unittest discover -s tests -p 'test_original_kill_switch_exit_audit_offline.py' -v
           python -m unittest discover -s tests -p 'test_original_close_callsite_audit_offline.py' -v
