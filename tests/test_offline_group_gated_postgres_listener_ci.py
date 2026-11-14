@@ -34,6 +34,12 @@ result=request_offline_entry_via_unix_socket(
  pinned_account='0x'+'1'*40,ipc_group_gid=int(sys.argv[5]))
 print(json.dumps({'state':result.state,'submit_authorized':result.submit_authorized}),flush=True)
 """
+_RAW_CONNECT = """
+import socket,sys
+with socket.socket(socket.AF_UNIX,socket.SOCK_STREAM) as sock:
+    sock.settimeout(2)
+    sock.connect(sys.argv[1])
+"""
 
 
 def _ids():
@@ -59,7 +65,7 @@ def _server(path, gids, uids, ready):
         allowed_uids={uid: (bot,"mainnet",ACCOUNT)
                       for uid,bot in zip(uids,BOTS)},
         connection_factories={bot:db(bot) for bot in BOTS},
-        max_requests=3, ready=ready, timeout=15.0)
+        max_requests=4, ready=ready, timeout=15.0)
 
 
 @unittest.skipUnless(
@@ -123,6 +129,38 @@ class GroupGatedRealProcessListenerTests(unittest.TestCase):
                     parsed=json.loads(child.stdout)
                     self.assertFalse(parsed["submit_authorized"])
                     outcomes.append(parsed["state"])
+                # Group membership is not authorization: an unknown UID
+                # with socket-group access must be rejected by SO_PEERCRED.
+                # An unknown UID WITHOUT group access must fail at the
+                # filesystem socket boundary before reaching the listener.
+                outsider_uid = uids[3]
+                def drop_ungrouped():
+                    os.setgroups([])
+                    os.setgid(outsider_uid)
+                    os.setuid(outsider_uid)
+                no_group = subprocess.run(
+                    [sys.executable,"-c",_RAW_CONNECT,path],
+                    preexec_fn=drop_ungrouped,
+                    env={"PATH":"/usr/bin:/bin"},capture_output=True,
+                    text=True,timeout=5,check=False)
+                self.assertNotEqual(no_group.returncode,0)
+                self.assertIn("PermissionError",no_group.stderr)
+
+                def drop_outsider():
+                    os.setgroups([gid])
+                    os.setgid(outsider_uid)
+                    os.setuid(outsider_uid)
+                outsider = subprocess.run(
+                    [sys.executable,"-c",_CHILD,path,"0","daily","AVAX",str(gid)],
+                    preexec_fn=drop_outsider,
+                    env={"PATH":"/usr/bin:/bin","PYTHONPATH":client_dir,
+                         "ISOLATED_POSTGRES_CI":"1","PGDATABASE":"safety_test",
+                         "PGHOST":"localhost","CI_SOCKET_GROUP_AUDIT":"1"},
+                    capture_output=True,text=True,timeout=8,check=False)
+                self.assertEqual(outsider.returncode,0,outsider.stderr)
+                self.assertEqual(json.loads(outsider.stdout),
+                                 {"state":"hold","submit_authorized":False})
+
                 process.join(timeout=8)
                 self.assertEqual(process.exitcode,0,"listener did not exit cleanly")
                 self.assertEqual(outcomes.count("recorded_offline_only"),1,outcomes)
