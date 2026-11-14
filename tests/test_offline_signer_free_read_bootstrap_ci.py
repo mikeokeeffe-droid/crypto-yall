@@ -125,6 +125,69 @@ class SignerFreeReadBootstrapTests(unittest.TestCase):
                 self.assertEqual(result.state, "hold")
                 self.assertFalse(result.submit_authorized)
 
+    def test_source_shaped_candidates_flow_only_to_non_executable_review(self):
+        for bot in ("daily", "intraday", "aggressive"):
+            view = self.build(bot)
+            for action in ("open_long", "open_short"):
+                with self.subTest(bot=bot, action=action):
+                    long = action == "open_long"
+                    candidate = {
+                        "ticker": "SOL-USD", "hl_coin": "SOL",
+                        "action": action,
+                        "side": "long" if long else "short",
+                        "reason": (
+                            ("BUY signal" if long else "ENTER SHORT signal")
+                            if bot == "daily" else
+                            ("buy signal" if long else "enter_short signal")
+                        ),
+                        "confidence" if bot == "daily" else "priority": 0.7,
+                    }
+                    review = view.draft_original_candidate_review(
+                        candidate=candidate, rounded_size="1.6",
+                        requested_leverage=2,
+                    )
+                    self.assertEqual(review.state, "review_only")
+                    self.assertFalse(review.submit_authorized)
+                    self.assertFalse(review.leverage_applied)
+                    envelope = json.loads(review.review_json)
+                    self.assertEqual(
+                        set(envelope),
+                        {"operation", "action", "side", "hl_coin",
+                         "rounded_size", "requested_leverage",
+                         "cross_margin_requested"},
+                    )
+                    self.assertEqual(envelope["action"], action)
+                    self.assertEqual(envelope["requested_leverage"], 2)
+                    self.assertNotIn("ticker", envelope)
+                    self.assertNotIn("reason", envelope)
+
+    def test_unknown_candidate_fields_and_unapproved_actions_hold(self):
+        view = self.build("aggressive")
+        valid = {
+            "ticker": "SOL-USD", "hl_coin": "SOL",
+            "action": "open_long", "side": "long",
+            "reason": "buy signal", "priority": 0.7,
+        }
+        invalids = [
+            {**valid, "submit_authorized": True},
+            {**valid, "ownership_verified": True},
+            {**valid, "close_size": 0.25},
+            {**valid, "action": "pyramid_long"},
+            {**valid, "action": "close"},
+            {**valid, "reason": "pyramid add #1 (osc re-entry)"},
+            {**valid, "priority": float("nan")},
+            {**valid, "ticker": "BTC-USD"},
+        ]
+        for candidate in invalids:
+            with self.subTest(candidate=candidate):
+                review = view.draft_original_candidate_review(
+                    candidate=candidate, rounded_size="1.6",
+                    requested_leverage=2,
+                )
+                self.assertEqual(review.state, "hold")
+                self.assertIsNone(review.review_json)
+                self.assertFalse(review.submit_authorized)
+
     def test_original_bots_and_sdk_never_imported(self):
         import sys
         for module in ("hyperliquid_executor", "intraday_executor",
