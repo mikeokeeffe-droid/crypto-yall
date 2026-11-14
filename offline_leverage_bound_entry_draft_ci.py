@@ -42,16 +42,22 @@ class OfflineLeverageBoundEntrySink(OfflineOriginalExecutorMutationSink):
         # A method call is NOT exchange acknowledgement or successful leverage
         # change. Record the desired value only, including duplicate attempts.
         self.leverage_attempts += 1
+        # Clear a previously observed proposal BEFORE calling the underlying
+        # non-signing sink. If that operation throws, the original executor
+        # catches its error and continues toward market_open. Never retain a
+        # 'review_only' size+leverage draft after that failed call.
+        self.requested_leverage = None
+        self.cross_margin_requested = None
+        result = super().update_leverage(leverage, coin, cross)
         if (self.leverage_attempts == 1
                 and type(leverage) is int and 1 <= leverage <= 100
                 and type(coin) is str and coin == self.trade.get("hl_coin")
                 and cross is True):
             self.requested_leverage = leverage
             self.cross_margin_requested = True
-        else:
-            self.requested_leverage = None
-            self.cross_margin_requested = None
-        return super().update_leverage(leverage, coin, cross)
+        # The non-signing sink returning does NOT verify Hyperliquid leverage
+        # application. The V2 payload stays non-executable review-only.
+        return result
 
     def market_open(self, coin, is_buy, size):
         response = super().market_open(coin, is_buy, size)
