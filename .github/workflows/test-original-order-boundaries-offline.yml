@@ -16,6 +16,8 @@ on:
       - 'tests/test_offline_original_signer_free_pipeline_ci.py'
       - 'offline_leverage_bound_entry_draft_ci.py'
       - 'tests/test_offline_leverage_bound_entry_draft_ci.py'
+      - 'offline_v2_signer_free_socket_client_ci.py'
+      - 'tests/test_offline_v2_signer_free_socket_client_ci.py'
       - 'tests/test_offline_original_leverage_failure_ci.py'
       - 'offline_pr40_release_readiness_ci.py'
       - 'tests/test_offline_pr40_release_readiness_ci.py'
@@ -246,6 +248,7 @@ jobs:
           python -m unittest discover -s tests -p 'test_offline_original_executor_mutation_sink_ci.py' -v
           python -m unittest discover -s tests -p 'test_offline_original_signer_free_pipeline_ci.py' -v
           python -m unittest discover -s tests -p 'test_offline_leverage_bound_entry_draft_ci.py' -v
+          python -m unittest discover -s tests -p 'test_offline_v2_signer_free_socket_client_ci.py' -v
           python -m unittest discover -s tests -p 'test_offline_original_leverage_failure_ci.py' -v
           python -m unittest discover -s tests -p 'test_offline_pr40_release_readiness_ci.py' -v
           python -m unittest discover -s tests -p 'test_position_increase_claim_invariant_offline.py' -v
