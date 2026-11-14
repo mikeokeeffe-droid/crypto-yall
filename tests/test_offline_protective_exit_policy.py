@@ -9,8 +9,21 @@ VALID = dict(action="close", reduce_only=True, account_verified=True,
 class ProtectiveExitReviewTests(unittest.TestCase):
     def test_valid_synthetic_close_is_review_only_not_execution_approval(self):
         result = review_protective_exit_offline(**VALID)
-        self.assertEqual(result.status, "review_only")
+        self.assertEqual(result.status, "hold")
+        self.assertTrue(result.structurally_consistent)
         self.assertFalse(result.submit_authorized)
+
+    def test_caller_claimed_ownership_never_grants_close(self):
+        for key in ("account_verified", "position_owned", "snapshot_fresh"):
+            for claim in (True, False, 1, "true", None):
+                with self.subTest(field=key, claim=claim):
+                    result = review_protective_exit_offline(
+                        **dict(VALID, **{key: claim}))
+                    self.assertEqual(result.status, "hold")
+                    self.assertFalse(result.submit_authorized)
+                    self.assertFalse(result.ownership_verified)
+                    self.assertEqual(
+                        result.structurally_consistent, claim is True)
 
     def test_unknown_or_unsafe_closes_are_held(self):
         changes = (
@@ -32,7 +45,8 @@ class ProtectiveExitReviewTests(unittest.TestCase):
     def test_exact_size_and_short_close_remain_review_only(self):
         result = review_protective_exit_offline(
             **dict(VALID, position_side="short", close_size="2.5"))
-        self.assertEqual(result.status, "review_only")
+        self.assertEqual(result.status, "hold")
+        self.assertTrue(result.structurally_consistent)
         self.assertFalse(result.submit_authorized)
 
     def test_pinned_close_identity_mismatch_holds(self):
@@ -40,7 +54,8 @@ class ProtectiveExitReviewTests(unittest.TestCase):
         pinned = dict(bot="daily", account="0xSyntheticAccount", coin="SOL", side="long")
         matching = review_pinned_close_identity_offline(
             intended=pinned, observed=dict(pinned))
-        self.assertEqual(matching.status, "review_only")
+        self.assertEqual(matching.status, "hold")
+        self.assertTrue(matching.structurally_consistent)
         self.assertFalse(matching.submit_authorized)
         for changed in (
             {"bot": "intraday"}, {"account": "0xOtherAccount"},
@@ -59,7 +74,8 @@ class ProtectiveExitReviewTests(unittest.TestCase):
         fake = dict(bot="aggressive", account="0xUnverified", coin="BTC", side="short")
         result = review_pinned_close_identity_offline(
             intended=fake, observed=dict(fake))
-        self.assertEqual(result.status, "review_only")
+        self.assertEqual(result.status, "hold")
+        self.assertTrue(result.structurally_consistent)
         self.assertFalse(result.submit_authorized)
 
 if __name__ == "__main__":
