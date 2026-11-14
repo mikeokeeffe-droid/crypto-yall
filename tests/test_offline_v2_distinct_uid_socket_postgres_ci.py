@@ -76,8 +76,8 @@ def _serve(socket_path, group, uids, ready, max_requests):
     def factory(bot):
         return lambda: psycopg.connect(
             host="localhost", port=5432, dbname="safety_test",
-            user="entry_login_" + bot,
-            password="disposable-" + bot + "-only",
+            user="ci_v2_coordinator_" + bot,
+            password="disposable-v2-coordinator-" + bot + "-only",
         )
     allowlist = {uid: (bot, "mainnet", ACCOUNT)
                  for uid, bot in zip(uids, BOTS)}
