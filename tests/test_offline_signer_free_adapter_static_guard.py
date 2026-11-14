@@ -11,7 +11,8 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 PROTECTED = ("offline_original_bot_intent_adapter.py",
              "offline_signer_free_info_fixture_ci.py",
-             "offline_signer_free_bot_view_ci.py")
+             "offline_signer_free_bot_view_ci.py",
+             "offline_three_bot_mutation_review_ci.py")
 DENIED_MODULES = frozenset({
     "hyperliquid", "eth_account", "requests", "socket", "ssl", "http",
     "urllib", "urllib3", "httpx", "aiohttp", "websocket", "websockets",
