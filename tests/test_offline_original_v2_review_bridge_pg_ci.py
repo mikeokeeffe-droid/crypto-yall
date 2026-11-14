@@ -30,6 +30,7 @@ class OriginalV2ReviewBridgeTests(unittest.TestCase):
         password = (
             os.environ["PGPASSWORD"] if user == "postgres"
             else "disposable-sender-only" if user == "ci_sender_worker"
+            else "disposable-v2-coordinator-" + user.removeprefix("ci_v2_coordinator_") + "-only" if user.startswith("ci_v2_coordinator_")
             else "disposable-" + user.removeprefix("entry_login_") + "-only"
         )
         return psycopg.connect(
@@ -54,7 +55,7 @@ class OriginalV2ReviewBridgeTests(unittest.TestCase):
     def submit(self, bot, draft, request_id=None, factory=None):
         return record_v2_draft_for_offline_review(
             connection_factory=factory or (
-                lambda: self.db("entry_login_" + bot)
+                lambda: self.db("ci_v2_coordinator_" + bot)
             ),
             verified_bot=bot, pinned_environment="mainnet",
             pinned_account=ACCOUNT, request_id=request_id or uuid.uuid4(),
@@ -121,7 +122,7 @@ class OriginalV2ReviewBridgeTests(unittest.TestCase):
         valid=self.draft()
         result=self.submit(
             "daily", valid,
-            factory=lambda: self.db("entry_login_intraday"),
+            factory=lambda: self.db("ci_v2_coordinator_intraday"),
         )
         self.assertEqual(result.state, "hold")
         self.assertFalse(result.submit_authorized)
