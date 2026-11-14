@@ -54,7 +54,7 @@ def _ids():
     return uids, gid
 
 
-def _server(path, gids, uids, ready):
+def _server(path, gids, uids, ready, max_requests=4):
     def db(bot):
         return lambda: psycopg.connect(
             host="localhost", port=5432, dbname="safety_test",
@@ -65,7 +65,7 @@ def _server(path, gids, uids, ready):
         allowed_uids={uid: (bot,"mainnet",ACCOUNT)
                       for uid,bot in zip(uids,BOTS)},
         connection_factories={bot:db(bot) for bot in BOTS},
-        max_requests=4, ready=ready, timeout=15.0)
+        max_requests=max_requests, ready=ready, timeout=15.0)
 
 
 @unittest.skipUnless(
@@ -176,6 +176,53 @@ class GroupGatedRealProcessListenerTests(unittest.TestCase):
                 self.assertIn(rows[0][0],BOTS)
                 self.assertEqual(rows[0][1:3],("SOL","pending"))
                 self.assertFalse(os.path.lexists(path))
+
+                # The previous coordinator exited and removed its socket.
+                # Restart a new independently authenticated group-gated
+                # listener against the SAME durable disposable PostgreSQL
+                # claims. A repeat request must HOLD, not allocate again.
+                restarted_ready = ctx.Event()
+                restarted = ctx.Process(
+                    target=_server,
+                    args=(path,gid,uids[:3],restarted_ready,1),
+                )
+                restarted.start()
+                try:
+                    self.assertTrue(restarted_ready.wait(timeout=8),
+                                    "restarted listener not ready")
+                    def drop_first():
+                        os.setgroups([gid])
+                        os.setgid(uids[0])
+                        os.setuid(uids[0])
+                    repeated=subprocess.run(
+                        [sys.executable,"-c",_CHILD,path,"0","daily","SOL",str(gid)],
+                        preexec_fn=drop_first,
+                        env={"PATH":"/usr/bin:/bin","PYTHONPATH":client_dir,
+                             "ISOLATED_POSTGRES_CI":"1",
+                             "PGDATABASE":"safety_test",
+                             "PGHOST":"localhost",
+                             "CI_SOCKET_GROUP_AUDIT":"1"},
+                        capture_output=True,text=True,timeout=8,check=False)
+                    self.assertEqual(repeated.returncode,0,repeated.stderr)
+                    self.assertEqual(json.loads(repeated.stdout),
+                                     {"state":"hold","submit_authorized":False})
+                    restarted.join(timeout=8)
+                    self.assertEqual(restarted.exitcode,0,
+                                     "restarted listener did not exit cleanly")
+                    with psycopg.connect(
+                        host="localhost",port=5432,dbname="safety_test",
+                        user="postgres",password=os.environ["PGPASSWORD"],
+                        autocommit=True) as db:
+                        after=db.execute(
+                            "select bot,coin,status from "
+                            "public.ci_scoped_entry_intents"
+                        ).fetchall()
+                    self.assertEqual(after,rows)
+                    self.assertFalse(os.path.lexists(path))
+                finally:
+                    if restarted.is_alive():
+                        restarted.terminate()
+                        restarted.join(timeout=5)
             finally:
                 if process.is_alive():
                     process.terminate()
