@@ -105,3 +105,29 @@ deployment or shared production controller is authorised by this document.
 | Current PR network/submit authority | DISABLED / NO-GO |
 
 Keep PR #40 and PR #41 draft until their separate review gates are satisfied.
+
+## PID-1 namespace permission failure observed on disposable staging host
+
+On 13 Nov 2026 the offline oneshot probe returned `hold` because the
+unprivileged runtime could read `/proc/self/ns/net` but could not read
+`/proc/1/ns/net` (`Permission denied`). This is not permission to disable
+the check or run the collector as root.
+
+A *candidate* fix in this draft permits a separately prepared reference
+file at `/run/collector-review-host/netns` only when the direct PID-1
+namespace read is denied. The probe demands a regular, single-linked,
+root-owned, non-group/world-writable reference, root-owned parent directory,
+and a valid `net:[digits]` value. Missing or invalid reference remains HOLD.
+It compares against the sandbox's own netns as before; a different ID is
+necessary, not sufficient, evidence of network isolation.
+
+Only after confirming this is a dedicated, credential-free staging host,
+the operator may independently capture PID 1's namespace identifier as root
+and stage it with an atomic, root-owned install in a private runtime directory.
+Do not copy a value from this document, invent a namespace ID or fetch it from
+the isolated collector process. Review the *actual* effective unit properties,
+mount permissions and firewall policy separately. A matching namespace check
+must never be treated as proof of disabled network egress.
+
+**Current result:** observed permission issue explained; corrected draft
+logic and tests still require CI and host-side revalidation. Keep NO-GO.
