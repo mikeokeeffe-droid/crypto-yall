@@ -18,6 +18,7 @@ from offline_original_signal_projection_ci import _TICKERS
 from offline_original_read_helper_cutover_ci import (
     extract_original_info_read_helpers_offline,
 )
+from offline_original_sizing_v2_ci import preview_original_sizing_for_v2_offline
 from offline_signer_free_read_bootstrap_ci import (
     bootstrap_original_read_only_offline,
 )
@@ -148,11 +149,31 @@ def run_worker(bot, sock_path, group_id, source_root, action="buy"):
                  else decider(*args))
     if len(decisions) != 1:
         return held
+    # A full decision-cycle review blocks close-and-reverse, pyramids and
+    # unknown actions before size is computed. No fixed 1.6-size shortcut.
+    candidate = decisions[0]
+    preflight = view.draft_review_from_complete_decision_batch(
+        decisions=decisions, selected_index=0,
+        rounded_size="0.16", requested_leverage=2,
+    )
+    if preflight.state != "review_only" or preflight.submit_authorized:
+        return held
+    sizing = preview_original_sizing_for_v2_offline(
+        bot=bot, source_root=Path(source_root), view=view,
+        original_candidate=candidate,
+    )
+    if (sizing.state != "review_only" or sizing.submit_authorized
+            or sizing.leverage_applied
+            or type(sizing.rounded_size) is not str
+            or type(sizing.v2_json) is not str):
+        return held
     review = view.draft_review_from_complete_decision_batch(
         decisions=decisions, selected_index=0,
-        rounded_size="1.6", requested_leverage=2,
+        rounded_size=sizing.rounded_size,
+        requested_leverage=sizing.requested_leverage,
     )
-    if review.state != "review_only" or review.submit_authorized:
+    if (review.state != "review_only" or review.submit_authorized
+            or review.review_json != sizing.v2_json):
         return held
     ack = request_v2_review_via_unix_socket_offline(
         socket_path=sock_path, expected_coordinator_uid=0,
@@ -180,6 +201,9 @@ def run_worker(bot, sock_path, group_id, source_root, action="buy"):
         "synthetic_mid": mid,
         "synthetic_size_decimals": decimals,
         "synthetic_position_count": len(positions),
+        "original_sizing_calculated": True,
+        "synthetic_rounded_size": sizing.rounded_size,
+        "requested_leverage": sizing.requested_leverage,
     }
 
 
