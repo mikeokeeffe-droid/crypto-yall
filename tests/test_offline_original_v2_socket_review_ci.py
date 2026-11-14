@@ -30,7 +30,8 @@ class V2SocketReviewTests(unittest.TestCase):
     def connection():
         return psycopg.connect(
             host="localhost",port=5432,dbname="safety_test",
-            user="entry_login_daily",password="disposable-daily-only",
+            user="ci_v2_coordinator_daily",
+            password="disposable-v2-coordinator-daily-only",
         )
 
     def setUp(self):
