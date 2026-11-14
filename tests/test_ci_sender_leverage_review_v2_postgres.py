@@ -27,6 +27,7 @@ class SenderV2LeverageReviewTests(unittest.TestCase):
             "postgres" if user == "postgres"
             else "disposable-sender-only" if user == "ci_sender_worker"
             else "disposable-reviewer-only" if user == "ci_sender_reviewer"
+            else "disposable-v2-coordinator-" + user.removeprefix("ci_v2_coordinator_") + "-only" if user.startswith("ci_v2_coordinator_")
             else "disposable-" + user.removeprefix("entry_login_") + "-only"
         )
         return psycopg.connect(
@@ -45,7 +46,7 @@ class SenderV2LeverageReviewTests(unittest.TestCase):
 
     def record(self, bot="daily", *overrides):
         data = overrides[0] if overrides else self.args(bot)
-        with self.connect("entry_login_" + bot) as conn:
+        with self.connect("ci_v2_coordinator_" + bot) as conn:
             return conn.execute(
                 "select recorded,review_token,fencing "
                 "from public.ci_sender_v2_record_review("
@@ -81,6 +82,7 @@ class SenderV2LeverageReviewTests(unittest.TestCase):
         result = self.record()
         self.assertTrue(result[0])
         for user in (*("entry_login_" + b for b in BOTS),
+                     *("ci_v2_coordinator_" + b for b in BOTS),
                      "ci_sender_worker"):
             with self.subTest(user=user), self.connect(user) as conn:
                 with self.assertRaises(InsufficientPrivilege):
@@ -124,7 +126,7 @@ class SenderV2LeverageReviewTests(unittest.TestCase):
                 args = list(base)
                 for index, value in changes.items():
                     args[index] = value
-                with self.connect("entry_login_daily") as conn:
+                with self.connect("ci_v2_coordinator_daily") as conn:
                     with self.assertRaises(InsufficientPrivilege):
                         conn.execute(
                             "select * from public.ci_sender_v2_record_review("
