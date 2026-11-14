@@ -26,12 +26,12 @@ _ALLOWED_NAMES = frozenset((
     "info", "address", "coin", "state", "equity", "spot_state",
     "usdc_balance", "b", "p", "pos", "positions", "size",
     "raw_leverage", "leverage", "meta", "universe",
-    "float", "int", "isinstance", "dict", "str", "next",
+    "float", "int", "isinstance", "dict", "str", "bool", "next",
     "Exception", "TypeError", "ValueError", "True", "False",
 ))
 _SAFE_BUILTINS = {
     "float": float, "int": int, "isinstance": isinstance,
-    "next": next, "dict": dict, "str": str,
+    "next": next, "dict": dict, "str": str, "bool": bool,
     "TypeError": TypeError, "ValueError": ValueError,
 }
 
