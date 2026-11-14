@@ -12,6 +12,8 @@ class ExitReview:
     status: str
     reason: str
     submit_authorized: bool = False
+    structurally_consistent: bool = False
+    ownership_verified: bool = False
 
 def _positive_decimal(value):
     if type(value) is not str:
@@ -43,9 +45,14 @@ def review_protective_exit_offline(*, action, reduce_only, account_verified,
     closing = _positive_decimal(close_size)
     if size is None or closing is None or closing > size:
         return hold("invalid or oversized close")
+    # These caller-provided booleans do NOT establish authenticated order
+    # provenance, a bounded reduce-only account close, or emergency coverage.
+    # Structural compatibility is diagnostic evidence; it never grants rights.
     return ExitReview(
-        "review_only",
-        "synthetic close meets preliminary checks; live enforcement unverified",
+        "hold",
+        "synthetic close eligibility only; exchange ownership and live "
+        "reduce-only enforcement remain unverified",
+        structurally_consistent=True,
     )
 
 
@@ -76,5 +83,9 @@ def review_pinned_close_identity_offline(*, intended, observed):
             or not intended["coin"].isalnum()
             or intended["coin"] != intended["coin"].upper()):
         return hold("invalid coin")
-    return ExitReview("review_only",
-                      "synthetic identities match; ownership not authenticated")
+    return ExitReview(
+        "hold",
+        "synthetic identities match; independent bot/account ownership "
+        "not authenticated",
+        structurally_consistent=True,
+    )
