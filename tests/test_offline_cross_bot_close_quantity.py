@@ -19,7 +19,8 @@ class CloseQuantityTests(unittest.TestCase):
 
     def test_partial_own_quantity_only_review(self):
         r = self.review([fill("a", "daily", "1"), fill("b", "intraday", "2")])
-        self.assertEqual(r.status, "review_only")
+        self.assertEqual(r.status, "hold")
+        self.assertTrue(r.structurally_consistent)
         self.assertFalse(r.submit_authorized)
 
     def test_own_prior_close_reduces_available_quantity(self):
@@ -47,6 +48,20 @@ class CloseQuantityTests(unittest.TestCase):
             self.review([fill("a", "daily", "2"), opposite]).status, "hold"
         )
 
+    def test_unauthenticated_flag_never_grants_close_authority(self):
+        for claimed in (True, False, 1, "true", None):
+            with self.subTest(claimed=claimed):
+                result = self.review(
+                    [fill("a", "daily", "1")],
+                    provenance_verified=claimed,
+                )
+                self.assertEqual(result.status, "hold")
+                self.assertFalse(result.submit_authorized)
+                self.assertFalse(result.ownership_verified)
+                self.assertTrue(result.structurally_consistent
+                                if claimed is True
+                                else not result.structurally_consistent)
+
     def test_attributed_size_exceeding_exchange_holds(self):
         self.assertEqual(
             self.review([fill("a", "daily", "3")], exchange_size="2").status,
@@ -62,7 +77,8 @@ class CloseQuantityTests(unittest.TestCase):
     def test_claimed_provenance_still_never_authorizes_submit(self):
         # A caller-supplied True cannot authenticate a Hyperliquid receipt.
         result = self.review([fill("a", "daily", "1")], provenance_verified=True)
-        self.assertEqual(result.status, "review_only")
+        self.assertEqual(result.status, "hold")
+        self.assertTrue(result.structurally_consistent)
         self.assertFalse(result.submit_authorized)
 
 if __name__ == "__main__":
