@@ -40,7 +40,8 @@ class CrossBotCloseOwnershipTests(unittest.TestCase):
         for bot in ("daily", "intraday"):
             with self.subTest(bot=bot):
                 identity, eligibility = self.review(bot, bot, owned=False)
-                self.assertEqual(identity.status, "review_only")
+                self.assertEqual(identity.status, "hold")
+                self.assertTrue(identity.structurally_consistent)
                 self.assertEqual(eligibility.status, "hold")
                 self.assertFalse(identity.submit_authorized)
                 self.assertFalse(eligibility.submit_authorized)
@@ -54,16 +55,19 @@ class CrossBotCloseOwnershipTests(unittest.TestCase):
         identity, eligibility = self.review(
             "intraday", "intraday", owned=False, close_size="3"
         )
-        self.assertEqual(identity.status, "review_only")
+        self.assertEqual(identity.status, "hold")
+        self.assertTrue(identity.structurally_consistent)
         self.assertEqual(eligibility.status, "hold")
 
-    def test_even_claimed_verified_partial_close_remains_review_only(self):
+    def test_even_claimed_verified_partial_close_remains_hold(self):
         # A caller-provided True is not authenticated order/fill evidence.
         identity, eligibility = self.review(
             "daily", "daily", owned=True, close_size="1"
         )
-        self.assertEqual(identity.status, "review_only")
-        self.assertEqual(eligibility.status, "review_only")
+        self.assertEqual(identity.status, "hold")
+        self.assertTrue(identity.structurally_consistent)
+        self.assertEqual(eligibility.status, "hold")
+        self.assertTrue(eligibility.structurally_consistent)
         self.assertFalse(identity.submit_authorized)
         self.assertFalse(eligibility.submit_authorized)
 
