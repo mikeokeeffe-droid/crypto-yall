@@ -27,6 +27,8 @@ import copy
 
 import requests
 
+from entry_claim_safety import blocks_entry_with_pending_claim, safe_to_release_pre_submit_skip
+
 from intraday_data_loader import fetch_all_intraday, HL_SYMBOL_MAP
 from intraday_strategy import generate_intraday_signals, classify_intraday_signal
 from hyperliquid_executor import (
@@ -740,32 +742,21 @@ def main():
                 f"{skipped_assets}"
             )
 
-    # Ownership tracking: only manage positions this bot opened.
-    # Recover a confirmed exchange position from a pre-order ownership claim
-    # if a prior run filled but failed before its post-fill Gist save.
+    # Ownership tracking: only manage positions previously recorded as owned.
+    # Pending entry claims require independent order-aware verification.
     owned_coins = set(
         state.get("owned_coins", [])
     )
     pending_claims = state.get("pending_entry_claims", {}) or {}
-    for pending_coin, claim in list(pending_claims.items()):
-        pos = open_positions.get(pending_coin)
-        if pos is None:
-            pending_claims.pop(pending_coin, None)
-            continue
-        claimed_side = str((claim or {}).get("side", "")).lower()
-        actual_side = (
-            "long"
-            if float(pos.get("size", 0.0) or 0.0) > 0
-            else "short"
+    for pending_coin, _claim in list(pending_claims.items()):
+        # A same-side exchange position is NOT evidence that this bot placed
+        # the matching order; another bot may have opened that position.
+        # Preserve the unresolved claim and previously recorded ownership,
+        # but never adopt new ownership without order-specific reconciliation.
+        print(
+            f"Unresolved Intraday entry claim for {pending_coin}: "
+            "independent order/fill ownership verification required"
         )
-        if claimed_side == actual_side:
-            if pending_coin not in owned_coins:
-                print(
-                    f"Recovered Intraday ownership for {pending_coin} "
-                    f"from persisted pending entry claim"
-                )
-            owned_coins.add(pending_coin)
-            pending_claims.pop(pending_coin, None)
     state["pending_entry_claims"] = pending_claims
 
     stale_owned = (
@@ -824,6 +815,11 @@ def main():
     results = []
 
     for trade in trades:
+        # Entry-only guard: unresolved own claims must not be overwritten or retried.
+        # This does not replace the atomic cross-bot reservation still needed.
+        if blocks_entry_with_pending_claim(trade, state.get("pending_entry_claims", {})):
+            print(f"BLOCKED: {trade['action']} {trade['hl_coin']} has unresolved entry claim")
+            continue
         leverage = max(1.0, min(INTRADAY_LEVERAGE, INTRADAY_MAX_LEVERAGE))
 
         is_new_entry = trade.get("action") in ("open_long", "open_short")
@@ -843,7 +839,9 @@ def main():
             leverage,
         )
 
-        if is_new_entry and result.get("status") != "filled":
+        # Only locally skipped requests prove no exchange order was sent.
+        # Errors, unknowns and timeouts keep the claim until reconciliation.
+        if is_new_entry and safe_to_release_pre_submit_skip(result):
             state.setdefault("pending_entry_claims", {}).pop(trade["hl_coin"], None)
             save_state(state)
 

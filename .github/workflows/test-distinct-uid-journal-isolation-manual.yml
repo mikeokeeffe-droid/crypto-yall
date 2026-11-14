@@ -1,0 +1,80 @@
+name: Distinct UID journal isolation (offline branch test)
+
+on:
+  push:
+    branches:
+      - safety/original-bots-offline-baseline-20261030
+    paths:
+      - '.github/workflows/test-distinct-uid-journal-isolation-manual.yml'
+      - 'tests/test_offline_three_distinct_uid_socket_admission.py'
+      - 'offline_socket_journal_bridge_fixture.py'
+      - 'tests/test_offline_distinct_uid_socket_permission_denial.py'
+      - 'tests/test_offline_coordinator_listener_fixture.py'
+      - 'offline_coordinator_listener_fixture.py'
+      - 'tests/test_offline_distinct_uid_socket_identity.py'
+      - 'offline_unix_peer_identity_fixture.py'
+      - 'tests/test_offline_distinct_uid_bypass_denial.py'
+      - 'tests/test_offline_credential_uid_isolation.py'
+      - 'tests/test_offline_distinct_uid_journal_isolation.py'
+      - 'offline_sender_restart_journal.py'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  distinct-uid-isolation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Exercise disposable journal and credential isolation as distinct Linux UID
+        run: |
+          set -euo pipefail
+          sudo -n env PATH="$PATH" PYTHONPATH="$PWD" \
+            python -m unittest discover -s tests \
+              -p 'test_offline_distinct_uid_journal_isolation.py' -v \
+              2>&1 | tee /tmp/distinct-uid-isolation.log
+          sudo -n env PATH="$PATH" PYTHONPATH="$PWD" \
+            python -m unittest discover -s tests \
+              -p 'test_offline_credential_uid_isolation.py' -v \
+              2>&1 | tee /tmp/credential-uid-isolation.log
+          sudo -n env PATH="$PATH" PYTHONPATH="$PWD" \
+            python -m unittest discover -s tests \
+              -p 'test_offline_distinct_uid_bypass_denial.py' -v \
+              2>&1 | tee /tmp/distinct-uid-bypass-denial.log
+          sudo -n env PATH="$PATH" PYTHONPATH="$PWD" \
+            python -m unittest discover -s tests \
+              -p 'test_offline_distinct_uid_socket_identity.py' -v \
+              2>&1 | tee /tmp/distinct-uid-socket-identity.log
+          sudo -n env PATH="$PATH" PYTHONPATH="$PWD" \
+            python -m unittest discover -s tests \
+              -p 'test_offline_distinct_uid_socket_permission_denial.py' -v \
+              2>&1 | tee /tmp/distinct-uid-socket-permission.log
+          sudo -n env PATH="$PATH" PYTHONPATH="$PWD" \
+            python -m unittest discover -s tests \
+              -p 'test_offline_three_distinct_uid_socket_admission.py' -v \
+              2>&1 | tee /tmp/three-distinct-uid-socket.log
+          sudo -n env PATH="$PATH" PYTHONPATH="$PWD" \
+            python -m unittest \
+              tests.test_offline_coordinator_listener_fixture.OfflineCoordinatorListenerTests.test_socket_parent_wrong_owner_denied -v \
+              2>&1 | tee /tmp/socket-parent-ownership.log
+          sudo -n env PATH="$PATH" PYTHONPATH="$PWD" \
+            python -m unittest \
+              tests.test_offline_coordinator_listener_fixture.OfflineCoordinatorListenerTests.test_foreign_owned_replay_file_rejected -v \
+              2>&1 | tee /tmp/replay-file-ownership.log
+          sudo -n env PATH="$PATH" PYTHONPATH="$PWD" \
+            python -m unittest \
+              tests.test_offline_coordinator_listener_fixture.OfflineCoordinatorListenerTests.test_foreign_owned_journal_file_rejected -v \
+              2>&1 | tee /tmp/journal-file-ownership.log
+          for log in /tmp/distinct-uid-isolation.log /tmp/credential-uid-isolation.log /tmp/distinct-uid-bypass-denial.log /tmp/distinct-uid-socket-identity.log /tmp/distinct-uid-socket-permission.log /tmp/three-distinct-uid-socket.log /tmp/socket-parent-ownership.log /tmp/replay-file-ownership.log /tmp/journal-file-ownership.log; do
+            grep -q 'Ran 1 test' "$log"
+            grep -q '^OK$' "$log"
+            if grep -Eq 'skipped|SKIP' "$log"; then
+              echo "UID isolation test skipped: $log"
+              exit 1
+            fi
+          done
