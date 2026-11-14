@@ -96,6 +96,27 @@ class HostIsolationProbeTests(unittest.TestCase):
                 self.assertEqual(review(environment_names=names).state,"hold")
 
 
+    def test_diagnostic_emits_only_bounded_name_fingerprints(self):
+        from collector_review.host_isolation_probe import (
+            _unexpected_environment_name_fingerprints,
+        )
+        import hashlib
+        names=("PATH", "LANG", "HL_PRIVATE_KEY", "UNEXPECTED_RUNTIME_VAR")
+        count, tokens=_unexpected_environment_name_fingerprints(names)
+        self.assertEqual(count, 2)
+        expected=tuple(hashlib.sha256(
+            ("offline-collector-env-v1:" + name).encode()
+        ).hexdigest()[:16] for name in sorted(names)
+                   if name not in ("PATH","LANG"))
+        self.assertEqual(tokens, expected)
+        self.assertTrue(all("HL_PRIVATE_KEY" not in x for x in tokens))
+        self.assertEqual(_unexpected_environment_name_fingerprints(
+            ("PATH", "LANG")), (0, ()))
+        many=tuple("UNEXPECTED_" + str(i) for i in range(20))
+        count, tokens=_unexpected_environment_name_fingerprints(many)
+        self.assertEqual(count, 20)
+        self.assertEqual(len(tokens), 8)
+
     def test_standard_systemd_shell_name_is_allowed_but_unknown_names_hold(self):
         self.assertEqual(
             review(environment_names=("PATH", "LANG", "SHELL")).state,
