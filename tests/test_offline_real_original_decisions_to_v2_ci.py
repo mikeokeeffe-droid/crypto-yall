@@ -178,6 +178,79 @@ class OriginalDecisionsToSignerFreeV2Tests(unittest.TestCase):
         self.assertIsNone(result.review_json)
         self.assertFalse(result.submit_authorized)
 
+    def test_original_same_cycle_close_and_reverse_entry_both_hold(self):
+        # The original deciders close a long and propose opening short in
+        # the same cycle. A close is NOT a proven fill or a cleared position.
+        for bot in BOT_SOURCE:
+            with self.subTest(bot=bot):
+                decisions = decide(
+                    bot, {"SOL-USD": signal("enter_short")},
+                    {"SOL": {"size": 0.5, "unrealized_pnl": 2}},
+                )
+                self.assertEqual(len(decisions), 2)
+                self.assertEqual(
+                    [item["action"] for item in decisions],
+                    ["close", "open_short"],
+                )
+                for index in range(len(decisions)):
+                    result = view(bot).draft_review_from_complete_decision_batch(
+                        decisions=decisions, selected_index=index,
+                        rounded_size="0.025", requested_leverage=2,
+                    )
+                    self.assertEqual(result.state, "hold")
+                    self.assertIsNone(result.review_json)
+                    self.assertFalse(result.submit_authorized)
+
+    def test_complete_batch_accepts_distinct_new_entries_for_review_only(self):
+        for bot in BOT_SOURCE:
+            with self.subTest(bot=bot):
+                decisions = decide(bot, {
+                    "SOL-USD": signal("buy", .8),
+                    "AVAX-USD": signal("enter_short", .7),
+                })
+                self.assertEqual(len(decisions), 2)
+                for index, proposal in enumerate(decisions):
+                    draft = view(bot).draft_review_from_complete_decision_batch(
+                        decisions=decisions, selected_index=index,
+                        rounded_size="0.025", requested_leverage=2,
+                    )
+                    self.assertEqual(draft.state, "review_only")
+                    self.assertFalse(draft.submit_authorized)
+                    self.assertFalse(draft.leverage_applied)
+                    self.assertEqual(
+                        json.loads(draft.review_json)["hl_coin"],
+                        proposal["hl_coin"],
+                    )
+
+    def test_batch_unknown_duplicate_and_pyramid_actions_hold_all(self):
+        for bot in BOT_SOURCE:
+            entries = decide(bot, {"SOL-USD": signal("buy")})
+            self.assertEqual(len(entries), 1)
+            bad_batches = [
+                [entries[0], entries[0]],
+                [{**entries[0], "cloid": "spoofed"}],
+                [{**entries[0], "action": "pyramid_long"}],
+                [{**entries[0], "action": "close"}],
+                entries + [dict(entries[0], hl_coin="AVAX",
+                                ticker="AVAX-USD",
+                                unexpected_future_flag=True)],
+            ]
+            for batch in bad_batches:
+                with self.subTest(bot=bot, batch=batch):
+                    result = view(bot).draft_review_from_complete_decision_batch(
+                        decisions=batch, selected_index=0,
+                        rounded_size="0.025", requested_leverage=2,
+                    )
+                    self.assertEqual(result.state, "hold")
+                    self.assertIsNone(result.review_json)
+                    self.assertFalse(result.submit_authorized)
+            self.assertEqual(
+                view(bot).draft_review_from_complete_decision_batch(
+                    decisions=[], selected_index=0,
+                    rounded_size="0.025", requested_leverage=2,
+                ).state, "hold",
+            )
+
     def test_extraction_does_not_import_signers_or_execute_original_modules(self):
         for bot in BOT_SOURCE:
             self.assertTrue(callable(original_decider(bot)))
