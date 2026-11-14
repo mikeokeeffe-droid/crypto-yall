@@ -118,6 +118,56 @@ class OfflineReadBootstrap:
         )
 
 
+    def draft_review_from_complete_decision_batch(
+        self, *, decisions, selected_index, rounded_size, requested_leverage,
+    ):
+        """Offline-only check of a COMPLETE original decision cycle.
+
+        One original decision cycle can include a close followed by an
+        opposite-side new entry for the SAME coin. Since this synthetic
+        prototype cannot prove that the close completed, refuse EVERY entry
+        proposal in a cycle with a close, pyramid or unknown action. Also
+        refuse duplicate coins or inconsistent/partial candidate shapes.
+
+        This is NOT an atomic dispatch mechanism or exchange settlement
+        proof. The harness must supply the entire original decision list;
+        individual candidate review is not a security boundary on its own.
+        """
+        held = OfflineLeverageDraft()
+        if (type(decisions) is not list or not 1 <= len(decisions) <= 3
+                or type(selected_index) is not int
+                or not 0 <= selected_index < len(decisions)):
+            return held
+        from offline_original_signal_projection_ci import (
+            project_original_entry_candidate_offline,
+        )
+        coins = set()
+        for candidate in decisions:
+            projected = project_original_entry_candidate_offline(
+                verified_bot=self.bot, candidate=candidate,
+            )
+            if (projected.state != "projected_review_only"
+                    or projected.submit_authorized
+                    or projected.ownership_verified
+                    or type(projected.trade_json) is not str):
+                return held
+            try:
+                reviewed = json.loads(projected.trade_json)
+            except (ValueError, TypeError):
+                return held
+            if (type(reviewed) is not dict
+                    or set(reviewed) != {"action", "side", "hl_coin"}
+                    or reviewed["hl_coin"] in coins):
+                return held
+            coins.add(reviewed["hl_coin"])
+        # The only permitted result here is NON-EXECUTABLE review data.
+        return self.draft_original_candidate_review(
+            candidate=decisions[selected_index],
+            rounded_size=rounded_size,
+            requested_leverage=requested_leverage,
+        )
+
+
 def bootstrap_original_read_only_offline(
     *, verified_bot, pinned_environment, pinned_account, snapshot,
 ):
