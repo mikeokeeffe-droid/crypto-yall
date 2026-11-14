@@ -53,10 +53,12 @@ class OfflineSystemdUnitReview(unittest.TestCase):
             with self.subTest(key=key):
                 self.assertEqual(s.get(key), [value])
         self.assertEqual(s.get("SystemCallFilter"), ["@system-service"])
-        self.assertEqual(len(s["ExecStart"]), 2)
+        self.assertEqual(len(s["ExecStart"]), 3)
         self.assertIn("-m collector_review.host_isolation_probe",
                       s["ExecStart"][0])
-        self.assertIn("-m unittest", s["ExecStart"][1])
+        self.assertIn("-m collector_review.ip_socket_denial_probe",
+                      s["ExecStart"][1])
+        self.assertIn("-m unittest", s["ExecStart"][2])
         self.assertTrue(all("market_open" not in step
                             for step in s["ExecStart"]))
         for forbidden in ("EnvironmentFile", "LoadCredential",
