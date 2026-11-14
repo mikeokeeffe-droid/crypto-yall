@@ -21,7 +21,7 @@ _UNIT = "testnet-collector-offline-review.service"
 _NETNS = re.compile(r"net:\[[0-9]+\]\Z", re.ASCII)
 _CGROUP = re.compile(r"(?:^|/)testnet-collector-offline-review\.service(?:/|$)")
 _ALLOWED_ENV = frozenset((
-    "HOME", "PATH", "LANG", "LC_ALL", "LC_CTYPE", "TZ", "USER", "LOGNAME",
+    "HOME", "PATH", "LANG", "LC_ALL", "LC_CTYPE", "TZ", "USER", "LOGNAME", "SHELL",
     "INVOCATION_ID", "JOURNAL_STREAM", "SYSTEMD_EXEC_PID",
     "PYTHONDONTWRITEBYTECODE", "PYTHONUNBUFFERED",
 ))
