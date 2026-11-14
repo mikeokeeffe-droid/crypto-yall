@@ -24,7 +24,7 @@ _FREE_CALLS = frozenset((
 ))
 _METHODS = frozenset((
     "get", "user_fills", "user_funding_history", "sleep",
-    "now", "timestamp",
+    "now", "timestamp", "append",
 ))
 _EXCHANGE_READS = frozenset(("user_fills", "user_funding_history"))
 _FORBIDDEN_NAMES = frozenset((
@@ -115,6 +115,10 @@ def extract_original_history_helpers_offline(*, source_root):
                 elif isinstance(call, ast.Attribute):
                     if call.attr not in _METHODS:
                         raise ValueError("unreviewed history method")
+                    if (call.attr == "append"
+                            and (not isinstance(call.value, ast.Name)
+                                 or call.value.id != "matching")):
+                        raise ValueError("unreviewed mutation of history")
                     if call.attr in _EXCHANGE_READS:
                         if (not isinstance(call.value, ast.Name)
                                 or call.value.id != "info"):
