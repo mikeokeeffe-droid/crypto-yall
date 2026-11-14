@@ -9,16 +9,19 @@ import json
 import multiprocessing
 import os
 import pwd
+import shutil
 import socket
 import subprocess
 import sys
 import tempfile
 import unittest
+from pathlib import Path
 
 import psycopg
 from offline_original_bot_process_listener_ci import serve_offline_original_entry_requests
 
 ACCOUNT = "0x" + "1" * 40
+SOURCE_ROOT = Path(__file__).resolve().parents[1]
 BOTS = ("daily", "intraday", "aggressive")
 _CHILD = """
 import json,os,sys
@@ -78,6 +81,20 @@ class GroupGatedRealProcessListenerTests(unittest.TestCase):
                        "public.ci_scoped_entry_claims")
         with tempfile.TemporaryDirectory() as root:
             os.chmod(root,0o711)
+            # The GitHub Actions checkout can be inside a runner-private
+            # home directory. Stage ONLY the two non-networking client
+            # modules into a disposable, root-owned read-only import path
+            # traversable by all three synthetic bot UIDs. Do not change
+            # runner home permissions or expose PostgreSQL credentials.
+            client_dir = os.path.join(root,"client_modules")
+            os.mkdir(client_dir,0o755)
+            for module in (
+                "offline_original_bot_entry_socket_client_ci.py",
+                "offline_original_bot_intent_adapter.py",
+            ):
+                dest=os.path.join(client_dir,module)
+                shutil.copyfile(SOURCE_ROOT / module,dest)
+                os.chmod(dest,0o644)
             directory = os.path.join(root,"ipc")
             os.mkdir(directory)
             os.chown(directory,0,gid)
@@ -95,7 +112,7 @@ class GroupGatedRealProcessListenerTests(unittest.TestCase):
                         os.setgroups([gid])
                         os.setgid(uid)
                         os.setuid(uid)
-                    env={"PATH":"/usr/bin:/bin","PYTHONPATH":os.getcwd(),
+                    env={"PATH":"/usr/bin:/bin","PYTHONPATH":client_dir,
                          "ISOLATED_POSTGRES_CI":"1","PGDATABASE":"safety_test",
                          "PGHOST":"localhost","CI_SOCKET_GROUP_AUDIT":"1"}
                     child=subprocess.run(
