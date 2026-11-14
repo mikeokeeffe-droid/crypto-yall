@@ -34,6 +34,7 @@ on:
       - 'offline_original_bot_entry_socket_client_ci.py'
       - 'tests/test_offline_original_bot_process_listener_ci.py'
       - 'tests/test_offline_original_bot_distinct_uid_postgres_ci.py'
+      - 'tests/test_offline_group_gated_postgres_listener_ci.py'
       - 'tests/test_account_scoped_claims_postgres_ci.py'
       - 'tests/test_readonly_reconciler_login_ci.py'
       - 'restricted_shared_entry_postgres_ci.py'
@@ -110,6 +111,21 @@ jobs:
           python -m unittest discover -s tests -p 'test_reconciliation_permission_boundary_ci.py' -v
           python -m unittest discover -s tests -p 'test_stale_handoff_cas_ci.py' -v
           python -m unittest discover -s tests -p 'test_readonly_reconciler_login_ci.py' -v
+      - name: Verify group-gated real coordinator listener for three Linux UIDs
+        run: |
+          set -euo pipefail
+          sudo -n env PATH="$PATH" PYTHONPATH="$PWD" \
+            ISOLATED_POSTGRES_CI=1 PGDATABASE=safety_test PGHOST=localhost \
+            CI_SOCKET_GROUP_AUDIT=1 PGPASSWORD="$PGPASSWORD" \
+            python -m unittest discover -s tests \
+              -p 'test_offline_group_gated_postgres_listener_ci.py' -v \
+              2>&1 | tee /tmp/group-gated-real-listener.log
+          grep -q 'Ran 1 test' /tmp/group-gated-real-listener.log
+          grep -q '^OK$' /tmp/group-gated-real-listener.log
+          if grep -Eq 'skipped|SKIP' /tmp/group-gated-real-listener.log; then
+            echo 'Group-gated real listener test skipped: fail closed'
+            exit 1
+          fi
       - name: Verify three distinct Linux UIDs on disposable PostgreSQL
         run: |
           set -euo pipefail
