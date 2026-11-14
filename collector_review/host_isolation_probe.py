@@ -14,6 +14,7 @@ from dataclasses import dataclass
 import os
 from pathlib import Path
 import re
+import stat
 
 
 _UNIT = "testnet-collector-offline-review.service"
@@ -25,6 +26,7 @@ _ALLOWED_ENV = frozenset((
     "PYTHONDONTWRITEBYTECODE", "PYTHONUNBUFFERED",
 ))
 _REQUIRED_CAPS = ("CapInh", "CapPrm", "CapEff", "CapBnd", "CapAmb")
+_HOST_NETNS_REF = Path("/run/collector-review-host/netns")
 
 
 @dataclass(frozen=True)
@@ -121,13 +123,53 @@ def review_host_observations_offline(*, status_text, cgroup_text,
     )
 
 
+
+def _read_root_owned_host_netns_reference():
+    """Read an operator-captured, root-owned PID-1 netns ID if procfs denies it.
+
+    This must be created independently *on the dedicated offline host* by
+    an authorised operator while outside this sandbox. It is a comparison
+    baseline, not proof of egress restrictions, host provenance or authority.
+    Fail closed on missing, writable, symlinked, malformed or oversized input.
+    """
+    try:
+        for directory in (Path("/run"), _HOST_NETNS_REF.parent):
+            s = directory.lstat()
+            if (not stat.S_ISDIR(s.st_mode) or s.st_uid != 0
+                    or s.st_gid != 0 or s.st_mode & 0o022):
+                return None
+        fd = os.open(_HOST_NETNS_REF, os.O_RDONLY | os.O_CLOEXEC
+                     | os.O_NOFOLLOW | os.O_NONBLOCK)
+        try:
+            s = os.fstat(fd)
+            if (not stat.S_ISREG(s.st_mode) or s.st_uid != 0
+                    or s.st_gid != 0 or s.st_mode & 0o022
+                    or s.st_nlink != 1 or not 1 <= s.st_size <= 64):
+                return None
+            data = os.read(fd, 65)
+        finally:
+            os.close(fd)
+        baseline = data.decode("ascii").strip()
+        return baseline if _NETNS.fullmatch(baseline) else None
+    except (OSError, UnicodeError, ValueError):
+        return None
+
 def probe_current_host_without_network():
     """Read this process's kernel status; never open sockets or read secrets."""
     try:
         status = Path("/proc/self/status").read_text(encoding="utf-8")
         cgroup = Path("/proc/self/cgroup").read_text(encoding="utf-8")
         own = os.readlink("/proc/self/ns/net")
-        init = os.readlink("/proc/1/ns/net")
+        try:
+            init = os.readlink("/proc/1/ns/net")
+        except PermissionError:
+            # DynamicUser cannot necessarily inspect PID 1's ns symlink.
+            # Never replace this with a guessed namespace ID or skip the check.
+            init = _read_root_owned_host_netns_reference()
+            if init is None:
+                return HostProbeDecision(
+                    reason="PID 1 netns unreadable; trusted host baseline missing"
+                )
         uid = os.geteuid()
         gid = os.getegid()
         names = tuple(os.environ.keys())
