@@ -127,6 +127,7 @@ def extract_original_history_helpers_offline(*, source_root):
     namespace = {
         "__builtins__": {
             "str": str, "int": int, "float": float, "range": range,
+            "dict": dict, "tuple": tuple, "list": list, "set": set,
             "sorted": sorted, "len": len, "sum": sum, "min": min,
             "max": max, "reversed": reversed, "bool": bool,
             "Exception": Exception, "TypeError": TypeError,
