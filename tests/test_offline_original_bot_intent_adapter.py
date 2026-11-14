@@ -104,6 +104,35 @@ class OriginalBotIntentAdapterTests(unittest.TestCase):
                     pinned_account=ACCOUNT,
                 ))
 
+    def test_unknown_fields_fail_closed_not_silently_projected(self):
+        for bot in BOTS:
+            for key, value in (
+                ("note", "synthetic"),
+                ("reduce_only", False),
+                ("close_size", "0.25"),
+                ("margin_mode", "isolated"),
+                ("fence_token", 10),
+                ("unexpected_future_authorization", True),
+            ):
+                with self.subTest(bot=bot, field=key):
+                    trade = {"action": "open_long", "side": "long",
+                             "hl_coin": "SOL", key: value}
+                    self.assertIsNone(project_original_entry(
+                        verified_bot=bot, trade=trade,
+                        rounded_size="0.025",
+                        pinned_environment="mainnet",
+                        pinned_account=ACCOUNT,
+                    ))
+                    reviewed = prepare_signer_free_entry_handoff_offline(
+                        verified_bot=bot, trade=trade,
+                        rounded_size="0.025",
+                        pinned_environment="mainnet",
+                        pinned_account=ACCOUNT,
+                    )
+                    self.assertEqual(reviewed.state, "hold")
+                    self.assertIsNone(reviewed.request_json)
+                    self.assertFalse(reviewed.submit_authorized)
+
     def test_never_loads_trading_sdk_or_original_executors(self):
         import sys
         self.assertNotIn("hyperliquid.exchange", sys.modules)
