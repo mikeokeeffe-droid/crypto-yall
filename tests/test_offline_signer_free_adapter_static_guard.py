@@ -14,6 +14,7 @@ PROTECTED = ("offline_original_bot_intent_adapter.py",
              "offline_signer_free_bot_view_ci.py",
              "offline_signer_free_read_bootstrap_ci.py",
              "offline_original_signal_projection_ci.py",
+             "offline_account_exposure_conservation_ci.py",
              "offline_three_bot_mutation_review_ci.py",
              "offline_original_executor_mutation_sink_ci.py")
 DENIED_MODULES = frozenset({
