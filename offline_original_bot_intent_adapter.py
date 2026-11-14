@@ -60,6 +60,14 @@ def project_original_entry(*, verified_bot, trade, rounded_size,
         or _QUANTITY.fullmatch(rounded_size) is None):
         return None
 
+    # Strict synthetic handoff schema. The original signal dict may contain
+    # additional strategy metadata, but it must be intentionally projected
+    # into this reviewed three-field request by a separate adapter. Ignoring
+    # unknown fields risks silently accepting client claims about authority,
+    # margins, reduce-only state, or ownership under future field names.
+    if set(trade) != {"action", "side", "hl_coin"}:
+        return None
+
     action = trade.get("action")
     coin = trade.get("hl_coin")
     side = trade.get("side")
