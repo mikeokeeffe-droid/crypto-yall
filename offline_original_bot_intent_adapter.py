@@ -18,6 +18,14 @@ _SCOPES = frozenset(("mainnet", "testnet"))
 _COIN = re.compile(r"[A-Z0-9]+\Z", re.ASCII)
 _ACCOUNT = re.compile(r"0x[0-9a-f]{40}\Z", re.ASCII)
 _QUANTITY = re.compile(r"(?:0|[1-9][0-9]*)(?:\.[0-9]+)?\Z", re.ASCII)
+# Never accept authority/provenance claims from a client-controlled trade dict.
+# Review-only intent data must be independent of the original bot's claims.
+_FORBIDDEN_TRADE_FIELDS = frozenset((
+    "submit_authorized", "order_authorized", "can_submit", "allow_submit",
+    "leverage_applied", "ownership_verified", "origin_authenticated",
+    "private_key", "wallet", "token", "cloid",
+))
+
 
 
 @dataclass(frozen=True)
@@ -60,7 +68,8 @@ def project_original_entry(*, verified_bot, trade, rounded_size,
         or type(coin) is not str
         or _COIN.fullmatch(coin) is None
         or "bot" in trade or "account" in trade
-        or "environment" in trade or "dex" in trade):
+        or "environment" in trade or "dex" in trade
+        or any(field in trade for field in _FORBIDDEN_TRADE_FIELDS)):
         return None
     try:
         value = Decimal(rounded_size)
