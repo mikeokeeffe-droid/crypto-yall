@@ -40,7 +40,7 @@ def _read_exact(peer, amount):
 def request_offline_entry_via_unix_socket(
     *, socket_path, expected_coordinator_uid, verified_bot,
     trade, rounded_size, pinned_environment, pinned_account,
-    pinned_dex="",
+    pinned_dex="", ipc_group_gid=None,
 ):
     """Send an unprivileged request to the local CI coordinator, then HOLD.
 
@@ -60,7 +60,10 @@ def request_offline_entry_via_unix_socket(
             or expected_coordinator_uid <= 0
             or type(socket_path) is not str
             or not os.path.isabs(socket_path)
-            or len(os.fsencode(socket_path)) > 100):
+            or len(os.fsencode(socket_path)) > 100
+            or (ipc_group_gid is not None and (
+                os.environ.get("CI_SOCKET_GROUP_AUDIT") != "1"
+                or type(ipc_group_gid) is not int or ipc_group_gid <= 0))):
         return hold("disposable Linux safety_test coordinator required")
 
     message = prepare_signer_free_entry_handoff_offline(
@@ -77,12 +80,17 @@ def request_offline_entry_via_unix_socket(
     try:
         directory = os.lstat(os.path.dirname(socket_path))
         target = os.lstat(socket_path)
+        expected_directory_mode = 0o700 if ipc_group_gid is None else 0o710
+        expected_socket_mode = 0o600 if ipc_group_gid is None else 0o660
         if (not stat.S_ISDIR(directory.st_mode)
                 or directory.st_uid != expected_coordinator_uid
-                or stat.S_IMODE(directory.st_mode) != 0o700
+                or stat.S_IMODE(directory.st_mode) != expected_directory_mode
                 or not stat.S_ISSOCK(target.st_mode)
                 or target.st_uid != expected_coordinator_uid
-                or stat.S_IMODE(target.st_mode) != 0o600):
+                or stat.S_IMODE(target.st_mode) != expected_socket_mode
+                or (ipc_group_gid is not None and (
+                    directory.st_gid != ipc_group_gid
+                    or target.st_gid != ipc_group_gid))):
             return hold("untrusted coordinator socket ownership or permissions")
         with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as peer:
             peer.settimeout(_TIMEOUT_SECONDS)
