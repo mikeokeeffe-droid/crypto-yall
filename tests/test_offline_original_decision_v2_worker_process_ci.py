@@ -24,6 +24,45 @@ from test_offline_v2_distinct_uid_socket_postgres_ci import (
 
 ROOT = Path(__file__).resolve().parents[1]
 
+# Only these reviewed CI modules and source-text-only executor files are
+# staged. No package credentials, Git directory, deployment config, state,
+# or server-side database password becomes accessible to bot identities.
+STAGED_SOURCE_FILES = (
+    "offline_original_decision_v2_worker_ci.py",
+    "offline_original_signal_projection_ci.py",
+    "offline_signer_free_read_bootstrap_ci.py",
+    "offline_signer_free_bot_view_ci.py",
+    "offline_signer_free_info_fixture_ci.py",
+    "offline_leverage_bound_entry_draft_ci.py",
+    "offline_original_executor_mutation_sink_ci.py",
+    "offline_three_bot_mutation_review_ci.py",
+    "offline_original_bot_intent_adapter.py",
+    "offline_v2_signer_free_socket_client_ci.py",
+    "hyperliquid_executor.py",
+    "intraday_executor.py",
+    "aggressive_executor.py",
+)
+
+
+def _stage_read_only_offline_worker(folder, group):
+    """Root-owned/group-readable CI-only source, never the entire checkout."""
+    stage = Path(folder) / "reviewed-worker"
+    stage.mkdir(mode=0o750)
+    os.chown(stage, 0, group)
+    os.chmod(stage, 0o750)
+    for name in STAGED_SOURCE_FILES:
+        source = ROOT / name
+        if not source.is_file() or source.is_symlink():
+            raise AssertionError("unreviewed or missing staged source")
+        target = stage / name
+        target.write_bytes(source.read_bytes())
+        os.chown(target, 0, group)
+        os.chmod(target, 0o640)
+        if (stat.S_IMODE(os.lstat(target).st_mode) != 0o640
+                or os.lstat(target).st_gid != group):
+            raise AssertionError("reviewed CI source permissions incorrect")
+    return stage
+
 
 @unittest.skipUnless(
     sys.platform.startswith("linux")
@@ -48,7 +87,7 @@ class OriginalDecisionV2DistinctUIDTests(unittest.TestCase):
             ).fetchall()
 
     @staticmethod
-    def _run_bot(uid, group, bot, socket_path, action):
+    def _run_bot(uid, group, bot, socket_path, action, source_root):
         def drop_permissions():
             os.setgroups([group])
             os.setgid(uid)
@@ -56,11 +95,13 @@ class OriginalDecisionV2DistinctUIDTests(unittest.TestCase):
 
         proc = subprocess.run(
             [sys.executable, "-m", "offline_original_decision_v2_worker_ci",
-             bot, socket_path, str(group), str(ROOT), action],
+             bot, socket_path, str(group), str(source_root), action],
             preexec_fn=drop_permissions,
+            cwd=str(source_root),
             env={
                 "PATH": "/usr/bin:/bin",
-                "PYTHONPATH": str(ROOT),
+                "PYTHONPATH": str(source_root),
+                "PYTHONDONTWRITEBYTECODE": "1",
                 "ISOLATED_POSTGRES_CI": "1",
                 "PGDATABASE": "safety_test",
                 "PGHOST": "localhost",
@@ -85,6 +126,9 @@ class OriginalDecisionV2DistinctUIDTests(unittest.TestCase):
             conn.execute("truncate public.ci_sender_v2_reviews restart identity")
         with tempfile.TemporaryDirectory() as directory:
             os.chmod(directory, 0o711)
+            source_root = _stage_read_only_offline_worker(directory, group)
+            self.assertEqual(
+                stat.S_IMODE(os.lstat(source_root).st_mode), 0o750)
             ipc = os.path.join(directory, "ipc")
             os.mkdir(ipc)
             os.chown(ipc, 0, group)
@@ -101,7 +145,8 @@ class OriginalDecisionV2DistinctUIDTests(unittest.TestCase):
                 self.assertEqual(stat.S_IMODE(os.lstat(sock).st_mode), 0o660)
                 results = []
                 for uid, bot in zip(uids, BOTS):
-                    result = self._run_bot(uid, group, bot, sock, "buy")
+                    result = self._run_bot(
+                        uid, group, bot, sock, "buy", source_root)
                     self.assertEqual(result["submit_authorized"], False)
                     self.assertEqual(result["leverage_applied"], False)
                     self.assertFalse(result["signer_imported"])
@@ -126,6 +171,7 @@ class OriginalDecisionV2DistinctUIDTests(unittest.TestCase):
                 # mislabelled as an entry or forwarded over this interface.
                 close = self._run_bot(
                     uids[2], group, "aggressive", sock, "sell_exit",
+                    source_root,
                 )
                 self.assertEqual(close["state"], "hold")
                 self.assertFalse(close["review_recorded"])
