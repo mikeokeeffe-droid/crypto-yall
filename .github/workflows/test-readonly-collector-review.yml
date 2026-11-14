@@ -1,0 +1,42 @@
+name: Read-only Testnet Collector Review (offline)
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'collector_review/**'
+      - '.github/workflows/test-readonly-collector-review.yml'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  offline-collector-review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Offline-only collector policy tests (no secrets or exchange calls)
+        run: python -m unittest collector_review.test_testnet_info_https -v
+      - name: Offline-only synthetic hash-chain integrity tests
+        run: python -m unittest collector_review.test_offline_capture_audit -v
+      - name: Offline-only runtime identity and credential boundary tests
+        run: python -m unittest collector_review.test_runtime_identity_review -v
+      - name: Static offline systemd isolation review (no deployment)
+        run: python -m unittest collector_review.test_offline_systemd_unit -v
+      - name: Offline kernel and process isolation observation fixtures
+        run: python -m unittest collector_review.test_host_isolation_probe -v
+      - name: Verify systemd unit syntax without installing or starting
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -x /usr/bin/systemd-analyze
+          tmpdir="$(mktemp -d)"
+          trap 'rm -rf "$tmpdir"' EXIT
+          cp collector_review/deployment/testnet-collector-offline-review.service.example "$tmpdir/testnet-collector-offline-review.service"
+          systemd-analyze verify "$tmpdir/testnet-collector-offline-review.service"
+
