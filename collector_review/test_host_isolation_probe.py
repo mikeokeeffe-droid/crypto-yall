@@ -1,6 +1,7 @@
 """Offline fixtures for kernel-observation review; never probe CI host here."""
 from dataclasses import replace
 import unittest
+from unittest.mock import patch
 
 from collector_review.host_isolation_probe import (
     HostProbeDecision, review_host_observations_offline,
@@ -93,6 +94,31 @@ class HostIsolationProbeTests(unittest.TestCase):
         ):
             with self.subTest(names=names):
                 self.assertEqual(review(environment_names=names).state,"hold")
+
+
+    def test_permission_denied_with_missing_host_baseline_fails_closed(self):
+        def readlink(path):
+            if path == "/proc/self/ns/net":
+                return "net:[4026532100]"
+            raise PermissionError("PID 1 namespace protected")
+
+        with patch("collector_review.host_isolation_probe.os.readlink",
+                   side_effect=readlink), patch(
+                   "collector_review.host_isolation_probe._read_root_owned_host_netns_reference",
+                   return_value=None):
+            from collector_review.host_isolation_probe import (
+                probe_current_host_without_network,
+            )
+            decision = probe_current_host_without_network()
+        self.assertEqual(decision.state, "hold")
+        self.assertFalse(decision.network_egress_verified)
+        self.assertFalse(decision.testnet_read_authorized)
+        self.assertFalse(decision.trading_authorized)
+
+    def test_supplied_host_baseline_must_be_distinct(self):
+        decision = review(init_netns="net:[4026532100]")
+        self.assertEqual(decision.state, "hold")
+        self.assertFalse(decision.network_egress_verified)
 
 
 if __name__ == "__main__":
