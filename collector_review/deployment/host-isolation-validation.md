@@ -1,6 +1,6 @@
 # PR #41: independent offline Linux host-isolation validation
 
-**Status: PLAN ONLY — NOT PERFORMED / NOT APPROVED FOR DEPLOYMENT.**
+**Status: OFFLINE STAGING EXERCISE COMPLETED ON TEST HOST — INDEPENDENT SIGN-OFF PENDING; NO NETWORK DEPLOYMENT APPROVED.**
 
 This is an operator handoff for a **new, disposable Linux systemd host**.
 It must not be used on the machine, image, account, or runner containing
@@ -91,20 +91,40 @@ A real read-only response does not establish exchange ownership, history
 completeness, or any right to create/modify orders. No merge, live trade
 deployment or shared production controller is authorised by this document.
 
-## Evidence / decision record (fill only after real host inspection)
+## Evidence / decision record — observed on test host 14 November 2026
+
+Operator-provided Termius and Hetzner screenshots from `ubuntu-4gb-hel1-1`
+(project `crypto-yall-offline-test`). These are observations, **not**
+independent reviewer sign-off or proof of absolute absence of credentials.
 
 | Evidence | Current state |
 |---|---|
-| Named dedicated host and OS/systemd | NOT PROVIDED |
-| Root-owned immutable checkout and file ACL review | NOT VERIFIED |
-| Network isolation applied to **actual** process | NOT VERIFIED |
-| Credential-file/secret-socket non-access | NOT VERIFIED |
-| Host-side probe output in real unit | NOT RUN |
-| Independent host security sign-off | NOT PROVIDED |
-| Explicit named testnet account and one-shot approval | NOT PROVIDED |
-| Current PR network/submit authority | DISABLED / NO-GO |
+| Named dedicated host and OS | `ubuntu-4gb-hel1-1`, Ubuntu 26.04.1 LTS; systemd package version not separately recorded |
+| Local source review / ownership | `/opt/crypto-yall/collector_review` root-owned, ordinary files 644, directories 755; `find -xdev` found no symlinks or group/world-writable entries |
+| Git-reviewed host probe | protected file verified against Git blob `c8dc23e83888414971f5d311d653bef88fc6323c` |
+| Actual systemd oneshot | `collector_host_probe=host_candidate`; `Ran 16 tests`, `OK`; `Result=success`, `ExecMainStatus=0`; later `ActiveState=inactive`, `UnitFileState=static` |
+| Effective unit sandbox settings | `DynamicUser=yes`, `NoNewPrivileges=yes`, `ProtectHome=yes`, `ProtectSystem=strict`, `PrivateDevices=yes`; `PrivateNetwork=yes`, `IPAddressDeny=any`, `RestrictAddressFamilies=AF_UNIX`; no namespace-sharing paths |
+| Namespace comparison | host probe found expected *candidate* private net namespace; operator-staged PID 1 namespace reference owned by root with mode 644, parent mode 755 |
+| Systemd configuration exposure | `systemd-analyze security` reported 1.9 (OK); informational score, not a deployment gate |
+| Socket creation negative tests | two **separate transient services** with corresponding network restrictions blocked AF_INET and AF_INET6 socket creation with Errno 97; this is not a direct network egress test of the actual collector unit |
+| Filesystem negative tests | **separate transient services** with similar restrictions returned `home_access=False`, `root_access=False`, `collector_writable=False`; these are selected-path checks, not complete filesystem ACL validation |
+| Credential configuration / inventory | no credential-loading or extra path directives found in reviewed unit text; filename-pattern search found zero hits in /home, /root, /opt; neither establishes credential/secret-socket absence |
+| Hetzner firewall | `collector-test-firewall` applied to one named test server; inbound SSH 22/ICMP; **outbound unrestricted by this firewall** |
+| No automatic activation | `TriggeredBy=` empty; `UnitFileState=static` and `ActiveState=inactive` on last check |
+| External egress enforcement | **NOT INDEPENDENTLY VERIFIED** for actual collector; probe explicitly reports `network_egress_verified=false` |
+| Independent host security sign-off | **NOT PROVIDED** |
+| Explicit named testnet account and one-shot approval | **NOT PROVIDED** |
+| Current PR network/submit authority | **DISABLED / NO-GO** |
 
-Keep PR #40 and PR #41 draft until their separate review gates are satisfied.
+These tests are limited to the observed configuration and paths. Neither the
+temporary sandbox probes nor the low systemd exposure score establishes
+network isolation for all possible transports, full secret non-access,
+request provenance, or permission to connect to any exchange. The tested
+oneshot executes offline checks only.
+
+**Decision:** Document the offline staging milestone. Do not enable network
+transport, merge PR #41, deploy live trading bots, or grant testnet account
+access without a separate, explicit review.
 
 ## PID-1 namespace permission failure observed on disposable staging host
 
@@ -129,5 +149,4 @@ the isolated collector process. Review the *actual* effective unit properties,
 mount permissions and firewall policy separately. A matching namespace check
 must never be treated as proof of disabled network egress.
 
-**Current result:** observed permission issue explained; corrected draft
-logic and tests still require CI and host-side revalidation. Keep NO-GO.
+**Updated result (14 Nov 2026):** corrected probe passed in the actual offline oneshot sandbox, with `host_candidate` and 16 offline tests passing; independent egress and credentials review remains outstanding. Keep NO-GO.
