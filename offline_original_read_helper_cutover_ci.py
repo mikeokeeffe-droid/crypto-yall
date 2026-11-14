@@ -43,7 +43,7 @@ def extract_original_info_read_helpers_offline(*, source_root):
     The source directory is supplied by trusted CI and cannot enable a
     trading client or call any code from the original module's imports.
     """
-    if type(source_root) is not Path:
+    if not isinstance(source_root, Path):
         raise ValueError("trusted local CI source Path required")
     source_path = source_root / _SOURCE
     if source_path.is_symlink() or not source_path.is_file():
