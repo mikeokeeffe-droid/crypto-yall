@@ -90,7 +90,9 @@ def classify(bot, action, *, close_size=None):
         "action": action, "hl_coin": "SOL",
         "side": "short" if action.endswith("_short") else "long",
     }
-    if close_size is not None:
+    # Sized-close metadata belongs only to a close action. New-entry
+    # requests intentionally use the exact three-field allowlist.
+    if action == "close" and close_size is not None:
         trade["close_size"] = close_size
     return review_original_bot_mutation_offline(
         verified_bot=bot, trade=trade, rounded_size="0.025",
