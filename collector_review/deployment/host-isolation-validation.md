@@ -106,7 +106,7 @@ independent reviewer sign-off or proof of absolute absence of credentials.
 | Effective unit sandbox settings | `DynamicUser=yes`, `NoNewPrivileges=yes`, `ProtectHome=yes`, `ProtectSystem=strict`, `PrivateDevices=yes`; `PrivateNetwork=yes`, `IPAddressDeny=any`, `RestrictAddressFamilies=AF_UNIX`; no namespace-sharing paths |
 | Namespace comparison | host probe found expected *candidate* private net namespace; operator-staged PID 1 namespace reference owned by root with mode 644, parent mode 755 |
 | Systemd configuration exposure | `systemd-analyze security` reported 1.9 (OK); informational score, not a deployment gate |
-| Socket creation negative tests | two **separate transient services** with corresponding network restrictions blocked AF_INET and AF_INET6 socket creation with Errno 97; this is not a direct network egress test of the actual collector unit |
+| Socket creation negative tests | Separate transient services first blocked AF_INET and AF_INET6 with Errno 97; on 14 Nov 2026 at 11:02:49 UTC the updated **actual offline oneshot unit** emitted `collector_ipv4_socket_denied=true`, `collector_ipv6_socket_denied=true`, `collector_ip_socket_probe=pass`, preceded by `collector_host_probe=host_candidate`, and ran 16 offline tests. This is socket-creation denial evidence, not comprehensive egress proof |
 | Filesystem negative tests | **separate transient services** with similar restrictions returned `home_access=False`, `root_access=False`, `collector_writable=False`; these are selected-path checks, not complete filesystem ACL validation |
 | Credential configuration / inventory | no credential-loading or extra path directives found in reviewed unit text; filename-pattern search found zero hits in /home, /root, /opt; neither establishes credential/secret-socket absence |
 | Hetzner firewall | `collector-test-firewall` applied to one named test server; inbound SSH 22/ICMP; **outbound unrestricted by this firewall** |
@@ -168,3 +168,24 @@ the new diagnostic can provide narrow evidence of address-family enforcement
 **inside the actual oneshot sandbox**. It still cannot establish absolute
 absence of all external egress paths, file-secret exposure, or authorization
 for testnet requests. Keep the collector offline and live trading NO-GO.
+
+## Observed in-unit socket-denial check — 14 November 2026, 11:02:49 UTC
+
+Operator-supplied journal screenshot for the reviewed offline oneshot on
+`ubuntu-4gb-hel1-1` showed the three-step unit run:
+
+- `collector_host_probe=host_candidate`
+- `collector_ipv4_socket_denied=true`
+- `collector_ipv6_socket_denied=true`
+- `collector_ip_socket_probe=pass`
+- `Ran 16 tests` and systemd `Finished ... OFFLINE sandbox review`
+- Post-run `ActiveState=inactive`, `Result=success`, `ExecMainStatus=0`
+
+This supersedes the earlier *proposal-only* status for the in-unit socket
+probe. It confirms the intended address-family restriction applied to this
+process during that run. The probe **does not connect** to a remote endpoint,
+so its `network_egress_verified=false` status remains unchanged. Secret
+and socket availability, network paths other than these tested AF_INET /
+AF_INET6 socket creations, host-level egress control and independent reviewer
+sign-off remain separate unresolved gates. Do not enable networking, merge,
+connect to Hyperliquid, or authorize trading based on this result.
