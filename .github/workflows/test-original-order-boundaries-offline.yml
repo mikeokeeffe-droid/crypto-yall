@@ -16,6 +16,8 @@ on:
       - 'offline_account_exposure_conservation_ci.py'
       - 'tests/test_offline_account_exposure_conservation_ci.py'
       - 'tests/test_offline_signer_free_read_bootstrap_ci.py'
+      - 'offline_original_read_helper_cutover_ci.py'
+      - 'tests/test_offline_original_read_helper_cutover_ci.py'
       - 'offline_three_bot_mutation_review_ci.py'
       - 'tests/test_offline_three_bot_mutation_review_ci.py'
       - 'tests/test_original_mutation_source_policy_ci.py'
@@ -252,6 +254,7 @@ jobs:
           python -m unittest discover -s tests -p 'test_offline_signer_free_adapter_static_guard.py' -v
           python -m unittest discover -s tests -p 'test_offline_signer_free_bot_view_ci.py' -v
           python -m unittest discover -s tests -p 'test_offline_signer_free_read_bootstrap_ci.py' -v
+          python -m unittest discover -s tests -p 'test_offline_original_read_helper_cutover_ci.py' -v
           python -m unittest discover -s tests -p 'test_offline_original_signal_projection_ci.py' -v
           python -m unittest discover -s tests -p 'test_offline_original_candidate_source_contract_ci.py' -v
           python -m unittest discover -s tests -p 'test_offline_real_original_decisions_to_v2_ci.py' -v
