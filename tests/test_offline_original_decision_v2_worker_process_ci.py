@@ -29,6 +29,7 @@ ROOT = Path(__file__).resolve().parents[1]
 # or server-side database password becomes accessible to bot identities.
 STAGED_SOURCE_FILES = (
     "offline_original_decision_v2_worker_ci.py",
+    "offline_original_read_helper_cutover_ci.py",
     "offline_original_signal_projection_ci.py",
     "offline_signer_free_read_bootstrap_ci.py",
     "offline_signer_free_bot_view_ci.py",
@@ -153,6 +154,11 @@ class OriginalDecisionV2DistinctUIDTests(unittest.TestCase):
                     self.assertFalse(result["original_executor_imported"])
                     self.assertFalse(result["trading_secret_present"])
                     self.assertFalse(result["postgres_password_present"])
+                    self.assertTrue(result["original_read_helpers_used"])
+                    self.assertEqual(result["synthetic_equity"], 150.0)
+                    self.assertEqual(result["synthetic_mid"], 125.0)
+                    self.assertEqual(result["synthetic_size_decimals"], 3)
+                    self.assertEqual(result["synthetic_position_count"], 0)
                     results.append(result)
                 self.assertEqual(
                     [r["state"] for r in results],
@@ -176,6 +182,7 @@ class OriginalDecisionV2DistinctUIDTests(unittest.TestCase):
                 self.assertEqual(close["state"], "hold")
                 self.assertFalse(close["review_recorded"])
                 self.assertFalse(close["submit_authorized"])
+                self.assertNotIn("original_read_helpers_used", close)
                 self.assertEqual(self._rows(), rows)
             finally:
                 if server.is_alive():
