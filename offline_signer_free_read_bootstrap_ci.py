@@ -82,6 +82,42 @@ class OfflineReadBootstrap:
             return hold
 
 
+    def draft_original_candidate_review(
+        self, *, candidate, rounded_size, requested_leverage,
+    ):
+        """Validate the original source-shaped candidate before V2 review.
+
+        A bot candidate contains metadata (ticker, reason, rank) that must
+        never flow to the coordinator as trusted scope or authorization.
+        Projection requires its exact reviewed fields and returns only the
+        three approved action/side/coin fields. This stays offline: it does
+        not authenticate a process, apply leverage or send an order.
+        """
+        from offline_original_signal_projection_ci import (
+            project_original_entry_candidate_offline,
+        )
+        projected = project_original_entry_candidate_offline(
+            verified_bot=self.bot, candidate=candidate,
+        )
+        if (projected.state != "projected_review_only"
+                or projected.submit_authorized
+                or projected.ownership_verified
+                or type(projected.trade_json) is not str):
+            return OfflineLeverageDraft()
+        try:
+            trade = json.loads(projected.trade_json)
+        except (TypeError, ValueError):
+            return OfflineLeverageDraft()
+        if type(trade) is not dict or set(trade) != {
+            "action", "side", "hl_coin"
+        }:
+            return OfflineLeverageDraft()
+        return self.draft_entry_review(
+            trade=trade, rounded_size=rounded_size,
+            requested_leverage=requested_leverage,
+        )
+
+
 def bootstrap_original_read_only_offline(
     *, verified_bot, pinned_environment, pinned_account, snapshot,
 ):
