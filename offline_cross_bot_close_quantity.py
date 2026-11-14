@@ -11,6 +11,8 @@ class QuantityReview:
     status: str
     reason: str
     submit_authorized: bool = False
+    structurally_consistent: bool = False
+    ownership_verified: bool = False
 
 def _qty(value):
     if type(value) is not str:
@@ -62,4 +64,13 @@ def review_close_quantity_offline(*, bot, account, coin, side, close_size,
         return hold("attributed quantity exceeds shared exchange position")
     if close > owned:
         return hold("close exceeds bot-attributed remaining quantity")
-    return QuantityReview("review_only", "synthetic attribution fits; independent reconciliation and live enforcement absent")
+    # A caller-controlled provenance_verified=True is NOT an independently
+    # authenticated ownership proof. Return HOLD even if the arithmetic fits.
+    # Structural consistency is diagnostic only and must never be interpreted
+    # as authority for an exchange close.
+    return QuantityReview(
+        "hold",
+        "synthetic attribution fits; exchange provenance, exclusive ownership "
+        "and atomic close enforcement remain unverified",
+        structurally_consistent=True,
+    )
