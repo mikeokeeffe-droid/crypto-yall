@@ -17,6 +17,8 @@ on:
       - 'tests/test_ci_sender_leverage_review_v2_postgres.py'
       - 'offline_original_v2_review_bridge_ci.py'
       - 'tests/test_offline_original_v2_review_bridge_pg_ci.py'
+      - 'offline_original_v2_socket_review_ci.py'
+      - 'tests/test_offline_original_v2_socket_review_ci.py'
       - 'tests/test_pre_submit_intent_postgres_ci.py'
       - 'tests/test_ci_sender_journal_postgres.py'
       - 'offline_ci_pg_fake_sender.py'
@@ -106,6 +108,7 @@ jobs:
           python -m unittest discover -s tests -p 'test_ci_sender_journal_postgres.py' -v
           python -m unittest discover -s tests -p 'test_ci_sender_leverage_review_v2_postgres.py' -v
           python -m unittest discover -s tests -p 'test_offline_original_v2_review_bridge_pg_ci.py' -v
+          python -m unittest discover -s tests -p 'test_offline_original_v2_socket_review_ci.py' -v
           python -m unittest discover -s tests -p 'test_offline_ci_pg_fake_sender.py' -v
           python -m unittest discover -s tests -p 'test_ci_pg_fake_sender_process_crashes.py' -v
           python -m unittest discover -s tests -p 'test_offline_ci_pg_sender_reconciliation.py' -v
