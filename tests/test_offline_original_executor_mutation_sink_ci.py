@@ -77,7 +77,7 @@ class OriginalExecutorMutationSinkTests(unittest.TestCase):
                     self.assertEqual([e[0] for e in sink.events],
                                      ["leverage_hold", "entry_request_only"])
                     self.assertEqual(sink.last_review.state, "request_only")
-                    self.assertIn('"rounded_size":"2"', sink.last_review.request_json)
+                    self.assertEqual(__import__("json").loads(sink.last_review.request_json)["rounded_size"], "2.0")
                     self.assertFalse(sink.last_review.submit_authorized)
                     self.assertFalse(sink.last_review.ownership_verified)
 
