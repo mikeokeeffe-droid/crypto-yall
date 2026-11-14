@@ -57,7 +57,8 @@ def request_offline_entry_via_unix_socket(
             or os.environ.get("PGHOST") not in ("localhost", "127.0.0.1")
             or not hasattr(socket, "SO_PEERCRED")
             or type(expected_coordinator_uid) is not int
-            or expected_coordinator_uid <= 0
+            or (expected_coordinator_uid <= 0 and ipc_group_gid is None)
+            or expected_coordinator_uid < 0
             or type(socket_path) is not str
             or not os.path.isabs(socket_path)
             or len(os.fsencode(socket_path)) > 100
