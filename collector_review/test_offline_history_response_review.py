@@ -68,6 +68,11 @@ def inspect(kind, payload, **kwargs):
     reviewed_plan = plan(kind, **parameters)
     options = dict(
         plan=reviewed_plan,
+        pinned_scope=SCOPE,
+        pinned_request_type=kind,
+        pinned_oid=parameters.get("oid"),
+        pinned_start_ms=parameters.get("start_ms"),
+        pinned_end_ms=parameters.get("end_ms"),
         raw_body=json.dumps(payload).encode(),
         status_code=200, content_type="application/json",
     )
@@ -168,6 +173,74 @@ class OfflineHistoryResponseTests(unittest.TestCase):
         ):
             with self.subTest(changes=str(changes)[:80]):
                 r = inspect("orderStatus", good, **changes)
+                self.assertEqual(r.state, "hold")
+                self.assert_untrusted(r)
+
+    def test_valid_plan_cannot_replace_independently_pinned_request(self):
+        for kind, pinned, mismatches in (
+            ("orderStatus", {"oid": CLOID}, (
+                {"oid": "0x" + "c" * 32},
+                {"oid": 42},
+            )),
+            ("userFillsByTime", {"start_ms": 1000, "end_ms": 2000}, (
+                {"start_ms": 1001, "end_ms": 2000},
+                {"start_ms": 1000, "end_ms": 1999},
+            )),
+            ("userFunding", {"start_ms": 1000, "end_ms": 2000}, (
+                {"start_ms": 1001, "end_ms": 2000},
+                {"start_ms": 1000, "end_ms": 1999},
+            )),
+        ):
+            payload = (
+                valid_order() if kind == "orderStatus" else
+                [valid_fill()] if kind == "userFillsByTime" else
+                [valid_funding()]
+            )
+            baseline = plan(kind, **pinned)
+            good = inspect_history_fixture_response_offline(
+                plan=baseline, pinned_scope=SCOPE,
+                pinned_request_type=kind,
+                pinned_oid=pinned.get("oid"),
+                pinned_start_ms=pinned.get("start_ms"),
+                pinned_end_ms=pinned.get("end_ms"),
+                raw_body=json.dumps(payload).encode(),
+                status_code=200, content_type="application/json",
+            )
+            self.assertEqual(good.state, "fixture_only")
+            self.assert_untrusted(good)
+            for changes in mismatches:
+                with self.subTest(kind=kind, changes=changes):
+                    forged = plan(kind, **changes)
+                    result = inspect_history_fixture_response_offline(
+                        plan=forged, pinned_scope=SCOPE,
+                        pinned_request_type=kind,
+                        pinned_oid=pinned.get("oid"),
+                        pinned_start_ms=pinned.get("start_ms"),
+                        pinned_end_ms=pinned.get("end_ms"),
+                        raw_body=json.dumps(payload).encode(),
+                        status_code=200, content_type="application/json",
+                    )
+                    self.assertEqual(result.state, "hold")
+                    self.assert_untrusted(result)
+
+    def test_self_consistent_wrong_account_and_type_do_not_override_pins(self):
+        forged_scope = OfflineHistoryQueryScope(account="0x" + "2" * 40)
+        variants = (
+            (plan_testnet_history_query_offline(
+                scope=forged_scope, request_type="orderStatus", oid=CLOID,
+            ), SCOPE, "orderStatus", CLOID, None, None),
+            (plan("userFunding", start_ms=1000, end_ms=2000),
+             SCOPE, "userFillsByTime", None, 1000, 2000),
+        )
+        for forged, scope, kind, oid, start, end in variants:
+            with self.subTest(kind=kind):
+                r = inspect_history_fixture_response_offline(
+                    plan=forged, pinned_scope=scope,
+                    pinned_request_type=kind, pinned_oid=oid,
+                    pinned_start_ms=start, pinned_end_ms=end,
+                    raw_body=b"[]", status_code=200,
+                    content_type="application/json",
+                )
                 self.assertEqual(r.state, "hold")
                 self.assert_untrusted(r)
 
