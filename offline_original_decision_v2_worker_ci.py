@@ -15,6 +15,9 @@ from pathlib import Path
 import sys
 
 from offline_original_signal_projection_ci import _TICKERS
+from offline_original_read_helper_cutover_ci import (
+    extract_original_info_read_helpers_offline,
+)
 from offline_signer_free_read_bootstrap_ci import (
     bootstrap_original_read_only_offline,
 )
@@ -60,12 +63,19 @@ def _source_decider(bot, source_root):
     return ns["decide_trades"]
 
 
-def _synthetic_view(bot):
+def _synthetic_view(bot, action):
     snapshot = {
         "environment": "mainnet", "account": ACCOUNT,
         "user_state": {
             "marginSummary": {"accountValue": "150"},
-            "assetPositions": [],
+            "assetPositions": (
+                [{"position": {
+                    "coin": "SOL", "szi": "0.5", "entryPx": "125",
+                    "unrealizedPnl": "1", "leverage": {
+                        "type": "cross", "value": 2,
+                    },
+                }}] if action == "sell_exit" else []
+            ),
         },
         "spot_state": {"balances": [{"coin": "USDC", "total": "40"}]},
         "all_mids": {"SOL": "125"},
@@ -100,14 +110,30 @@ def run_worker(bot, sock_path, group_id, source_root, action="buy"):
             or any(key.startswith("CI_V2_COORDINATOR")
                    for key in os.environ)):
         return held
-    decider = _source_decider(bot, source_root)
-    view = _synthetic_view(bot)
-    if view is None or view.submit_authorized:
+    # Real original read-helper code, isolated from its signer-capable module,
+    # runs against the pinned synthetic Info surface in this unprivileged UID.
+    # No fallback to a live client is ever possible in this CI worker.
+    view = _synthetic_view(bot, action)
+    if view is None or view.submit_authorized or view.origin_authenticated:
         return held
-    if action == "sell_exit":
-        positions = {"SOL": {"size": 0.5, "unrealized_pnl": 1}}
-    else:
-        positions = {}
+    helpers = extract_original_info_read_helpers_offline(
+        source_root=Path(source_root),
+    )
+    equity = helpers["get_account_equity"](view.info, ACCOUNT)
+    positions = helpers["get_open_positions"](view.info, ACCOUNT)
+    listed = helpers["coin_is_listed"](view.info, "SOL")
+    mid = helpers["get_mid_price"](view.info, "SOL")
+    decimals = helpers["get_size_decimals"](view.info, "SOL")
+    if (type(equity) is not float or equity != 150.0
+            or type(positions) is not dict
+            or not listed or type(mid) is not float or mid != 125.0
+            or type(decimals) is not int or decimals != 3
+            or (action == "buy" and positions)
+            or (action == "sell_exit"
+                and (set(positions) != {"SOL"}
+                     or positions["SOL"]["size"] != 0.5))):
+        return held
+    decider = _source_decider(bot, source_root)
     signals = {
         "SOL-USD": {
             "action": action,
@@ -149,6 +175,11 @@ def run_worker(bot, sock_path, group_id, source_root, action="buy"):
         ),
         "trading_secret_present": "HL_PRIVATE_KEY" in os.environ,
         "postgres_password_present": "PGPASSWORD" in os.environ,
+        "original_read_helpers_used": True,
+        "synthetic_equity": equity,
+        "synthetic_mid": mid,
+        "synthetic_size_decimals": decimals,
+        "synthetic_position_count": len(positions),
     }
 
 
