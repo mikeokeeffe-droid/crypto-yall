@@ -17,7 +17,8 @@ from offline_original_bot_socket_bridge_ci import handle_offline_original_entry_
 _BOTS = frozenset(("daily", "intraday", "aggressive"))
 
 
-def _check_socket_directory(path):
+def _check_socket_directory(path, *, ipc_group_gid=None):
+    """Validate pre-provisioned mode; never relax a private parent silently."""
     current = os.path.abspath(path)
     while True:
         if stat.S_ISLNK(os.lstat(current).st_mode):
@@ -27,16 +28,18 @@ def _check_socket_directory(path):
             break
         current = upper
     folder = os.lstat(path)
+    expected_mode = 0o700 if ipc_group_gid is None else 0o710
     if (not stat.S_ISDIR(folder.st_mode)
             or folder.st_uid != os.geteuid()
-            or folder.st_mode & 0o077):
-        raise PermissionError("socket directory must be private to CI coordinator")
+            or stat.S_IMODE(folder.st_mode) != expected_mode
+            or (ipc_group_gid is not None and folder.st_gid != ipc_group_gid)):
+        raise PermissionError("offline coordinator directory ownership/mode mismatch")
 
 
 def serve_offline_original_entry_requests(*, socket_path, allowed_uids,
                                           connection_factories,
                                           max_requests=1, ready=None,
-                                          timeout=4.0):
+                                          timeout=4.0, ipc_group_gid=None):
     """Serve bounded requests from a real Unix listener; never dispatch orders.
 
     Test harness supplies preconfigured DB factories. No state is created.
@@ -65,8 +68,18 @@ def serve_offline_original_entry_requests(*, socket_path, allowed_uids,
             or any(not callable(factory) for factory in connection_factories.values())):
         raise ValueError("server-owned DB login map mismatch")
 
+    # Explicit, root-run disposable CI gate for three genuinely distinct UIDs.
+    # Socket group membership grants connectivity only; SO_PEERCRED below
+    # verifies each real UID. No bot receives database credentials.
+    if ipc_group_gid is not None:
+        if (os.environ.get("CI_SOCKET_GROUP_AUDIT") != "1"
+                or os.geteuid() != 0
+                or type(ipc_group_gid) is not int or ipc_group_gid <= 0
+                or len(allowed_uids) != 3
+                or any(uid <= 0 for uid in allowed_uids)):
+            raise PermissionError("group-gated socket requires disposable root CI")
     folder = os.path.dirname(os.path.abspath(socket_path))
-    _check_socket_directory(folder)
+    _check_socket_directory(folder, ipc_group_gid=ipc_group_gid)
     if os.path.lexists(socket_path):
         raise FileExistsError("refuse to replace existing coordinator socket")
 
@@ -74,7 +87,17 @@ def serve_offline_original_entry_requests(*, socket_path, allowed_uids,
         listener.bind(socket_path)
         info = os.lstat(socket_path)
         try:
-            os.chmod(socket_path, 0o600)  # same-UID test harness only
+            if ipc_group_gid is None:
+                os.chmod(socket_path, 0o600)  # legacy same-UID CI only
+            else:
+                os.chown(socket_path, os.geteuid(), ipc_group_gid)
+                os.chmod(socket_path, 0o660)
+                actual = os.lstat(socket_path)
+                if (not stat.S_ISSOCK(actual.st_mode)
+                        or actual.st_uid != os.geteuid()
+                        or actual.st_gid != ipc_group_gid
+                        or stat.S_IMODE(actual.st_mode) != 0o660):
+                    raise PermissionError("offline socket group policy not effective")
             listener.listen(max_requests)
             listener.settimeout(timeout)
             if ready is not None:
