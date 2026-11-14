@@ -30,6 +30,7 @@ ROOT = Path(__file__).resolve().parents[1]
 STAGED_SOURCE_FILES = (
     "offline_original_decision_v2_worker_ci.py",
     "offline_original_read_helper_cutover_ci.py",
+    "offline_original_sizing_v2_ci.py",
     "offline_original_signal_projection_ci.py",
     "offline_signer_free_read_bootstrap_ci.py",
     "offline_signer_free_bot_view_ci.py",
@@ -159,6 +160,12 @@ class OriginalDecisionV2DistinctUIDTests(unittest.TestCase):
                     self.assertEqual(result["synthetic_mid"], 125.0)
                     self.assertEqual(result["synthetic_size_decimals"], 3)
                     self.assertEqual(result["synthetic_position_count"], 0)
+                    self.assertTrue(result["original_sizing_calculated"])
+                    self.assertEqual(result["requested_leverage"], 2)
+                    self.assertEqual(
+                        result["synthetic_rounded_size"],
+                        "0.24" if bot == "aggressive" else "0.16",
+                    )
                     results.append(result)
                 self.assertEqual(
                     [r["state"] for r in results],
@@ -169,7 +176,7 @@ class OriginalDecisionV2DistinctUIDTests(unittest.TestCase):
                 rows = self._rows()
                 self.assertEqual(len(rows), 1)
                 self.assertEqual(rows[0][0:2], ("daily", "SOL"))
-                self.assertEqual(str(rows[0][2]), "1.6")
+                self.assertEqual(str(rows[0][2]), "0.16")
                 self.assertEqual(rows[0][3:], (2, "review_only"))
                 self.assertFalse(os.path.lexists(sock))
 
@@ -183,6 +190,7 @@ class OriginalDecisionV2DistinctUIDTests(unittest.TestCase):
                 self.assertFalse(close["review_recorded"])
                 self.assertFalse(close["submit_authorized"])
                 self.assertNotIn("original_read_helpers_used", close)
+                self.assertNotIn("original_sizing_calculated", close)
                 self.assertEqual(self._rows(), rows)
             finally:
                 if server.is_alive():
