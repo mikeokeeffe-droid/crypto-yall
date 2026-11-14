@@ -11,6 +11,7 @@ credential absence in mounted files, trusted Hyperliquid provenance, actual
 account ownership, or readiness for a real testnet request.
 """
 from dataclasses import dataclass
+import hashlib
 import os
 from pathlib import Path
 import re
@@ -183,12 +184,34 @@ def probe_current_host_without_network():
     )
 
 
+def _unexpected_environment_name_fingerprints(names):
+    """Bounded diagnostic: never print environment names or their values.
+
+    Each truncated hash may be matched against a reviewer-provided shortlist
+    of ordinary environment names. Do not treat these hashes as secrets or
+    as proof that no credential-bearing names exist.
+    """
+    unknown = sorted(name for name in names
+                     if type(name) is str and name not in _ALLOWED_ENV)
+    tokens = tuple(hashlib.sha256(
+        ("offline-collector-env-v1:" + name).encode("utf-8")
+    ).hexdigest()[:16] for name in unknown[:8])
+    return len(unknown), tokens
+
+
 def main():
-    # Deliberately print no UID, env variable name/value, process argv,
+    # Deliberately print no UID, environment name/value, process argv,
     # account address, credential, network endpoint, or procfs content.
     result = probe_current_host_without_network()
     print("collector_host_probe=" + result.state)
     print("collector_host_probe_detail=" + result.reason)
+    if (result.state == "hold" and result.reason ==
+            "unexpected environment variable name; values not inspected"):
+        count, fingerprints = _unexpected_environment_name_fingerprints(
+            tuple(os.environ.keys()))
+        print("collector_unapproved_env_name_count=" + str(count))
+        print("collector_unapproved_env_name_fingerprints=" +
+              ",".join(fingerprints))
     print("network_egress_verified=false")
     print("testnet_read_authorized=false")
     print("trading_authorized=false")
