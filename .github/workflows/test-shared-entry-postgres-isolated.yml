@@ -19,6 +19,7 @@ on:
       - 'tests/test_offline_original_v2_review_bridge_pg_ci.py'
       - 'offline_original_v2_socket_review_ci.py'
       - 'tests/test_offline_original_v2_socket_review_ci.py'
+      - 'tests/test_offline_v2_distinct_uid_socket_postgres_ci.py'
       - 'tests/test_pre_submit_intent_postgres_ci.py'
       - 'tests/test_ci_sender_journal_postgres.py'
       - 'offline_ci_pg_fake_sender.py'
@@ -122,6 +123,21 @@ jobs:
           python -m unittest discover -s tests -p 'test_reconciliation_permission_boundary_ci.py' -v
           python -m unittest discover -s tests -p 'test_stale_handoff_cas_ci.py' -v
           python -m unittest discover -s tests -p 'test_readonly_reconciler_login_ci.py' -v
+      - name: Verify V2 group-gated review across three distinct Linux UIDs
+        run: |
+          set -euo pipefail
+          sudo -n env PATH="$PATH" PYTHONPATH="$PWD" \
+            ISOLATED_POSTGRES_CI=1 PGDATABASE=safety_test PGHOST=localhost \
+            CI_V2_REVIEW_AUDIT=1 PGPASSWORD="$PGPASSWORD" \
+            python -m unittest discover -s tests \
+              -p 'test_offline_v2_distinct_uid_socket_postgres_ci.py' -v \
+              2>&1 | tee /tmp/three-uid-v2-review.log
+          grep -q 'Ran 1 test' /tmp/three-uid-v2-review.log
+          grep -q '^OK$' /tmp/three-uid-v2-review.log
+          if grep -Eq 'skipped|SKIP' /tmp/three-uid-v2-review.log; then
+            echo 'V2 distinct-UID review test skipped — fail closed'
+            exit 1
+          fi
       - name: Verify group-gated real coordinator listener for three Linux UIDs
         run: |
           set -euo pipefail
