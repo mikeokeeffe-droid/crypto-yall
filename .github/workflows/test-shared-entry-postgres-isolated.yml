@@ -150,36 +150,7 @@ jobs:
               -p 'test_offline_original_decision_v2_worker_process_ci.py' -v \
               2>&1 | tee /tmp/three-uid-original-v2-decisions.log
           grep -q 'Ran 1 test' /tmp/three-uid-original-v2-decisions.log
-          grep -q '^OK        run: |
-          set -euo pipefail
-          sudo -n env PATH="$PATH" PYTHONPATH="$PWD" \
-            ISOLATED_POSTGRES_CI=1 PGDATABASE=safety_test PGHOST=localhost \
-            CI_SOCKET_GROUP_AUDIT=1 PGPASSWORD="$PGPASSWORD" \
-            python -m unittest discover -s tests \
-              -p 'test_offline_group_gated_postgres_listener_ci.py' -v \
-              2>&1 | tee /tmp/group-gated-real-listener.log
-          grep -q 'Ran 1 test' /tmp/group-gated-real-listener.log
-          grep -q '^OK$' /tmp/group-gated-real-listener.log
-          if grep -Eq 'skipped|SKIP' /tmp/group-gated-real-listener.log; then
-            echo 'Group-gated real listener test skipped: fail closed'
-            exit 1
-          fi
-      - name: Verify three distinct Linux UIDs on disposable PostgreSQL
-        run: |
-          set -euo pipefail
-          sudo -n env PATH="$PATH" PYTHONPATH="$PWD" \
-            ISOLATED_POSTGRES_CI=1 PGDATABASE=safety_test PGHOST=localhost \
-            PGPASSWORD="$PGPASSWORD" \
-            python -m unittest discover -s tests \
-              -p 'test_offline_original_bot_distinct_uid_postgres_ci.py' -v \
-              2>&1 | tee /tmp/three-real-uid-pg.log
-          grep -q 'Ran 1 test' /tmp/three-real-uid-pg.log
-          grep -q '^OK$' /tmp/three-real-uid-pg.log
-          if grep -Eq 'skipped|SKIP' /tmp/three-real-uid-pg.log; then
-            echo 'Distinct-UID test was skipped — fail closed'
-            exit 1
-          fi
- /tmp/three-uid-original-v2-decisions.log
+          grep -q '^OK$' /tmp/three-uid-original-v2-decisions.log
           if grep -Eq 'skipped|SKIP' /tmp/three-uid-original-v2-decisions.log; then
             echo 'Original decision V2 separate-UID test skipped — fail closed'
             exit 1
