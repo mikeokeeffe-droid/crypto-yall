@@ -150,3 +150,21 @@ mount permissions and firewall policy separately. A matching namespace check
 must never be treated as proof of disabled network egress.
 
 **Updated result (14 Nov 2026):** corrected probe passed in the actual offline oneshot sandbox, with `host_candidate` and 16 offline tests passing; independent egress and credentials review remains outstanding. Keep NO-GO.
+
+## Proposed in-unit no-connect socket-denial test (draft, not installed)
+
+After the 14 November offline sandbox review, PR #41 adds a distinct
+`collector_review.ip_socket_denial_probe` program and a **third offline
+ExecStart** step in the service example. It deliberately attempts only
+`socket(AF_INET, SOCK_STREAM)` and `socket(AF_INET6, SOCK_STREAM)`, with
+no `connect`, `bind`, `send`, DNS lookup or HTTP transport. The check
+must return HOLD if either socket unexpectedly opens. It runs after the
+existing host isolation probe and before the offline test suite.
+
+The already-installed systemd unit is **not automatically updated** by this
+draft. Do not mistake passing GitHub unit tests for runtime evidence from
+Hetzner. After CI and an explicit operator-approved, reviewed unit update,
+the new diagnostic can provide narrow evidence of address-family enforcement
+**inside the actual oneshot sandbox**. It still cannot establish absolute
+absence of all external egress paths, file-secret exposure, or authorization
+for testnet requests. Keep the collector offline and live trading NO-GO.
