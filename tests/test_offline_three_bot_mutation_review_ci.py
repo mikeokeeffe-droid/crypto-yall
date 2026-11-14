@@ -10,9 +10,9 @@ ACCOUNT = "0x" + "1" * 40
 BOTS = ("daily", "intraday", "aggressive")
 
 
-def check(bot, action, *, size="0.025", coin="SOL", **extra):
+def check(caller_bot, action, *, size="0.025", coin="SOL", **extra):
     return review(
-        verified_bot=bot,
+        verified_bot=caller_bot,
         trade={"action": action, "side":
                ("short" if action.endswith("_short") else "long"),
                "hl_coin": coin, **extra},
