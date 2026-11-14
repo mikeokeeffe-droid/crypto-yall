@@ -129,7 +129,12 @@ class SignerFreeV2ClientTests(unittest.TestCase):
                 "account":ACCOUNT,
             }),
         )
-        result,_=self.invoke(draft_override=unsafe)
+        with patch.dict(os.environ,{
+            "ISOLATED_POSTGRES_CI":"1","PGDATABASE":"safety_test",
+            "PGHOST":"localhost","CI_V2_REVIEW_AUDIT":"1",
+        }):
+            result=request(socket_path="/tmp/absent-v2-review.sock",
+                           expected_coordinator_uid=os.getuid(),draft=unsafe)
         self.assertEqual(result.state,"hold")
         self.assertFalse(result.review_recorded)
 
