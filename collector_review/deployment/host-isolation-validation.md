@@ -200,3 +200,31 @@ An operator-supplied Ubuntu terminal screenshot from the dedicated offline-test 
 - Do not switch the host-wide default outgoing policy without a safe, independently reviewed management/network plan. Do not weaken or start the collector unit. Independent reviewer must inspect complete effective firewall/cloud policy, its application to the prospective runtime, and credential access before any one-shot testnet network approval.
 
 **Decision stays HOLD. No service restart/start, testnet networking, exchange submission or live deployment authorised.**
+
+## Operator systemd network-setting observations — 15 November 2026, 22:22
+
+Operator-supplied terminal screenshot shows the following values for the
+**installed** `testnet-collector-offline-review.service`, obtained with a
+read-only `systemctl show` query:
+
+| Property | Observed value |
+|---|---|
+| `ActiveState` | `inactive` |
+| `PrivateNetwork` | `yes` |
+| `RestrictAddressFamilies` | `AF_UNIX` |
+| `IPAddressDeny` | `0.0.0.0/0 ::/0` |
+| `IPAddressAllow` | empty |
+| `NetworkNamespacePath` | empty |
+| `JoinsNamespaceOf` | empty |
+
+These are the effective values reported by systemd, consistent with the
+previously observed in-unit IP socket-denial test and the intentionally
+**offline** sandbox policy. An empty `NetworkNamespacePath` or
+`JoinsNamespaceOf` does not by itself demonstrate a kernel boundary.
+The unit was **not started** by this read-only query, so no new enforcement
+measurement was made. The host-wide UFW outbound policy is still reported
+as allow by default; independent full firewall/host egress and secret-access
+review remains **NOT COMPLETE**. Preserve the offline unit unchanged.
+
+**Disposition:** configuration checked; runtime network isolation NOT
+independently attested; testnet networking and live trading remain NO-GO.
