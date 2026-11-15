@@ -126,6 +126,54 @@ class OfflineHistoryResponseTests(unittest.TestCase):
                 self.assertEqual(r.state, "hold")
                 self.assert_untrusted(r)
 
+    def test_impossible_order_sizes_and_backward_status_time_hold(self):
+        baseline = valid_order()
+        order = baseline["order"]["order"]
+        status = baseline["order"]
+        cases = (
+            {"origSz": "0"},
+            {"origSz": "-0.1"},
+            {"sz": "-0.01"},
+            {"sz": "0.101"},
+            {"sz": "NaN"},
+            {"sz": "Infinity"},
+            {"sz": "0.05"},
+        )
+        for changes in cases:
+            with self.subTest(changes=changes):
+                forged = {
+                    **baseline,
+                    "order": {
+                        **status,
+                        "order": {**order, **changes},
+                    },
+                }
+                r = inspect("orderStatus", forged)
+                self.assertEqual(r.state, "hold")
+                self.assert_untrusted(r)
+        for timestamp in (1199, 0, True):
+            with self.subTest(timestamp=timestamp):
+                forged = {
+                    **baseline,
+                    "order": {**status, "statusTimestamp": timestamp},
+                }
+                r = inspect("orderStatus", forged)
+                self.assertEqual(r.state, "hold")
+                self.assert_untrusted(r)
+        # An open order may legitimately have a nonzero remaining quantity
+        # but may never exceed its original size.
+        open_order = {
+            **baseline,
+            "order": {
+                **status,
+                "status": "open",
+                "order": {**order, "sz": "0.05"},
+            },
+        }
+        r = inspect("orderStatus", open_order)
+        self.assertEqual(r.state, "fixture_only")
+        self.assert_untrusted(r)
+
     def test_fill_overlap_duplicate_and_saturated_page_hold(self):
         for bad in (
             [valid_fill(1), valid_fill(1)],
