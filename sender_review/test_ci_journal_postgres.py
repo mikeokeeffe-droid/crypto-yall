@@ -244,6 +244,45 @@ time.sleep(30)
                 worker.kill()
                 worker.communicate(timeout=5)
 
+    def test_review_events_are_append_only_during_uncertain_ack(self):
+        # Review-only journal events must not be editable to erase a HOLD
+        # after a simulated unknown-ACK recovery. No exchange operation.
+        self.assertTrue(record(bot="daily", coin="SOL", nonce="a" * 32)[0])
+        with connect() as conn:
+            held = conn.execute(
+                "select sender_review_ci.hold_uncertain(%s,%s,%s,%s)",
+                (ACCOUNT, "SOL", "a" * 32, 1),
+            ).fetchone()[0]
+        self.assertTrue(held)
+        before = self.query(
+            "SELECT event_id,intent_id,kind FROM "
+            "sender_review_ci.review_events ORDER BY event_id"
+        )
+        self.assertEqual([row[2] for row in before],
+                         ["review_recorded", "unknown_held"])
+        for statement in (
+            "UPDATE sender_review_ci.review_events "
+            "SET kind='review_recorded' WHERE kind='unknown_held'",
+            "DELETE FROM sender_review_ci.review_events "
+            "WHERE kind='unknown_held'",
+            "UPDATE sender_review_ci.review_events "
+            "SET created_at=clock_timestamp() "
+            "WHERE kind='review_recorded'",
+            "DELETE FROM sender_review_ci.review_events "
+            "WHERE kind='review_recorded'",
+        ):
+            with self.subTest(statement=statement):
+                with connect() as conn:
+                    with self.assertRaises(psycopg.errors.RaiseException):
+                        conn.execute(statement)
+                self.assertEqual(self.query(
+                    "SELECT event_id,intent_id,kind FROM "
+                    "sender_review_ci.review_events ORDER BY event_id"
+                ), before)
+        self.assertEqual(self.query(
+            "SELECT state FROM sender_review_ci.review_intents"
+        ), [("hold_unknown",)])
+
     def test_no_release_send_or_trade_function_exists(self):
         routines = self.query(
             "select proname from pg_proc p join pg_namespace n "
