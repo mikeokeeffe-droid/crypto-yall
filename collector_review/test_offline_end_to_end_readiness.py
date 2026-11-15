@@ -30,7 +30,7 @@ class TestnetOfflineEndToEndTests(unittest.TestCase):
             "coin": "SOL", "oid": 123, "timestamp": 1700000000000,
             "side": "B", "sz": "0.5", "limitPx": "120",
         }], separators=(",", ":")).encode()
-        with patch.object(collector.ssl, "create_default_context") as tls, \\
+        with patch.object(collector.ssl, "create_default_context") as tls, \
              patch.object(collector.http.client, "HTTPSConnection") as socket:
             checked = collector.review_untrusted_http_capture(
                 account=ACCOUNT, kind="openOrders", sent_body=body,
