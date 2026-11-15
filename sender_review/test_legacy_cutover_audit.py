@@ -40,7 +40,7 @@ class LegacyCutoverAuditTests(unittest.TestCase):
         source = """
 from typing import Any
 def get_client():
-    raise RuntimeError('not callable')
+    raise RuntimeError('HL_PRIVATE_KEY not callable')
 def execute(exchange, coin):
     exchange.market_open(coin, True, 1)
     exchange.market_close(coin)
@@ -69,6 +69,12 @@ def execute(exchange, coin):
             )
             with self.assertRaises(ValueError):
                 inspect_current_checkout(root)
+            # Restore workflow before checking missing-file failure,
+            # otherwise the earlier deliberate drift fails first.
+            (root/LEGACY["daily"]["workflow"]).write_text(
+                (ROOT/LEGACY["daily"]["workflow"]).read_text("utf-8"),
+                encoding="utf-8",
+            )
             (root/LEGACY["intraday"]["executor"]).unlink()
             with self.assertRaises(FileNotFoundError):
                 inspect_current_checkout(root)
