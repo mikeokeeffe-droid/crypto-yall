@@ -286,6 +286,93 @@ class SignedIdentityBridgePostgresTests(unittest.TestCase):
             "select 1 from sender_review_ci.review_intents"
         )), 1)
 
+    def test_three_signed_bots_same_nonce_cross_coin_single_evidence(self):
+        # Distinct fake signed JTI values and bot identities race with the
+        # SAME account-wide nonce on different coins. The fixture receipt
+        # must be consumed in the journal transaction and the losing
+        # submissions must never create empty scope rows or orphaned proof.
+        jobs = (
+            ("daily", "SOL", "three-bots-cross-coin-daily"),
+            ("intraday", "AVAX", "three-bots-cross-coin-intraday"),
+            ("aggressive", "LINK", "three-bots-cross-coin-aggressive"),
+        )
+        submissions = [
+            (bot, coin, jti, self.fixture.token(bot, jti=jti),
+             self.body(nonce="d" * 32, coin=coin))
+            for bot, coin, jti in jobs
+        ]
+        with concurrent.futures.ThreadPoolExecutor(max_workers=3) as pool:
+            futures = [
+                pool.submit(self.submit, token=token, body=body)
+                for _, _, _, token, body in submissions
+            ]
+            results = [f.result(timeout=10) for f in futures]
+        self.assertEqual(sum(r.journal_recorded for r in results), 1)
+        self.assertTrue(all(
+            not r.runtime_identity_authenticated
+            and not r.request_authorized
+            and not r.submit_authorized
+            and not r.close_authorized
+            for r in results
+        ))
+        winner_index = next(
+            index for index, r in enumerate(results) if r.journal_recorded
+        )
+        winning_bot, winning_coin, winning_jti, token, body = (
+            submissions[winner_index]
+        )
+        self.assertEqual(self.rows(
+            "SELECT bot,coin,request_nonce FROM "
+            "sender_review_ci.review_intents"
+        ), [(winning_bot, winning_coin, "d" * 32)])
+        self.assertEqual(self.rows(
+            "SELECT bot,jti,request_nonce FROM "
+            "sender_review_ci.fixture_identity_receipts"
+        ), [(winning_bot, winning_jti, "d" * 32)])
+        self.assertEqual(self.rows(
+            "SELECT e.bot,e.jti,e.body_sha256,e.token_sha256,i.coin "
+            "FROM sender_review_ci.fixture_request_evidence e "
+            "JOIN sender_review_ci.review_intents i ON i.id=e.intent_id"
+        ), [(
+            winning_bot, winning_jti,
+            hashlib.sha256(body).hexdigest(),
+            hashlib.sha256(token.encode("ascii")).hexdigest(),
+            winning_coin,
+        )])
+        self.assertEqual(self.rows(
+            "SELECT coin,fence,active_nonce FROM "
+            "sender_review_ci.scope_fences"
+        ), [(winning_coin, 1, "d" * 32)])
+        self.assertEqual(self.rows(
+            "SELECT kind FROM sender_review_ci.review_events"
+        ), [("review_recorded",)])
+        for index, (_, coin, _, _, _) in enumerate(submissions):
+            if index != winner_index:
+                self.assertFalse(results[index].journal_recorded)
+                self.assertEqual(results[index].state, "hold")
+                self.assertNotEqual(coin, winning_coin)
+
+        # Failed attempts did not consume competing identity receipts or
+        # poison other coin scopes: a new nonce and fresh fixture token can
+        # still create its own review-only HOLD, never an executable send.
+        losing_bot, losing_coin, _, _, _ = submissions[
+            (winner_index + 1) % len(submissions)
+        ]
+        fresh = self.submit(
+            token=self.fixture.token(
+                losing_bot, jti="fresh-cross-coin-review-001"
+            ),
+            body=self.body(nonce="e" * 32, coin=losing_coin),
+        )
+        self.assertTrue(fresh.journal_recorded)
+        self.assertFalse(fresh.submit_authorized)
+        self.assertEqual(self.rows(
+            "SELECT count(*) FROM sender_review_ci.fixture_identity_receipts"
+        ), [(2,)])
+        self.assertEqual(self.rows(
+            "SELECT count(*) FROM sender_review_ci.fixture_request_evidence"
+        ), [(2,)])
+
     def test_same_signed_token_different_coins_never_crosses_scope(self):
         token = self.fixture.token("daily")
         self.assertTrue(self.submit(token=token).journal_recorded)
