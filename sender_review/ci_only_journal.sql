@@ -152,6 +152,29 @@ BEGIN
 END
 $$;
 
+
+-- Signed OIDC test fixture JTI consumption is durable across CI process
+-- restarts. These rows are NOT server authentication or trading permission.
+CREATE TABLE IF NOT EXISTS sender_review_ci.fixture_identity_receipts (
+    environment text NOT NULL CHECK (environment = 'testnet'),
+    account text NOT NULL CHECK (account ~ '^0x[0-9a-f]{40}
+REVOKE ALL ON ALL SEQUENCES IN SCHEMA sender_review_ci FROM PUBLIC;
+REVOKE EXECUTE ON ALL FUNCTIONS IN SCHEMA sender_review_ci FROM PUBLIC;
+),
+    jti text NOT NULL CHECK (jti ~ '^[A-Za-z0-9_-]{6,128}
+REVOKE ALL ON ALL SEQUENCES IN SCHEMA sender_review_ci FROM PUBLIC;
+REVOKE EXECUTE ON ALL FUNCTIONS IN SCHEMA sender_review_ci FROM PUBLIC;
+),
+    bot text NOT NULL CHECK (bot IN ('daily','intraday','aggressive')),
+    request_nonce text NOT NULL CHECK (request_nonce ~ '^[0-9a-f]{32}
+REVOKE ALL ON ALL SEQUENCES IN SCHEMA sender_review_ci FROM PUBLIC;
+REVOKE EXECUTE ON ALL FUNCTIONS IN SCHEMA sender_review_ci FROM PUBLIC;
+),
+    created_at timestamptz NOT NULL DEFAULT clock_timestamp(),
+    PRIMARY KEY (environment, account, jti),
+    UNIQUE (environment, account, request_nonce)
+);
+
 REVOKE ALL ON ALL TABLES IN SCHEMA sender_review_ci FROM PUBLIC;
 REVOKE ALL ON ALL SEQUENCES IN SCHEMA sender_review_ci FROM PUBLIC;
 REVOKE EXECUTE ON ALL FUNCTIONS IN SCHEMA sender_review_ci FROM PUBLIC;
