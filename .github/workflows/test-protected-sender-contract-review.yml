@@ -41,6 +41,8 @@ jobs:
         run: python -m unittest sender_review.test_proposed_intent_interfaces_offline -v
       - name: Verify synthetic protective-close and unknown-ACK recovery always HOLD
         run: python -m unittest sender_review.test_protective_recovery_simulator_offline -v
+      - name: Verify synthetic account-wide ownership and fill reconciliation stays HOLD
+        run: python -m unittest sender_review.test_account_wide_reconciliation_fixture_offline -v
       - name: Verify no signer, socket, DB or HTTP imports in S1 module
         shell: bash
         run: |
