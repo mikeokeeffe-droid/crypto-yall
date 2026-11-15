@@ -1,0 +1,160 @@
+{
+  "schema_version": 1,
+  "artifact": "PROTECTED_SENDER_DEPLOYMENT_READINESS_REVIEW_ONLY",
+  "review_pr": 42,
+  "repository": "mikeokeeffe-droid/crypto-yall",
+  "review_branch": "review/protected-sender-cutover-20261115",
+  "verified_scope": "offline source and disposable CI tests only; not an operational attestation",
+  "global_decision": "NO_GO",
+  "may_merge": false,
+  "may_deploy_testnet": false,
+  "may_deploy_production": false,
+  "may_connect_exchange": false,
+  "may_sign_or_submit_orders": false,
+  "ci_success_is_deployment_approval": false,
+  "operator_approval_obtained": false,
+  "security_approval_obtained": false,
+  "runtime_host_attested": false,
+  "gates": [
+    {
+      "id": "runtime_oidc",
+      "owner": "security",
+      "requirement": "Real GitHub issuer JWKS, immutable workflow claims, trusted clock, HTTPS identity binding",
+      "required_evidence": "Independent service-side integration logs with redacted claims, negative replay/forgery tests and reviewed exact deployment commit",
+      "status": "UNVERIFIED",
+      "evidence_reference": null,
+      "reviewer": null,
+      "approved_commit": null
+    },
+    {
+      "id": "request_integrity",
+      "owner": "security",
+      "requirement": "End-to-end body hash/nonce/JTI and account+bot binding independent of caller assertions",
+      "required_evidence": "Durable database and service crash/replay tests across restarts, with reviewer-confirmed identity-to-request correlation",
+      "status": "UNVERIFIED",
+      "evidence_reference": null,
+      "reviewer": null,
+      "approved_commit": null
+    },
+    {
+      "id": "sender_db_roles",
+      "owner": "security",
+      "requirement": "Dedicated least-privilege production roles and hardened SECURITY DEFINER functions",
+      "required_evidence": "Real-role SQL ACL snapshots, no superuser and no direct table write tests on the actual target database",
+      "status": "UNVERIFIED",
+      "evidence_reference": null,
+      "reviewer": null,
+      "approved_commit": null
+    },
+    {
+      "id": "runtime_isolation",
+      "owner": "operations",
+      "requirement": "Verified host process permissions, secret isolation, and egress restrictions",
+      "required_evidence": "Actual effective systemd/container state, namespace and firewall measurements from target host",
+      "status": "UNVERIFIED",
+      "evidence_reference": null,
+      "reviewer": null,
+      "approved_commit": null
+    },
+    {
+      "id": "collector_transport",
+      "owner": "security",
+      "requirement": "Authenticated read-only TLS transport to explicitly allowed exchange /info endpoints",
+      "required_evidence": "Observed testnet TLS and network deny tests with independent packet/egress evidence and zero signing keys",
+      "status": "UNVERIFIED",
+      "evidence_reference": null,
+      "reviewer": null,
+      "approved_commit": null
+    },
+    {
+      "id": "archive_provenance",
+      "owner": "data",
+      "requirement": "Durable and independently verified account-wide history beyond provider retention limits",
+      "required_evidence": "Baseline checkpoint, archival completeness audit and documented treatment of older/manual positions",
+      "status": "UNVERIFIED",
+      "evidence_reference": null,
+      "reviewer": null,
+      "approved_commit": null
+    },
+    {
+      "id": "ownership_reconcile",
+      "owner": "risk",
+      "requirement": "Trusted account-wide fills/orders/positions reconcile correctly under concurrent bot/manual activity",
+      "required_evidence": "Integration traces of mixed-owner/partial-fill/legacy attribution and manual-dispute escalation",
+      "status": "UNVERIFIED",
+      "evidence_reference": null,
+      "reviewer": null,
+      "approved_commit": null
+    },
+    {
+      "id": "single_writer",
+      "owner": "security",
+      "requirement": "All original bot execution paths lack credentials and order egress; sole signer fenced",
+      "required_evidence": "Proof all five execution invocations migrated, secret access revoked, network egress blocked, and account-wide mutex tests",
+      "status": "UNVERIFIED",
+      "evidence_reference": null,
+      "reviewer": null,
+      "approved_commit": null
+    },
+    {
+      "id": "exit_reliability",
+      "owner": "risk",
+      "requirement": "Explicit-size exchange-enforced reduce-only closes with ownership and position precision",
+      "required_evidence": "Independent testnet evidence for partial, unknown-ACK, stale position, emergency exit, TP/SL and outage scenarios",
+      "status": "UNVERIFIED",
+      "evidence_reference": null,
+      "reviewer": null,
+      "approved_commit": null
+    },
+    {
+      "id": "unknown_ack_recovery",
+      "owner": "risk",
+      "requirement": "Persistent no-blind-retry unknown ACK and restart-safe reconciliation",
+      "required_evidence": "Live-protocol testnet reconciliation and delayed/missing ACK/reconnect drills with reviewer signoff",
+      "status": "UNVERIFIED",
+      "evidence_reference": null,
+      "reviewer": null,
+      "approved_commit": null
+    },
+    {
+      "id": "observability_rollback",
+      "owner": "operations",
+      "requirement": "Outage alerts, kill switches, reconciliation monitoring, rescue procedure, and tested rollback",
+      "required_evidence": "Human-observed response drill with logs, documented responsibilities, rollback playbook and open-position protection",
+      "status": "UNVERIFIED",
+      "evidence_reference": null,
+      "reviewer": null,
+      "approved_commit": null
+    },
+    {
+      "id": "independent_security_review",
+      "owner": "approval",
+      "requirement": "Independent expert review of exact code, dependencies, permissions, host and risk controls",
+      "required_evidence": "Signed review record with exact Git commit and deployed artifact digests",
+      "status": "UNVERIFIED",
+      "evidence_reference": null,
+      "reviewer": null,
+      "approved_commit": null
+    },
+    {
+      "id": "testnet_operator_approval",
+      "owner": "approval",
+      "requirement": "Separate explicit approval for a specific testnet account and bounded experiments",
+      "required_evidence": "Operator approval referencing account, region/network, risk cap, scope, commit and permitted date",
+      "status": "UNVERIFIED",
+      "evidence_reference": null,
+      "reviewer": null,
+      "approved_commit": null
+    },
+    {
+      "id": "production_operator_approval",
+      "owner": "approval",
+      "requirement": "Distinct explicit live authorization following testnet evidence and new security review",
+      "required_evidence": "Separate production approval tied to live account, maximum risk, version, monitoring and revocation plan",
+      "status": "UNVERIFIED",
+      "evidence_reference": null,
+      "reviewer": null,
+      "approved_commit": null
+    }
+  ]
+}
