@@ -274,14 +274,10 @@ def inspect_scripted_info_collection_offline(*, plan, transport):
             oid, coin, side, size, cloid = _parse_order(
                 status_doc["order"], nested=True
             )
+            selector = json.loads(plan.queries[4].body_json)["oid"]
             if (oid not in orders or orders[oid] != (coin, side, size, cloid)
-                    or cloid != request.get("oid", cloid)):
-                # 'request' above is fills query; compare against exact
-                # orderStatus selector below rather than trusting records.
-                selector = json.loads(plan.queries[4].body_json)["oid"]
-                if (oid not in orders or orders[oid] != (coin, side, size, cloid)
-                        or cloid != selector):
-                    return hold("order status/CLOID/historical mismatch")
+                    or cloid != selector):
+                return hold("order status/CLOID/historical mismatch")
         return MockCollectorReview(
             reason="synthetic JSON internally matches, but history and "
                    "exchange origin are NOT authenticated",
