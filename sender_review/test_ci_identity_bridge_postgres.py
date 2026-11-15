@@ -105,6 +105,52 @@ class SignedIdentityBridgePostgresTests(unittest.TestCase):
         self.assertFalse(r.runtime_identity_authenticated)
         self.assertFalse(r.submit_authorized)
 
+    def test_mismatched_bot_nonce_or_receipt_cannot_forge_evidence(self):
+        token = self.fixture.token("daily", jti="bound-fixture-match-001")
+        request_body = self.body(nonce="e"*32)
+        self.assertTrue(self.submit(token=token, body=request_body).journal_recorded)
+        # A second valid receipt, by itself, must not authorize evidence for
+        # this intent or turn an Intraday fixture into a Daily fixture.
+        with connect() as conn:
+            conn.execute(
+                "INSERT INTO sender_review_ci.fixture_identity_receipts "
+                "(environment,account,jti,bot,request_nonce) "
+                "VALUES ('testnet',%s,%s,%s,%s)",
+                (ACCOUNT, "unbound-fixture-002", "intraday", "d"*32),
+            )
+        original = self.rows(
+            "SELECT intent_id,token_sha256,body_sha256 FROM "
+            "sender_review_ci.fixture_request_evidence"
+        )
+        cases = (
+            ("intraday", "bound-fixture-match-001", "e"*32),
+            ("daily", "unbound-fixture-002", "e"*32),
+            ("intraday", "unbound-fixture-002", "d"*32),
+            ("daily", "bound-fixture-match-001", "d"*32),
+            ("daily", "nonexistent-fixture", "e"*32),
+        )
+        intent_id = original[0][0]
+        for bot, jti, nonce in cases:
+            with self.subTest(bot=bot, jti=jti, nonce=nonce):
+                # Use a SAVEPOINT to keep each deliberately failed SQL
+                # statement from aborting the enclosing test transaction.
+                with connect() as conn:
+                    with self.assertRaises(psycopg.errors.ForeignKeyViolation):
+                        conn.execute(
+                            "INSERT INTO sender_review_ci.fixture_request_evidence "
+                            "(intent_id,environment,account,request_nonce,bot,"
+                            "jti,token_sha256,body_sha256,body_length) "
+                            "VALUES (%s,'testnet',%s,%s,%s,%s,%s,%s,%s)",
+                            (intent_id, ACCOUNT, nonce, bot, jti,
+                             hashlib.sha256(token.encode()).hexdigest(),
+                             hashlib.sha256(request_body).hexdigest(),
+                             len(request_body)),
+                        )
+        self.assertEqual(original, self.rows(
+            "SELECT intent_id,token_sha256,body_sha256 FROM "
+            "sender_review_ci.fixture_request_evidence"
+        ))
+
     def test_changed_body_or_token_replay_does_not_modify_evidence(self):
         token = self.fixture.token("daily", jti="bound-fixture-002")
         body = self.body(nonce="c"*32)
