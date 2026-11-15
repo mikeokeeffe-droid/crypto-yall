@@ -47,6 +47,8 @@ jobs:
         run: python -m unittest sender_review.test_exchange_readset_gate_offline -v
       - name: Verify offline-only Hyperliquid read query plan and capped histories
         run: python -m unittest sender_review.test_hyperliquid_readonly_collection_plan_offline -v
+      - name: Validate mock-only Hyperliquid info responses and zero trade authority
+        run: python -m unittest sender_review.test_mock_hyperliquid_info_collector_offline -v
       - name: Verify no signer, socket, DB or HTTP imports in S1 module
         shell: bash
         run: |
