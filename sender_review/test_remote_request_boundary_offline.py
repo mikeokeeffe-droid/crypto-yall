@@ -106,6 +106,32 @@ class OfflineRemoteRequestBoundaryTests(unittest.TestCase):
             with self.subTest(claims=claims):
                 self.assertEqual(self.check(token=self.token(**claims)).state, "hold")
 
+    def test_remote_boundary_pins_expected_run_id_and_attempt(self):
+        # Even correctly signed fake tokens from the correct repo/workflow
+        # must match the independently fixed CI test policy run/attempt.
+        accepted = self.check(token=self.token(
+            run_id="123456789", run_attempt="1"
+        ))
+        self.assertEqual(accepted.state, "signed_fixture_review_only")
+        self.assertFalse(accepted.runtime_identity_authenticated)
+        self.assertFalse(accepted.submit_authorized)
+        for changes in (
+            {"run_id": "123456788"},
+            {"run_id": "123456790"},
+            {"run_attempt": "2"},
+            {"run_attempt": "3"},
+            {"run_id": "000000123456789"},
+            {"run_attempt": "01"},
+            {"run_id": True},
+            {"run_attempt": None},
+        ):
+            with self.subTest(changes=changes):
+                denied = self.check(token=self.token(**changes))
+                self.assertEqual(denied.state, "hold")
+                self.assertFalse(denied.request_authorized)
+                self.assertFalse(denied.submit_authorized)
+                self.assertFalse(denied.close_authorized)
+
     def test_duplicate_authorization_headers_and_unknown_headers_refused(self):
         t = self.token()
         cases = (
