@@ -373,6 +373,86 @@ class SignedIdentityBridgePostgresTests(unittest.TestCase):
             "SELECT count(*) FROM sender_review_ci.fixture_request_evidence"
         ), [(2,)])
 
+    def test_three_bots_shared_signed_jti_across_distinct_nonces(self):
+        # Three different signed TEST identities share one JTI while using
+        # different coins and nonces. A receipt must be single-use across
+        # bots, not just within one coin or request nonce.
+        jobs = (
+            ("daily", "SOL", "1" * 32),
+            ("intraday", "AVAX", "2" * 32),
+            ("aggressive", "LINK", "3" * 32),
+        )
+        shared_jti = "concurrent-shared-identity-001"
+        submissions = [
+            (bot, coin, nonce, self.fixture.token(bot, jti=shared_jti),
+             self.body(nonce=nonce, coin=coin))
+            for bot, coin, nonce in jobs
+        ]
+        with concurrent.futures.ThreadPoolExecutor(max_workers=3) as pool:
+            futures = [
+                pool.submit(self.submit, token=token, body=body)
+                for _, _, _, token, body in submissions
+            ]
+            results = [future.result(timeout=10) for future in futures]
+        self.assertEqual(sum(r.journal_recorded for r in results), 1)
+        self.assertTrue(all(
+            not r.runtime_identity_authenticated
+            and not r.request_authorized and not r.submit_authorized
+            and not r.close_authorized
+            for r in results
+        ))
+        winner_index = next(
+            index for index, outcome in enumerate(results)
+            if outcome.journal_recorded
+        )
+        bot, coin, nonce, token, body = submissions[winner_index]
+        self.assertEqual(self.rows(
+            "SELECT bot,jti,request_nonce FROM "
+            "sender_review_ci.fixture_identity_receipts"
+        ), [(bot, shared_jti, nonce)])
+        self.assertEqual(self.rows(
+            "SELECT bot,coin,request_nonce,state,fence FROM "
+            "sender_review_ci.review_intents"
+        ), [(bot, coin, nonce, "review_only", 1)])
+        self.assertEqual(self.rows(
+            "SELECT e.jti,e.bot,e.request_nonce,e.body_sha256,"
+            "e.token_sha256 FROM sender_review_ci.fixture_request_evidence e"
+        ), [(
+            shared_jti, bot, nonce,
+            hashlib.sha256(body).hexdigest(),
+            hashlib.sha256(token.encode("ascii")).hexdigest(),
+        )])
+        self.assertEqual(self.rows(
+            "SELECT coin,fence,active_nonce FROM sender_review_ci.scope_fences"
+        ), [(coin, 1, nonce)])
+        self.assertEqual(self.rows(
+            "SELECT kind FROM sender_review_ci.review_events"
+        ), [("review_recorded",)])
+        self.assertTrue(all(
+            outcome.state == "hold"
+            and not outcome.journal_recorded
+            for index, outcome in enumerate(results) if index != winner_index
+        ))
+
+        # Rejected JTI replays must not poison a losing coin or nonce.
+        losing_bot, losing_coin, losing_nonce, _, _ = submissions[
+            (winner_index + 1) % len(submissions)
+        ]
+        fresh = self.submit(
+            token=self.fixture.token(
+                losing_bot, jti="fresh-after-jti-replay-001"
+            ),
+            body=self.body(nonce=losing_nonce, coin=losing_coin),
+        )
+        self.assertTrue(fresh.journal_recorded)
+        self.assertFalse(fresh.submit_authorized)
+        self.assertEqual(self.rows(
+            "SELECT count(*) FROM sender_review_ci.review_intents"
+        ), [(2,)])
+        self.assertEqual(self.rows(
+            "SELECT count(*) FROM sender_review_ci.fixture_request_evidence"
+        ), [(2,)])
+
     def test_same_signed_token_different_coins_never_crosses_scope(self):
         token = self.fixture.token("daily")
         self.assertTrue(self.submit(token=token).journal_recorded)
