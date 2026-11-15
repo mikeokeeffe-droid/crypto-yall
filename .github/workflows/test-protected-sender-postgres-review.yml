@@ -1,0 +1,60 @@
+name: Protected Sender Disposable PostgreSQL Review
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'sender_review/**'
+      - '.github/workflows/test-protected-sender-postgres-review.yml'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  disposable-pg-journal:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: disposable-only-ci-password
+          POSTGRES_DB: sender_review_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d sender_review_test"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    env:
+      SENDER_REVIEW_DISPOSABLE_CI: '1'
+      PGHOST: 127.0.0.1
+      PGDATABASE: sender_review_test
+      PGPASSWORD: disposable-only-ci-password
+      PYTHONDONTWRITEBYTECODE: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install disposable PostgreSQL client
+        run: python -m pip install 'psycopg[binary]>=3.2,<4'
+      - name: Concurrent review-only journal and unknown-ack recovery
+        run: python -m unittest sender_review.test_ci_journal_postgres -v
+      - name: Verify no trade-authorizing SQL state or send function
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          text = Path("sender_review/ci_only_journal.sql").read_text("utf-8")
+          assert "hold_unknown" in text and "review_only" in text
+          assert "SECURITY INVOKER" in text
+          for marker in ("market_open(", "market_close(", "HL_PRIVATE_KEY",
+                         "submit_authorized", "release_claim(", "retry_order("):
+              assert marker not in text, marker
+          print("CI journal is review-only with no exchange sender")
+          PY
