@@ -40,6 +40,7 @@ class OfflineRemoteRequestBoundaryTests(unittest.TestCase):
             "aud": OFFLINE_REQUEST_POLICY.audience,
             "repository": OFFLINE_REQUEST_POLICY.repository,
             "repository_id": OFFLINE_REQUEST_POLICY.repository_id,
+            "repository_owner_id": OFFLINE_REQUEST_POLICY.repository_owner_id,
             "ref": OFFLINE_REQUEST_POLICY.ref,
             "sub": OFFLINE_REQUEST_POLICY.subject,
             "event_name": "workflow_dispatch",
@@ -88,6 +89,9 @@ class OfflineRemoteRequestBoundaryTests(unittest.TestCase):
         bad_claims = (
             {"repository": "attacker/crypto-yall"},
             {"repository_id": "000"},
+            {"repository_owner_id": "000"},
+            {"repository_owner_id": None},
+            {"sub": "repo:mikeokeeffe-droid/crypto-yall:ref:refs/heads/main"},
             {"aud": "wrong"},
             {"iss": "https://evil.example"},
             {"sub": "repo:attacker:ref:refs/heads/main"},
