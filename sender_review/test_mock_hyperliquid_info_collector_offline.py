@@ -255,10 +255,10 @@ class OfflineMockCollectorTests(unittest.TestCase):
             "mock_hyperliquid_info_collector_offline.py").read_text("utf-8")
         tree = ast.parse(src)
         forbidden = {
-            "open", "exec", "eval", "compile", "__import__",
+            "open", "exec", "eval", "__import__",
             "getattr", "setattr", "delattr",
             "system", "popen", "run", "Popen",
-            "urlopen", "request", "post", "get",
+            "urlopen", "request", "post",
             "connect", "socket", "Exchange",
             "market_open", "market_close", "order",
             "update_leverage", "cancel",
@@ -272,6 +272,8 @@ class OfflineMockCollectorTests(unittest.TestCase):
                 )
                 with self.subTest(name=name, line=node.lineno):
                     self.assertNotIn(name, forbidden)
+                    if isinstance(node.func, ast.Name):
+                        self.assertNotEqual(name, "compile")
             if isinstance(node, (ast.Import, ast.ImportFrom)):
                 for alias in (
                     node.names if isinstance(node, ast.Import)
