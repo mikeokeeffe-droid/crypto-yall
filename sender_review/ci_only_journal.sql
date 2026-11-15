@@ -166,6 +166,29 @@ CREATE TABLE IF NOT EXISTS sender_review_ci.fixture_identity_receipts (
     UNIQUE (environment, account, request_nonce)
 );
 
+
+-- Exact bytes of a signed TEST fixture and REVIEW-ONLY entry intent are
+-- evidenced together. Hashes are audit evidence, NEVER a trading signature.
+-- The references bind journal scope/nonce to evidence in the same database.
+-- The real runtime cannot use this design as an authentication service.
+CREATE TABLE IF NOT EXISTS sender_review_ci.fixture_request_evidence (
+    intent_id bigint PRIMARY KEY
+        REFERENCES sender_review_ci.review_intents(id) ON DELETE RESTRICT,
+    environment text NOT NULL CHECK (environment = 'testnet'),
+    account text NOT NULL CHECK (account ~ '^0x[0-9a-f]{40}$'),
+    request_nonce text NOT NULL CHECK (request_nonce ~ '^[0-9a-f]{32}$'),
+    bot text NOT NULL CHECK (bot IN ('daily','intraday','aggressive')),
+    jti text NOT NULL CHECK (jti ~ '^[A-Za-z0-9_-]{6,128}$'),
+    token_sha256 text NOT NULL CHECK (token_sha256 ~ '^[0-9a-f]{64}$'),
+    body_sha256 text NOT NULL CHECK (body_sha256 ~ '^[0-9a-f]{64}$'),
+    body_length int NOT NULL CHECK (body_length BETWEEN 1 AND 1024),
+    created_at timestamptz NOT NULL DEFAULT clock_timestamp(),
+    FOREIGN KEY (environment,account,request_nonce)
+        REFERENCES sender_review_ci.review_intents(environment,account,request_nonce),
+    UNIQUE (environment,account,jti),
+    UNIQUE (environment,account,request_nonce)
+);
+
 REVOKE ALL ON ALL TABLES IN SCHEMA sender_review_ci FROM PUBLIC;
 REVOKE ALL ON ALL SEQUENCES IN SCHEMA sender_review_ci FROM PUBLIC;
 REVOKE EXECUTE ON ALL FUNCTIONS IN SCHEMA sender_review_ci FROM PUBLIC;
