@@ -40,6 +40,11 @@ class OfflineOidcTrustPolicy:
     # immutable owner/repository IDs in the default OIDC subject.
     repository_owner_id: str | None = None
     immutable_subject: bool = False
+    # Optional operator-pinned source and workflow revisions. These are
+    # policy inputs, NOT trusted claims just because a token supplies them.
+    # Deployment still requires real issuer key and host provenance.
+    approved_source_sha: str | None = None
+    approved_workflow_sha: str | None = None
 
 
 @dataclass(frozen=True)
@@ -121,6 +126,12 @@ def verify_fixture_oidc_identity_offline(
                 if policy.immutable_subject else
                 ("repo:" + policy.repository + ":ref:" + policy.ref)
             )
+            or (policy.approved_source_sha is not None
+                and (type(policy.approved_source_sha) is not str
+                     or _SHA.fullmatch(policy.approved_source_sha) is None))
+            or (policy.approved_workflow_sha is not None
+                and (type(policy.approved_workflow_sha) is not str
+                     or _SHA.fullmatch(policy.approved_workflow_sha) is None))
             or type(policy.workflow_bot_refs) is not tuple
             or len(policy.workflow_bot_refs) != 3):
         return hold
@@ -185,6 +196,11 @@ def verify_fixture_oidc_identity_offline(
                 or _JTI.fullmatch(claims["jti"]) is None
                 or type(claims.get("sha")) is not str
                 or _SHA.fullmatch(claims["sha"]) is None
+                or (policy.approved_source_sha is not None
+                    and claims["sha"] != policy.approved_source_sha)
+                or (policy.approved_workflow_sha is not None
+                    and (type(claims.get("workflow_sha")) is not str
+                         or claims["workflow_sha"] != policy.approved_workflow_sha))
                 or type(claims.get("run_id")) is not str
                 or _DIGITS.fullmatch(claims["run_id"]) is None
                 or type(claims.get("run_attempt")) is not str
