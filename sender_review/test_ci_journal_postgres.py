@@ -9,6 +9,7 @@ import os
 from pathlib import Path
 import subprocess
 import sys
+import time
 import unittest
 
 import psycopg
@@ -130,6 +131,82 @@ class SenderJournalPostgresTests(unittest.TestCase):
             "select coin,fence,active_nonce from "
             "sender_review_ci.scope_fences order by coin"
         ), [("AVAX", 1, "b" * 32), ("SOL", 1, "a" * 32)])
+
+    def test_three_bots_queued_on_account_lock_do_not_create_loser_scopes(self):
+        # Force all three request transactions to wait on the SAME
+        # account-level advisory lock before allowing any to record.
+        # This exercises real PostgreSQL contention, not only Python
+        # thread scheduling. Still disposable review-only CI, no signer.
+        key = self.query(
+            "SELECT pg_catalog.hashtextextended(%s, 0)",
+            ("sender_review_ci|testnet|" + ACCOUNT,),
+        )[0][0]
+        with connect() as gate:
+            gate.execute("SELECT pg_catalog.pg_advisory_lock(%s)", (key,))
+            jobs = [
+                ("daily", "SOL", "1" * 32),
+                ("intraday", "AVAX", "1" * 32),
+                ("aggressive", "LINK", "1" * 32),
+            ]
+            with concurrent.futures.ThreadPoolExecutor(max_workers=3) as pool:
+                futures = [
+                    pool.submit(record, bot, coin, nonce)
+                    for bot, coin, nonce in jobs
+                ]
+                try:
+                    deadline = time.monotonic() + 8
+                    queued = 0
+                    while time.monotonic() < deadline:
+                        queued = self.query(
+                            "SELECT count(*) FROM pg_catalog.pg_stat_activity "
+                            "WHERE datname='sender_review_test' "
+                            "AND wait_event_type='Lock' "
+                            "AND wait_event='advisory' "
+                            "AND query LIKE '%sender_review_ci.record_review_only(%'"
+                        )[0][0]
+                        if queued == 3:
+                            break
+                        time.sleep(0.05)
+                    self.assertEqual(queued, 3, "three request workers must queue")
+                    self.assertEqual(self.query(
+                        "SELECT count(*) FROM sender_review_ci.scope_fences"
+                    ), [(0,)])
+                    self.assertEqual(self.query(
+                        "SELECT count(*) FROM sender_review_ci.review_intents"
+                    ), [(0,)])
+                finally:
+                    # Always release gate, including on a failed assertion.
+                    self.assertEqual(gate.execute(
+                        "SELECT pg_catalog.pg_advisory_unlock(%s)", (key,)
+                    ).fetchone(), (True,))
+                answers = [future.result(timeout=8) for future in futures]
+
+        self.assertEqual(sum(bool(result[0]) for result in answers), 1)
+        self.assertEqual(
+            sorted(result[2] for result in answers),
+            ["persisted-review-only-HOLD",
+             "replayed-request-nonce", "replayed-request-nonce"],
+        )
+        winner = self.query(
+            "SELECT coin,bot,request_nonce FROM "
+            "sender_review_ci.review_intents"
+        )
+        self.assertEqual(len(winner), 1)
+        self.assertEqual(winner[0][2], "1" * 32)
+        self.assertEqual(self.query(
+            "SELECT coin,fence,active_nonce FROM "
+            "sender_review_ci.scope_fences"
+        ), [(winner[0][0], 1, "1" * 32)])
+        self.assertEqual(self.query(
+            "SELECT kind FROM sender_review_ci.review_events"
+        ), [("review_recorded",)])
+        # The losing bot's coin remains claimable by a fresh, distinct
+        # nonce; replay must not create even an empty phantom reservation.
+        losing_coin = next(coin for _, coin, _ in jobs
+                           if coin != winner[0][0])
+        self.assertTrue(record(
+            bot="daily", coin=losing_coin, nonce="2" * 32
+        )[0])
 
     def test_uncertain_ack_persists_hold_and_survives_new_connection(self):
         accepted = record()
