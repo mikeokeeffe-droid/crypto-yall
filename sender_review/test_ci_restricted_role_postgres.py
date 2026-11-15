@@ -141,6 +141,29 @@ class RestrictedRoleTests(unittest.TestCase):
         self.assertEqual(len(self.rows(
             "SELECT 1 FROM sender_review_ci.fixture_identity_receipts"
         )),1)
+        # The denied claim's receipt must be rolled back rather than
+        # deleted via a privileged bypass of the append-only trigger.
+        self.assertEqual(self.rows(
+            "SELECT jti,bot,request_nonce FROM "
+            "sender_review_ci.fixture_identity_receipts"
+        ), [("fixture-001", "daily", "a"*32)])
+        self.assertEqual(self.rows(
+            "SELECT coin,fence,active_nonce FROM sender_review_ci.scope_fences"
+        ), [("SOL", 1, "a"*32)])
+        # A fresh attempt with the same denied JTI/nonce on an unclaimed
+        # coin can still record a review-only HOLD after the rollback.
+        accepted=self.call(
+            jti="fixture-002",bot="intraday",coin="AVAX",nonce="b"*32
+        )
+        self.assertEqual(
+            accepted,(True,1,"persisted-fixture-review-only-HOLD")
+        )
+        self.assertEqual(self.rows(
+            "SELECT count(*) FROM sender_review_ci.fixture_identity_receipts"
+        ), [(2,)])
+        self.assertEqual(self.rows(
+            "SELECT count(*) FROM sender_review_ci.review_intents"
+        ), [(2,)])
 
     def test_all_three_bots_race_only_one_records(self):
         jobs=[("daily","fixture-001","a"*32),
