@@ -31,8 +31,10 @@ OFFLINE_REQUEST_POLICY = OfflineOidcTrustPolicy(
     repository_id="1327094015",
     audience=_AUDIENCE,
     ref=_REF,
-    subject="repo:" + _REPO + ":ref:" + _REF,
+    subject="repo:mikeokeeffe-droid@313842984/crypto-yall@1327094015:ref:" + _REF,
     workflow_bot_refs=_WORKFLOWS,
+    repository_owner_id="313842984",
+    immutable_subject=True,
 )
 _REQUEST_PATH = "/v1/review-only/entry-intents"
 
