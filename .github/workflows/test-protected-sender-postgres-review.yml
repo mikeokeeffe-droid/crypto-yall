@@ -48,6 +48,8 @@ jobs:
         run: python -m unittest sender_review.test_ci_identity_bridge_postgres -v
       - name: Check denied PostgreSQL role permissions in disposable CI
         run: python -m unittest sender_review.test_ci_journal_permissions_postgres -v
+      - name: Test CI-only restricted role and no direct journal permissions
+        run: python -m unittest sender_review.test_ci_restricted_role_postgres -v
       - name: Verify no trade-authorizing SQL state or send function
         shell: bash
         run: |
