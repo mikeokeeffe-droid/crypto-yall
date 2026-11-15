@@ -114,6 +114,7 @@ class JournalUntrustedRolePermissionsTests(unittest.TestCase):
             ).fetchall()
         self.assertEqual(functions, [
             ("hold_uncertain",), ("record_review_only",),
+            ("reject_fixture_evidence_mutation",),
         ])
 
 
