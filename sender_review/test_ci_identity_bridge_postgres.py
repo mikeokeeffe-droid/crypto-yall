@@ -205,6 +205,55 @@ class SignedIdentityBridgePostgresTests(unittest.TestCase):
             "SELECT 1 FROM sender_review_ci.fixture_request_evidence"
         )), 1)
 
+    def test_unbound_signed_fixture_receipt_is_append_only(self):
+        # Test a receipt with NO evidence FK attached: removing or
+        # rewriting this JTI would enable a fake replay. Ordinary
+        # UPDATE/DELETE must fail even when FK constraints do not help.
+        token = self.fixture.token("daily", jti="immutable-jti-fixture-001")
+        body = self.body(nonce="8" * 32)
+        self.assertTrue(self.submit(token=token, body=body).journal_recorded)
+        with connect() as conn:
+            conn.execute(
+                "INSERT INTO sender_review_ci.fixture_identity_receipts "
+                "(environment,account,jti,bot,request_nonce) "
+                "VALUES ('testnet',%s,%s,%s,%s)",
+                (ACCOUNT, "unbound-jti-fixture-001",
+                 "aggressive", "9" * 32),
+            )
+        before = self.rows(
+            "SELECT environment,account,jti,bot,request_nonce "
+            "FROM sender_review_ci.fixture_identity_receipts ORDER BY jti"
+        )
+        self.assertEqual(len(before), 2)
+        for statement, parameters in (
+            ("UPDATE sender_review_ci.fixture_identity_receipts "
+             "SET jti=%s WHERE jti=%s",
+             ("rewritten-jti-fixture", "unbound-jti-fixture-001")),
+            ("UPDATE sender_review_ci.fixture_identity_receipts "
+             "SET request_nonce=%s WHERE jti=%s",
+             ("a" * 32, "unbound-jti-fixture-001")),
+            ("DELETE FROM sender_review_ci.fixture_identity_receipts "
+             "WHERE jti=%s", ("unbound-jti-fixture-001",)),
+            ("DELETE FROM sender_review_ci.fixture_identity_receipts "
+             "WHERE jti=%s", ("immutable-jti-fixture-001",)),
+        ):
+            with self.subTest(statement=statement):
+                with connect() as conn:
+                    with self.assertRaises(psycopg.errors.RaiseException):
+                        conn.execute(statement, parameters)
+                self.assertEqual(self.rows(
+                    "SELECT environment,account,jti,bot,request_nonce "
+                    "FROM sender_review_ci.fixture_identity_receipts "
+                    "ORDER BY jti"
+                ), before)
+        self.assertEqual(self.submit(token=token, body=body).state, "hold")
+        self.assertEqual(self.rows(
+            "SELECT count(*) FROM sender_review_ci.review_intents"
+        ), [(1,)])
+        self.assertEqual(self.rows(
+            "SELECT count(*) FROM sender_review_ci.fixture_request_evidence"
+        ), [(1,)])
+
     def test_invalid_or_contended_requests_leave_no_extra_evidence(self):
         valid = self.submit(
             token=self.fixture.token("daily", jti="bound-fixture-005")
