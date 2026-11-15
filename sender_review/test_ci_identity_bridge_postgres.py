@@ -1,8 +1,11 @@
 """Disposable-only integration: signed fixture, nonce receipt, journal HOLD."""
 import concurrent.futures
+import hashlib
 import json
 import os
 import unittest
+
+import psycopg
 
 from sender_review.ci_only_identity_bridge import (
     inspect_and_record_signed_fixture_offline,
@@ -82,6 +85,87 @@ class SignedIdentityBridgePostgresTests(unittest.TestCase):
                     self.rows("select bot from sender_review_ci.review_intents"),
                     [(bot,)],
                 )
+
+    def test_exact_bytes_and_fixture_identity_are_bound_atomically(self):
+        token = self.fixture.token("intraday", jti="bound-fixture-001")
+        body = self.body(nonce="f"*32)
+        r = self.submit(token=token, body=body)
+        self.assertTrue(r.journal_recorded)
+        evidence = self.rows(
+            "SELECT e.account,e.bot,e.jti,e.request_nonce,"
+            "e.token_sha256,e.body_sha256,e.body_length,i.coin,i.fence "
+            "FROM sender_review_ci.fixture_request_evidence e "
+            "JOIN sender_review_ci.review_intents i ON i.id=e.intent_id"
+        )
+        self.assertEqual(evidence, [(
+            ACCOUNT, "intraday", "bound-fixture-001", "f"*32,
+            hashlib.sha256(token.encode("ascii")).hexdigest(),
+            hashlib.sha256(body).hexdigest(), len(body), "SOL", 1,
+        )])
+        self.assertFalse(r.runtime_identity_authenticated)
+        self.assertFalse(r.submit_authorized)
+
+    def test_changed_body_or_token_replay_does_not_modify_evidence(self):
+        token = self.fixture.token("daily", jti="bound-fixture-002")
+        body = self.body(nonce="c"*32)
+        self.assertTrue(self.submit(token=token, body=body).journal_recorded)
+        before = self.rows(
+            "SELECT token_sha256,body_sha256 FROM "
+            "sender_review_ci.fixture_request_evidence"
+        )
+        # Same signed token, semantically identical but different raw bytes.
+        reformatted = json.dumps(json.loads(body), separators=(",", ":")).encode()
+        self.assertNotEqual(body, reformatted)
+        self.assertEqual(self.submit(token=token, body=reformatted).state, "hold")
+        # A new signed token cannot reuse a consumed request nonce.
+        different_token = self.fixture.token("daily", jti="bound-fixture-003")
+        self.assertEqual(
+            self.submit(token=different_token, body=body).state, "hold"
+        )
+        self.assertEqual(before, self.rows(
+            "SELECT token_sha256,body_sha256 FROM "
+            "sender_review_ci.fixture_request_evidence"
+        ))
+        self.assertEqual(len(self.rows(
+            "SELECT 1 FROM sender_review_ci.fixture_request_evidence"
+        )), 1)
+
+    def test_evidence_cannot_be_modified_or_deleted(self):
+        token = self.fixture.token("aggressive", jti="bound-fixture-004")
+        self.assertTrue(self.submit(token=token).journal_recorded)
+        with connect() as conn:
+            with self.assertRaises(psycopg.errors.RaiseException):
+                conn.execute(
+                    "UPDATE sender_review_ci.fixture_request_evidence "
+                    "SET body_sha256=%s", ("0"*64,)
+                )
+            with self.assertRaises(psycopg.errors.RaiseException):
+                conn.execute(
+                    "DELETE FROM sender_review_ci.fixture_request_evidence"
+                )
+        self.assertEqual(len(self.rows(
+            "SELECT 1 FROM sender_review_ci.fixture_request_evidence"
+        )), 1)
+
+    def test_invalid_or_contended_requests_leave_no_extra_evidence(self):
+        valid = self.submit(
+            token=self.fixture.token("daily", jti="bound-fixture-005")
+        )
+        self.assertTrue(valid.journal_recorded)
+        denied = self.submit(
+            token=self.fixture.token("intraday", jti="bound-fixture-006"),
+            body=self.body(nonce="b"*32),
+        )
+        self.assertEqual(denied.state, "hold")
+        self.assertEqual(len(self.rows(
+            "SELECT 1 FROM sender_review_ci.fixture_request_evidence"
+        )), 1)
+        self.assertEqual(len(self.rows(
+            "SELECT 1 FROM sender_review_ci.fixture_identity_receipts"
+        )), 1)
+        self.assertEqual(len(self.rows(
+            "SELECT 1 FROM sender_review_ci.review_intents"
+        )), 1)
 
     def test_replay_denied_across_fresh_database_connections(self):
         token = self.fixture.token("daily")
