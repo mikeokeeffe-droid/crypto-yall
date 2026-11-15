@@ -1,0 +1,39 @@
+# REVIEW FIXTURE ONLY — DO NOT INSTALL, ENABLE, LINK OR DEPLOY.
+# No executable collector exists. This is an intentionally inert systemd
+# isolation prototype for offline source tests. It must NEVER be enabled.
+# A future real unit requires independent host/security review.
+[Unit]
+Description=INERT CI-only protected sender read-only collector isolation review
+ConditionPathExists=/run/crypto-yall-readonly-review-never-create
+RefuseManualStart=yes
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/false
+DynamicUser=yes
+NoNewPrivileges=yes
+PrivateNetwork=yes
+IPAddressDeny=any
+RestrictAddressFamilies=AF_UNIX
+ProtectSystem=strict
+ProtectHome=yes
+PrivateDevices=yes
+PrivateTmp=yes
+PrivateUsers=yes
+ProtectProc=invisible
+ProcSubset=pid
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+ProtectKernelLogs=yes
+ProtectClock=yes
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+SystemCallArchitectures=native
+CapabilityBoundingSet=
+AmbientCapabilities=
+UMask=0077
+RemoveIPC=yes
