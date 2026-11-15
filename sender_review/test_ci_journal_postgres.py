@@ -127,6 +127,42 @@ class SenderJournalPostgresTests(unittest.TestCase):
             "select fence,active_nonce from sender_review_ci.scope_fences"
         ), [(1, "a" * 32)])
 
+    def test_concurrent_uncertain_ack_transitions_are_single_event_and_hold(self):
+        # Three competing recovery attempts use separate disposable DB
+        # connections. The journal must never duplicate the unknown ACK
+        # event or free the active fence even after clients disconnect.
+        first = record(bot="aggressive", coin="SOL", nonce="d" * 32)
+        self.assertTrue(first[0])
+        self.assertEqual(first[1], 1)
+
+        def hold_from_fresh_connection(_attempt):
+            with connect() as conn:
+                return conn.execute(
+                    "select sender_review_ci.hold_uncertain(%s,%s,%s,%s)",
+                    (ACCOUNT, "SOL", "d" * 32, 1),
+                ).fetchone()[0]
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=3) as pool:
+            results = list(pool.map(hold_from_fresh_connection, range(3)))
+        self.assertEqual(results.count(True), 1)
+        self.assertEqual(results.count(False), 2)
+        self.assertEqual(self.query(
+            "SELECT kind FROM sender_review_ci.review_events "
+            "ORDER BY event_id"
+        ), [("review_recorded",), ("unknown_held",)])
+        self.assertEqual(self.query(
+            "SELECT state,bot,fence FROM sender_review_ci.review_intents"
+        ), [("hold_unknown", "aggressive", 1)])
+        self.assertEqual(self.query(
+            "SELECT active_nonce,fence FROM sender_review_ci.scope_fences"
+        ), [("d" * 32, 1)])
+        self.assertFalse(hold_from_fresh_connection("later"))
+        self.assertFalse(record("daily", "SOL", "e" * 32)[0])
+        self.assertFalse(record("intraday", "SOL", "f" * 32)[0])
+        self.assertEqual(len(self.query(
+            "SELECT 1 FROM sender_review_ci.review_events"
+        )), 2)
+
     def test_wrong_fence_nonce_or_scope_cannot_transition(self):
         self.assertTrue(record()[0])
         for account, coin, nonce, fence in (
