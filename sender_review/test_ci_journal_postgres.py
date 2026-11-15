@@ -53,7 +53,8 @@ class SenderJournalPostgresTests(unittest.TestCase):
     def setUp(self):
         with connect() as conn:
             conn.execute(
-                "truncate sender_review_ci.review_events,"
+                "truncate sender_review_ci.fixture_identity_receipts,"
+                "sender_review_ci.review_events,"
                 "sender_review_ci.review_intents,"
                 "sender_review_ci.scope_fences restart identity cascade"
             )
