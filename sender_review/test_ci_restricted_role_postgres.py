@@ -165,6 +165,45 @@ class RestrictedRoleTests(unittest.TestCase):
             "SELECT count(*) FROM sender_review_ci.review_intents"
         ), [(2,)])
 
+    def test_invalid_journal_scope_rolls_back_restricted_identity_receipt(self):
+        # JTI/bot/nonce pass the fixture-only identity checks, but the
+        # journal rejects the lowercase coin. The nested SQL exception
+        # must roll back the unbound receipt; it cannot DELETE it now
+        # that receipt mutations are forbidden.
+        jti="invalid-coin-fixture-001"
+        nonce="4"*32
+        denied=self.call(
+            jti=jti,bot="intraday",coin="sol",nonce=nonce
+        )
+        self.assertEqual(
+            denied,(False,0,"journal-denied:invalid-review-input")
+        )
+        for table in (
+            "fixture_identity_receipts","scope_fences",
+            "review_intents","review_events","fixture_request_evidence",
+        ):
+            with self.subTest(table=table):
+                self.assertEqual(self.rows(
+                    "SELECT count(*) FROM sender_review_ci."+table
+                ),[(0,)])
+        # A corrected, distinct-coin review using the same fixture JTI
+        # and nonce is allowed ONLY as a fresh review-only HOLD. This is
+        # not authorization to retry a real exchange order.
+        accepted=self.call(
+            jti=jti,bot="intraday",coin="AVAX",nonce=nonce
+        )
+        self.assertEqual(
+            accepted,(True,1,"persisted-fixture-review-only-HOLD")
+        )
+        self.assertEqual(self.rows(
+            "SELECT jti,bot,request_nonce "
+            "FROM sender_review_ci.fixture_identity_receipts"
+        ),[(jti,"intraday",nonce)])
+        self.assertEqual(self.rows(
+            "SELECT coin,state,fence "
+            "FROM sender_review_ci.review_intents"
+        ),[("AVAX","review_only",1)])
+
     def test_all_three_bots_race_only_one_records(self):
         jobs=[("daily","fixture-001","a"*32),
               ("intraday","fixture-002","b"*32),
