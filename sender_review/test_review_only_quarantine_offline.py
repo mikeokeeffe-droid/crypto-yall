@@ -5,6 +5,7 @@ from tempfile import TemporaryDirectory
 
 from sender_review.review_only_quarantine_offline import (
     check_worker_source, check_workflow_source, review_fixture_quarantine,
+    check_frozen_legacy_content, git_blob_fingerprint,
 )
 from sender_review.legacy_cutover_audit import LEGACY, ROOT
 
@@ -44,6 +45,46 @@ class ReviewOnlyQuarantineTests(unittest.TestCase):
         ):
             with self.subTest(source=source):
                 self.assertTrue(check_workflow_source(source))
+
+    def test_frozen_live_files_detect_one_byte_drift(self):
+        # The eight checked-in live paths must exactly match the reviewed
+        # main-branch Git blobs, not merely pass a permissive regex scan.
+        self.assertEqual(check_frozen_legacy_content(ROOT), ())
+        with TemporaryDirectory() as folder:
+            root = Path(folder)
+            paths = (
+                "hyperliquid_executor.py", "intraday_executor.py",
+                "aggressive_executor.py", "intraday_profit_protection.py",
+                "aggressive_profit_protection.py",
+                ".github/workflows/execute-trades.yml",
+                ".github/workflows/execute-intraday.yml",
+                ".github/workflows/execute-aggressive.yml",
+            )
+            for path in paths:
+                target = root / path
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_bytes((ROOT / path).read_bytes())
+            self.assertEqual(check_frozen_legacy_content(root), ())
+            # A non-semantic edit must still force independent re-audit.
+            changed = root / paths[0]
+            changed.write_bytes(changed.read_bytes() + b"\\n")
+            issues = check_frozen_legacy_content(root)
+            self.assertEqual(len(issues), 1)
+            self.assertIn(paths[0], issues[0])
+            # No automatic permission to approve drift by changing a pin.
+            self.assertFalse(review_fixture_quarantine(root)[
+                "quarantine_checks_pass"
+            ])
+
+    def test_git_blob_fingerprint_type_and_content(self):
+        import hashlib
+        data = b"example\\n"
+        expected = hashlib.sha1(
+            b"blob " + str(len(data)).encode() + b"\\0" + data
+        ).hexdigest()
+        self.assertEqual(git_blob_fingerprint(data), expected)
+        with self.assertRaises(TypeError):
+            git_blob_fingerprint("example")
 
     def test_missing_legacy_executor_reports_no_go(self):
         # Copy only minimal valid legacy sources into a disposable directory,
