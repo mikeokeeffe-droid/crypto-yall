@@ -103,6 +103,15 @@ def _order_status(payload, oid):
             or not _number(order.get("limitPx"), positive=True)
             or type(order.get("reduceOnly")) is not bool):
         return False
+    # "sz" is remaining order quantity, not a signed position delta.
+    # A stale/malformed response must never show more unfilled than
+    # originally requested, nor a status predating its own order.
+    original = Decimal(order["origSz"])
+    remaining = Decimal(order["sz"])
+    if (remaining < 0 or remaining > original
+            or record["statusTimestamp"] < order["timestamp"]
+            or (record["status"] == "filled" and remaining != 0)):
+        return False
     cloid = order.get("cloid")
     if cloid is not None and (
             type(cloid) is not str or _CLOID.fullmatch(cloid) is None):
