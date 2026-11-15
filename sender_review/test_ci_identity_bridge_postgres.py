@@ -106,11 +106,15 @@ class SignedIdentityBridgePostgresTests(unittest.TestCase):
         self.assertFalse(r.submit_authorized)
 
     def test_mismatched_bot_nonce_or_receipt_cannot_forge_evidence(self):
+        from sender_review.test_ci_journal_postgres import record
         token = self.fixture.token("daily", jti="bound-fixture-match-001")
         request_body = self.body(nonce="e"*32)
         self.assertTrue(self.submit(token=token, body=request_body).journal_recorded)
-        # A second valid receipt, by itself, must not authorize evidence for
-        # this intent or turn an Intraday fixture into a Daily fixture.
+        # An independent review intent on AVAX is deliberately left WITHOUT
+        # evidence, so the FK (not a duplicate evidence PK) must reject a
+        # forged link between that intent and another bot or receipt.
+        review = record(bot="intraday", coin="AVAX", nonce="d"*32)
+        self.assertTrue(review[0])
         with connect() as conn:
             conn.execute(
                 "INSERT INTO sender_review_ci.fixture_identity_receipts "
@@ -118,22 +122,23 @@ class SignedIdentityBridgePostgresTests(unittest.TestCase):
                 "VALUES ('testnet',%s,%s,%s,%s)",
                 (ACCOUNT, "unbound-fixture-002", "intraday", "d"*32),
             )
+        intent_id = self.rows(
+            "SELECT id FROM sender_review_ci.review_intents "
+            "WHERE coin='AVAX'"
+        )[0][0]
         original = self.rows(
             "SELECT intent_id,token_sha256,body_sha256 FROM "
             "sender_review_ci.fixture_request_evidence"
         )
         cases = (
-            ("intraday", "bound-fixture-match-001", "e"*32),
-            ("daily", "unbound-fixture-002", "e"*32),
-            ("intraday", "unbound-fixture-002", "d"*32),
-            ("daily", "bound-fixture-match-001", "d"*32),
-            ("daily", "nonexistent-fixture", "e"*32),
+            ("daily", "unbound-fixture-002", "d"*32),
+            ("intraday", "bound-fixture-match-001", "d"*32),
+            ("intraday", "unbound-fixture-002", "e"*32),
+            ("daily", "bound-fixture-match-001", "e"*32),
+            ("intraday", "nonexistent-fixture", "d"*32),
         )
-        intent_id = original[0][0]
         for bot, jti, nonce in cases:
             with self.subTest(bot=bot, jti=jti, nonce=nonce):
-                # Use a SAVEPOINT to keep each deliberately failed SQL
-                # statement from aborting the enclosing test transaction.
                 with connect() as conn:
                     with self.assertRaises(psycopg.errors.ForeignKeyViolation):
                         conn.execute(
