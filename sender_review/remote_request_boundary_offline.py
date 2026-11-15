@@ -35,6 +35,12 @@ OFFLINE_REQUEST_POLICY = OfflineOidcTrustPolicy(
     workflow_bot_refs=_WORKFLOWS,
     repository_owner_id="313842984",
     immutable_subject=True,
+    # Pinned disposable test-run identity. These are NEVER live GitHub
+    # attestation, run-status evidence, or deployable authorisation.
+    # In a future runtime, only a separately trusted server-side source
+    # may supply an expected run/attempt; never accept caller claims.
+    expected_run_id="123456789",
+    expected_run_attempt="1",
 )
 _REQUEST_PATH = "/v1/review-only/entry-intents"
 
