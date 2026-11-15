@@ -33,6 +33,10 @@ jobs:
         run: |
           python -m unittest sender_review.test_legacy_cutover_audit -v
           python -m sender_review.legacy_cutover_audit
+      - name: Pin coordinated three-bot trading and protection cutover coverage
+        run: |
+          python -m unittest sender_review.test_three_bot_cutover_matrix -v
+          python -m sender_review.three_bot_cutover_matrix
       - name: Verify no signer, socket, DB or HTTP imports in S1 module
         shell: bash
         run: |
