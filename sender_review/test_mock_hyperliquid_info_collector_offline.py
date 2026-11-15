@@ -250,6 +250,40 @@ class OfflineMockCollectorTests(unittest.TestCase):
                 self.assertFalse(result.fixture_consistent)
                 self.assert_no_authority(result)
 
+    def test_mock_collector_has_no_dynamic_io_or_signing_calls(self):
+        src = Path(__file__).with_name(
+            "mock_hyperliquid_info_collector_offline.py").read_text("utf-8")
+        tree = ast.parse(src)
+        forbidden = {
+            "open", "exec", "eval", "compile", "__import__",
+            "getattr", "setattr", "delattr",
+            "system", "popen", "run", "Popen",
+            "urlopen", "request", "post", "get",
+            "connect", "socket", "Exchange",
+            "market_open", "market_close", "order",
+            "update_leverage", "cancel",
+        }
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Call):
+                name = (
+                    node.func.id if isinstance(node.func, ast.Name)
+                    else node.func.attr if isinstance(node.func, ast.Attribute)
+                    else ""
+                )
+                with self.subTest(name=name, line=node.lineno):
+                    self.assertNotIn(name, forbidden)
+            if isinstance(node, (ast.Import, ast.ImportFrom)):
+                for alias in (
+                    node.names if isinstance(node, ast.Import)
+                    else [type("X", (), {"name": node.module})()]
+                ):
+                    self.assertNotIn(alias.name.split(".")[0], {
+                        "os", "sys", "subprocess", "socket", "http",
+                        "urllib", "requests", "httpx", "aiohttp",
+                        "eth_account", "hyperliquid", "psycopg",
+                        "importlib", "pathlib",
+                    })
+
     def test_imports_are_pure_parsing_only(self):
         path = Path(__file__).with_name("mock_hyperliquid_info_collector_offline.py")
         imported = set()
