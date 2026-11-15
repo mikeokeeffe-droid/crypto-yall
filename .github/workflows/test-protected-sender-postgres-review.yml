@@ -41,7 +41,7 @@ jobs:
         with:
           python-version: '3.12'
       - name: Install disposable PostgreSQL client
-        run: python -m pip install 'psycopg[binary]>=3.2,<4'
+        run: python -m pip install 'psycopg[binary]>=3.2,<4' 'cryptography>=42,<47'
       - name: Concurrent review-only journal and unknown-ack recovery
         run: python -m unittest sender_review.test_ci_journal_postgres -v
       - name: Verify signed fixture identity, durable replay and fail-closed journal bridge
