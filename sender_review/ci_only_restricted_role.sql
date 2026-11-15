@@ -47,30 +47,38 @@ BEGIN
         RETURN;
     END IF;
 
-    INSERT INTO sender_review_ci.fixture_identity_receipts
-        (environment,account,jti,bot,request_nonce)
-    VALUES ('testnet',v_account,p_jti,p_bot,p_nonce)
-    ON CONFLICT DO NOTHING RETURNING jti INTO v_consumed;
-    IF v_consumed IS NULL THEN
-        RETURN QUERY SELECT false, 0::bigint, 'fixture-replay-held'::text;
-        RETURN;
-    END IF;
+    -- Nested exception block forms a PostgreSQL subtransaction. If the
+    -- journal rejects a fixture claim, roll back *both* the newly consumed
+    -- JTI receipt and any scope rows created during that claim. Never
+    -- DELETE a receipt: receipt rows are append-only, including unbound
+    -- ones, and must not be manually erased as a rollback workaround.
+    BEGIN
+        INSERT INTO sender_review_ci.fixture_identity_receipts
+            (environment,account,jti,bot,request_nonce)
+        VALUES ('testnet',v_account,p_jti,p_bot,p_nonce)
+        ON CONFLICT DO NOTHING RETURNING jti INTO v_consumed;
+        IF v_consumed IS NULL THEN
+            RETURN QUERY SELECT false, 0::bigint, 'fixture-replay-held'::text;
+            RETURN;
+        END IF;
 
-    SELECT r.recorded, r.assigned_fence, r.reason
-      INTO v_recorded,v_fence,v_reason
-      FROM sender_review_ci.record_review_only(
-          v_account,p_bot,p_coin,p_action,p_side,p_size,p_leverage,p_nonce
-      ) AS r;
-
-    IF NOT COALESCE(v_recorded,false) THEN
-        -- No receipt is consumed for an unrecorded/competing claim.
-        DELETE FROM sender_review_ci.fixture_identity_receipts AS f
-         WHERE f.environment='testnet' AND f.account=v_account
-           AND f.jti=p_jti AND f.request_nonce=p_nonce;
+        SELECT r.recorded, r.assigned_fence, r.reason
+          INTO v_recorded,v_fence,v_reason
+          FROM sender_review_ci.record_review_only(
+              v_account,p_bot,p_coin,p_action,p_side,p_size,p_leverage,p_nonce
+          ) AS r;
+        IF NOT COALESCE(v_recorded,false) THEN
+            -- CI-only sentinel for *expected* journal denial. The
+            -- exception rolls back inserts in this nested block before
+            -- its handler returns a review-only HOLD result.
+            RAISE EXCEPTION 'ci fixture journal denied'
+                USING ERRCODE='PZ001';
+        END IF;
+    EXCEPTION WHEN SQLSTATE 'PZ001' THEN
         RETURN QUERY SELECT false, COALESCE(v_fence,0),
             ('journal-denied:' || COALESCE(v_reason,'unknown'))::text;
         RETURN;
-    END IF;
+    END;
     RETURN QUERY SELECT true,v_fence,'persisted-fixture-review-only-HOLD'::text;
 END
 $$;
