@@ -40,7 +40,7 @@ class LegacyCutoverAuditTests(unittest.TestCase):
         source = """
 from typing import Any
 def get_client():
-    raise RuntimeError('HL_PRIVATE_KEY not callable')
+    raise RuntimeError('HL_PRIVATE_KEY')
 def execute(exchange, coin):
     exchange.market_open(coin, True, 1)
     exchange.market_close(coin)
