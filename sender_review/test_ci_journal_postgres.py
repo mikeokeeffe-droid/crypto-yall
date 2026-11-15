@@ -361,6 +361,82 @@ time.sleep(30)
             bot="aggressive", coin="SOL", nonce="9" * 32
         )[0])
 
+    def test_fresh_worker_after_unknown_ack_cannot_replay_or_release_lock(self):
+        # Simulate restart by exiting the original client, then launching
+        # a separate Python interpreter against the same disposable DB.
+        # No service, exchange request or signer is involved.
+        first = record(bot="daily", coin="SOL", nonce="a" * 32)
+        self.assertTrue(first[0])
+        with connect() as conn:
+            self.assertTrue(conn.execute(
+                "SELECT sender_review_ci.hold_uncertain(%s,%s,%s,%s)",
+                (ACCOUNT, "SOL", "a" * 32, 1),
+            ).fetchone()[0])
+        before = self.query(
+            "SELECT bot,coin,request_nonce,state,fence "
+            "FROM sender_review_ci.review_intents"
+        )
+        events_before = self.query(
+            "SELECT kind FROM sender_review_ci.review_events "
+            "ORDER BY event_id"
+        )
+        self.assertEqual(events_before, [
+            ("review_recorded",), ("unknown_held",),
+        ])
+        child = """
+import json
+import os
+import sys
+if (os.environ.get("SENDER_REVIEW_DISPOSABLE_CI") != "1"
+        or os.environ.get("PGDATABASE") != "sender_review_test"
+        or os.environ.get("PGHOST") != "127.0.0.1"):
+    raise SystemExit("disposable CI only")
+from sender_review.test_ci_journal_postgres import connect, record
+attempts = (
+    ("daily", "SOL", "a" * 32),
+    ("intraday", "SOL", "b" * 32),
+    ("aggressive", "SOL", "c" * 32),
+    ("intraday", "AVAX", "a" * 32),
+)
+results = [record(bot=bot, coin=coin, nonce=nonce)[0]
+           for bot, coin, nonce in attempts]
+with connect() as conn:
+    repeat_hold = conn.execute(
+        "SELECT sender_review_ci.hold_uncertain(%s,%s,%s,%s)",
+        ("0x" + "1" * 40, "SOL", "a" * 32, 1),
+    ).fetchone()[0]
+print(json.dumps({"claims": results, "repeated_hold": repeat_hold}))
+"""
+        env = dict(os.environ)
+        env["PYTHONPATH"] = str(ROOT)
+        restarted = subprocess.run(
+            [sys.executable, "-c", child], cwd=str(ROOT),
+            env=env, capture_output=True, text=True, timeout=15,
+            check=True,
+        )
+        import json
+        result = json.loads(restarted.stdout)
+        self.assertEqual(result, {
+            "claims": [False, False, False, False],
+            "repeated_hold": False,
+        })
+        self.assertEqual(self.query(
+            "SELECT bot,coin,request_nonce,state,fence "
+            "FROM sender_review_ci.review_intents"
+        ), before)
+        self.assertEqual(self.query(
+            "SELECT kind FROM sender_review_ci.review_events "
+            "ORDER BY event_id"
+        ), events_before)
+        self.assertEqual(self.query(
+            "SELECT active_nonce,fence FROM sender_review_ci.scope_fences "
+            "WHERE coin='SOL'"
+        ), [("a" * 32, 1)])
+        self.assertEqual(self.query(
+            "SELECT coin FROM sender_review_ci.scope_fences "
+            "WHERE coin='AVAX'"
+        ), [])
+
     def test_review_events_are_append_only_during_uncertain_ack(self):
         # Review-only journal events must not be editable to erase a HOLD
         # after a simulated unknown-ACK recovery. No exchange operation.
