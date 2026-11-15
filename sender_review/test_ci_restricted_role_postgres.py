@@ -78,7 +78,7 @@ class RestrictedRoleTests(unittest.TestCase):
                 "SELECT rolcanlogin,rolsuper,rolcreatedb,rolcreaterole "
                 "FROM pg_roles WHERE rolname=%s", (ROLE,),
             ).fetchone(), (False,False,False,False))
-            for table in ("fixture_identity_receipts","review_intents",
+            for table in ("fixture_request_evidence","fixture_identity_receipts","review_intents",
                           "review_events","scope_fences"):
                 for permission in ("SELECT","INSERT","UPDATE","DELETE"):
                     with self.subTest(table=table,permission=permission):
