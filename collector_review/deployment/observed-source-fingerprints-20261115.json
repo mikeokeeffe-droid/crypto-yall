@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "record_type": "OPERATOR_SCREENSHOT_TO_GITHUB_SOURCE_HASH_COMPARISON",
+  "captured_date_utc": "2026-11-15",
+  "source_pull_request": 41,
+  "source_commit": "51957b22c7034ff29d9befbda881ad31574d46c8",
+  "host_source_location": "/opt/crypto-yall/collector_review",
+  "comparison": "SIX_OF_SIX_SHA256_MATCH",
+  "observation_limitations": "Local hashes were read from operator screenshots; there is no signed host attestation, full tree inventory, runtime artifact proof, or separate reviewer sign-off. CI hash checks are not live host checks.",
+  "host_attested": false,
+  "effective_sandbox_attested": false,
+  "real_exchange_data_authenticated": false,
+  "testnet_network_authorized": false,
+  "trading_authorized": false,
+  "files": [
+    {
+      "path": "collector_review/host_isolation_probe.py",
+      "sha256": "affadca36552fc1e6557919985a8ff48cf27112aa6700752aeded4ddb57fc405",
+      "match": "EXACT"
+    },
+    {
+      "path": "collector_review/ip_socket_denial_probe.py",
+      "sha256": "bb7fee933d5f82f655d1dfecac5314046ea3da3875b9312d08c878852ab465b2",
+      "match": "EXACT"
+    },
+    {
+      "path": "collector_review/testnet_info_https.py",
+      "sha256": "9ff545496073e4d5064e94d1fbc0e042279efd283ed6ef79839d3eb0b7f07efc",
+      "match": "EXACT"
+    },
+    {
+      "path": "collector_review/test_testnet_info_https.py",
+      "sha256": "f500e4c544ff7af42fc010c3a980c010519868f0e8d23cd9144fa594980afe63",
+      "match": "EXACT"
+    },
+    {
+      "path": "collector_review/offline_capture_audit.py",
+      "sha256": "c182e0a503a721cccc624cbc2b875d12ac09c700d3e03292dbf3e61a308b124c",
+      "match": "EXACT"
+    },
+    {
+      "path": "collector_review/runtime_identity_review.py",
+      "sha256": "5e60c22465d974ef6272c0495f42dff569fcefa99a1481560c18efffd88e422e",
+      "match": "EXACT"
+    }
+  ]
+}
