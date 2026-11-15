@@ -77,6 +77,22 @@ BEGIN
         RETURN;
     END IF;
 
+    -- An account-scoped transaction lock rejects replay BEFORE creating
+    -- a different coin's scope row. It is CI-only serialization, not
+    -- exchange ownership or a deployable auth/signer control.
+    -- Hash collisions merely serialize unrelated CI review requests.
+    PERFORM pg_catalog.pg_advisory_xact_lock(
+        pg_catalog.hashtextextended('sender_review_ci|testnet|' || p_account, 0)
+    );
+    IF EXISTS (
+       SELECT 1 FROM sender_review_ci.review_intents i
+       WHERE i.environment='testnet'
+         AND i.account=p_account AND i.request_nonce=p_nonce
+    ) THEN
+        RETURN QUERY SELECT false, 0::bigint, 'replayed-request-nonce'::text;
+        RETURN;
+    END IF;
+
     -- Row lock serializes all three bots and *all* requests for same scope.
     -- Never clear active_nonce in this CI implementation, even after crash.
     INSERT INTO sender_review_ci.scope_fences
