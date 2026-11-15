@@ -280,6 +280,87 @@ time.sleep(30)
                 worker.kill()
                 worker.communicate(timeout=5)
 
+    def test_interrupted_unknown_ack_transaction_rolls_back_without_releasing_fence(self):
+        # A disposable child connection is killed before COMMIT in two
+        # phases: after the state UPDATE, or after the review-only
+        # hold_uncertain() routine returned (which inserts an event).
+        # Neither uncommitted transition may survive a disconnected worker.
+        self.assertTrue(record(bot="intraday", coin="SOL", nonce="7" * 32)[0])
+        child = """
+import os, psycopg, sys, time
+account = "0x" + "1" * 40
+conn = psycopg.connect(
+    host="127.0.0.1", port=5432, dbname="sender_review_test",
+    user="postgres", password=os.environ["PGPASSWORD"],
+)
+if sys.argv[1] == "after_state_update":
+    changed = conn.execute(
+        "UPDATE sender_review_ci.review_intents SET state='hold_unknown' "
+        "WHERE environment='testnet' AND account=%s AND coin='SOL' "
+        "AND request_nonce=%s AND fence=1 AND state='review_only' "
+        "RETURNING id", (account, "7" * 32)
+    ).fetchone()
+    assert changed is not None
+else:
+    changed = conn.execute(
+        "SELECT sender_review_ci.hold_uncertain(%s,%s,%s,%s)",
+        (account, "SOL", "7" * 32, 1),
+    ).fetchone()
+    assert changed == (True,)
+print("RECOVERY_UNCOMMITTED", flush=True)
+time.sleep(30)
+"""
+        for phase in ("after_state_update", "after_hold_function"):
+            with self.subTest(phase=phase):
+                worker = subprocess.Popen(
+                    [sys.executable, "-c", child, phase],
+                    cwd=str(ROOT), env=dict(os.environ),
+                    stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                    text=True,
+                )
+                try:
+                    self.assertEqual(
+                        worker.stdout.readline().strip(), "RECOVERY_UNCOMMITTED"
+                    )
+                    worker.kill()
+                    worker.communicate(timeout=5)
+                    self.assertNotEqual(worker.returncode, 0)
+                    self.assertEqual(self.query(
+                        "SELECT state FROM sender_review_ci.review_intents"
+                    ), [("review_only",)])
+                    self.assertEqual(self.query(
+                        "SELECT kind FROM sender_review_ci.review_events "
+                        "ORDER BY event_id"
+                    ), [("review_recorded",)])
+                    self.assertEqual(self.query(
+                        "SELECT active_nonce,fence "
+                        "FROM sender_review_ci.scope_fences"
+                    ), [("7" * 32, 1)])
+                    self.assertFalse(record(
+                        bot="daily", coin="SOL", nonce="8" * 32
+                    )[0])
+                finally:
+                    if worker.poll() is None:
+                        worker.kill()
+                        worker.communicate(timeout=5)
+        # An independently retried recovery can record one durable HOLD,
+        # but must never authorize another entry or clear the same fence.
+        with connect() as conn:
+            self.assertTrue(conn.execute(
+                "SELECT sender_review_ci.hold_uncertain(%s,%s,%s,%s)",
+                (ACCOUNT, "SOL", "7" * 32, 1),
+            ).fetchone()[0])
+        self.assertEqual(self.query(
+            "SELECT state FROM sender_review_ci.review_intents"
+        ), [("hold_unknown",)])
+        self.assertEqual(self.query(
+            "SELECT kind FROM sender_review_ci.review_events "
+            "ORDER BY event_id"
+        ), [("review_recorded",), ("unknown_held",)])
+        self.assertFalse(record(
+            bot="aggressive", coin="SOL", nonce="9" * 32
+        )[0])
+
     def test_review_events_are_append_only_during_uncertain_ack(self):
         # Review-only journal events must not be editable to erase a HOLD
         # after a simulated unknown-ACK recovery. No exchange operation.
