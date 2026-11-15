@@ -212,6 +212,44 @@ class OfflineMockCollectorTests(unittest.TestCase):
         d[4]["order"]["status"] = "open"
         self.assertFalse(simulate(docs=d, with_lookup=True).fixture_consistent)
 
+    def test_mutated_request_plan_cannot_impersonate_safe_info_read(self):
+        base = make_plan()
+        mutations = (
+            (0, '{"type":"clearinghouseState","user":"0x' + '2'*40 + '","dex":""}'),
+            (0, '{"type":"clearinghouseState","user":"0x' + '1'*40 + '","dex":"evil"}'),
+            (0, '{"type":"exchange","user":"0x' + '1'*40 + '"}'),
+            (0, '{"type":"clearinghouseState","user":"0x' + '1'*40 +
+                '","dex":"","submitAuthorized":true}'),
+            (3, '{"type":"userFillsByTime","user":"0x' + '1'*40 +
+                '","startTime":0,"endTime":2000,"aggregateByTime":false}'),
+        )
+        for index, altered in mutations:
+            with self.subTest(index=index, altered=altered):
+                queries = list(base.queries)
+                queries[index] = replace(queries[index], body_json=altered)
+                modified = replace(base, queries=tuple(queries))
+                result = simulate(plan=modified)
+                self.assertFalse(result.fixture_consistent)
+                self.assert_no_authority(result)
+
+    def test_altered_request_transport_and_privileges_hold(self):
+        base = make_plan()
+        q = base.queries[0]
+        for item in (
+            replace(q, host="evil.example"),
+            replace(q, path="/exchange"),
+            replace(q, method="GET"),
+            replace(q, contains_trading_key=True),
+            replace(q, network_request_performed=True),
+            replace(q, authorizes_order=True),
+            replace(q, body_json='{"type":"clearinghouseState"}'),
+        ):
+            with self.subTest(item=item):
+                queries = (item,) + base.queries[1:]
+                result = simulate(plan=replace(base, queries=queries))
+                self.assertFalse(result.fixture_consistent)
+                self.assert_no_authority(result)
+
     def test_imports_are_pure_parsing_only(self):
         path = Path(__file__).with_name("mock_hyperliquid_info_collector_offline.py")
         imported = set()
