@@ -57,6 +57,9 @@ class JournalUntrustedRolePermissionsTests(unittest.TestCase):
                 ("SELECT has_table_privilege(%s, "
                  "'sender_review_ci.fixture_identity_receipts', 'INSERT')",
                  (DENIED_ROLE,)),
+                ("SELECT has_table_privilege(%s, "
+                 "'sender_review_ci.fixture_request_evidence', 'INSERT')",
+                 (DENIED_ROLE,)),
                 ("SELECT has_function_privilege(%s, "
                  "'sender_review_ci.record_review_only("
                  "text,text,text,text,text,numeric,integer,text)', 'EXECUTE')",
@@ -78,6 +81,7 @@ class JournalUntrustedRolePermissionsTests(unittest.TestCase):
             "SELECT count(*) FROM sender_review_ci.review_events",
             "SELECT count(*) FROM sender_review_ci.scope_fences",
             "SELECT count(*) FROM sender_review_ci.fixture_identity_receipts",
+            "SELECT count(*) FROM sender_review_ci.fixture_request_evidence",
             "UPDATE sender_review_ci.scope_fences SET fence=fence+1 "
             "WHERE false",
             "INSERT INTO sender_review_ci.fixture_identity_receipts "
