@@ -22,6 +22,10 @@ jobs:
           python-version: '3.12'
       - name: Offline-only collector policy tests (no secrets or exchange calls)
         run: python -m unittest collector_review.test_testnet_info_https -v
+      - name: Verify six exact operator-to-reviewed-source hashes (offline)
+        run: python -m unittest collector_review.test_source_fingerprint_pin -v
+      - name: End-to-end synthetic collector chain and transport deny (offline)
+        run: python -m unittest collector_review.test_offline_end_to_end_readiness -v
       - name: Offline-only order and history planning (no network)
         run: python -m unittest collector_review.test_offline_history_query_plan -v
       - name: Offline-only untrusted fill funding and order response review
