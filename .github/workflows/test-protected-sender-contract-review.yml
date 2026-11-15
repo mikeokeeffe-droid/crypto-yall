@@ -29,6 +29,10 @@ jobs:
         run: python -m unittest sender_review.test_offline_oidc_identity_fixture -v
       - name: Test strict offline remote signed identity and request envelope
         run: python -m unittest sender_review.test_remote_request_boundary_offline -v
+      - name: Audit original three-bot signing and order paths (NO-GO)
+        run: |
+          python -m unittest sender_review.test_legacy_cutover_audit -v
+          python -m sender_review.legacy_cutover_audit
       - name: Verify no signer, socket, DB or HTTP imports in S1 module
         shell: bash
         run: |
