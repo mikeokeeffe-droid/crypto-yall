@@ -2,6 +2,7 @@
 import hashlib
 import os
 import unittest
+from unittest.mock import patch
 
 from sender_review.ci_only_remote_journal_boundary import (
     review_remote_fixture_to_disposable_journal_offline,
@@ -166,6 +167,56 @@ class FakeRemoteJournalBoundaryTests(unittest.TestCase):
         self.assertEqual(self.rows(
             "SELECT count(*) FROM sender_review_ci.fixture_identity_receipts"
         ), [(1,)])
+
+    def test_disposable_environment_guards_fail_closed(self):
+        # The FAKE remote ingress must never persist even a receipt if
+        # the named disposable CI environment isn't explicitly enabled.
+        # Patch process environment only within this local test case.
+        for key, value in (
+            (CI_MARKER, "0"),
+            ("PGDATABASE", "not_sender_review_test"),
+            ("PGHOST", "192.0.2.1"),
+        ):
+            with self.subTest(key=key):
+                with patch.dict(os.environ, {key: value}):
+                    denied = self.send()
+                self.assertEqual(denied.state, "hold")
+                self.assertFalse(denied.journal_recorded)
+                self.assert_no_authority(denied)
+                self.assert_empty()
+
+    def test_untrusted_fixture_key_clock_and_database_config_fail_closed(self):
+        # A syntactically valid test token cannot authorize persistence
+        # under a missing verifier key, expired fixture clock, invalid
+        # fixed account or incorrect disposable-DB credentials.
+        token = self.fixture.token("daily")
+        body = self.fixture.body()
+        headers = (
+            ("Authorization", "Bearer " + token),
+            ("Content-Type", "application/json"),
+        )
+        baseline = dict(
+            method="POST", path="/v1/review-only/entry-intents",
+            headers=headers, body=body,
+            trusted_fixture_keys=self.keys, fixture_now_seconds=NOW,
+            fixed_test_account=ACCOUNT,
+            db_password=os.environ["PGPASSWORD"],
+        )
+        cases = (
+            {"trusted_fixture_keys": {}},
+            {"fixture_now_seconds": NOW + 1000},
+            {"fixed_test_account": "invalid-account"},
+            {"db_password": ""},
+        )
+        for changes in cases:
+            with self.subTest(changes=changes):
+                denied = review_remote_fixture_to_disposable_journal_offline(
+                    **(baseline | changes)
+                )
+                self.assertEqual(denied.state, "hold")
+                self.assertFalse(denied.journal_recorded)
+                self.assert_no_authority(denied)
+                self.assert_empty()
 
     def test_replay_and_cross_coin_collision_leave_no_extra_evidence(self):
         token = self.fixture.token("intraday", jti="remote-replay-identity")
