@@ -143,6 +143,30 @@ class FakeRemoteJournalBoundaryTests(unittest.TestCase):
                 self.assert_no_authority(result)
                 self.assert_empty()
 
+    def test_wrong_signed_workflow_run_cannot_create_any_database_rows(self):
+        # The outer fake HTTP boundary checks the pinned CI fixture
+        # run/attempt BEFORE a DB transaction can consume a JTI.
+        for changes in (
+            {"run_id": "123456788"},
+            {"run_id": "123456790"},
+            {"run_attempt": "2"},
+            {"run_attempt": "3"},
+            {"run_attempt": "01"},
+        ):
+            with self.subTest(changes=changes):
+                signed = self.fixture.token("daily", **changes)
+                result = self.send(token=signed)
+                self.assertEqual(result.state, "hold")
+                self.assertFalse(result.journal_recorded)
+                self.assert_no_authority(result)
+                self.assert_empty()
+        accepted = self.send(token=self.fixture.token("daily"))
+        self.assertTrue(accepted.journal_recorded)
+        self.assert_no_authority(accepted)
+        self.assertEqual(self.rows(
+            "SELECT count(*) FROM sender_review_ci.fixture_identity_receipts"
+        ), [(1,)])
+
     def test_replay_and_cross_coin_collision_leave_no_extra_evidence(self):
         token = self.fixture.token("intraday", jti="remote-replay-identity")
         body = self.fixture.body(coin="AVAX", request_nonce="d" * 32)
