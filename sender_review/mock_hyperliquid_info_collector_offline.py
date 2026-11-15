@@ -16,6 +16,7 @@ import re
 
 from sender_review.hyperliquid_readonly_collection_plan_offline import (
     ReadOnlyCollectorPlan,
+    plan_offline_readonly_testnet_collection,
 )
 
 _COIN = re.compile(r"[A-Z][A-Z0-9]{0,23}\Z", re.ASCII)
@@ -189,10 +190,32 @@ def inspect_scripted_info_collection_offline(*, plan, transport):
             or plan.state != "HOLD" or not plan.queries):
         return hold("invalid mock plan or attempted transport activation")
     try:
+        # A typed dataclass is not trusted input. Rebuild the entire query
+        # plan from the pinned test account and validate every exact byte of
+        # the canonical request envelopes, not merely their "type" fields.
         types = [json.loads(q.body_json)["type"] for q in plan.queries]
         if types not in (list(_EXPECTED),
                          list(_EXPECTED[:4]) + ["orderStatus", _EXPECTED[4]]):
             return hold("unexpected query sequence")
+        if any(type(q.body_json) is not str for q in plan.queries):
+            return hold("non-string request envelope")
+        fills_selector = json.loads(plan.queries[3].body_json)
+        if type(fills_selector) is not dict:
+            return hold("invalid fills query")
+        selected_oid = None
+        if "orderStatus" in types:
+            lookup = json.loads(plan.queries[4].body_json)
+            if type(lookup) is not dict:
+                return hold("invalid status query")
+            selected_oid = lookup.get("oid")
+        expected_plan = plan_offline_readonly_testnet_collection(
+            account="0x" + "1" * 40,
+            start_time_ms=fills_selector.get("startTime"),
+            end_time_ms=fills_selector.get("endTime"),
+            optional_order_lookup=selected_oid,
+        )
+        if not expected_plan.queries or plan.queries != expected_plan.queries:
+            return hold("noncanonical account, request fields or query scope")
         if len(transport.replies) != len(types):
             return hold("missing/extra mock responses")
         docs = {}
