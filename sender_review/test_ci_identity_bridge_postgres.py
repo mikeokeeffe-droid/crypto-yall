@@ -237,6 +237,74 @@ class SignedIdentityBridgePostgresTests(unittest.TestCase):
             "select 1 from sender_review_ci.review_intents"
         )), 1)
 
+    def test_insert_failures_roll_back_fixture_receipt_intent_fence_and_evidence(self):
+        # Fail at TWO different stages of the real CI-only transaction:
+        # after journal intent/scope creation (review_events INSERT), and
+        # after signed fixture receipt+journal+event (evidence INSERT).
+        # A crash/error must never commit partial JTI consumption, scope
+        # fences or journal records. This intentionally tests PostgreSQL
+        # transaction atomicity; it does not test a deployed sender.
+        tables = (
+            "fixture_identity_receipts", "scope_fences", "review_intents",
+            "review_events", "fixture_request_evidence",
+        )
+        for phase, table in (
+            ("event_insert", "review_events"),
+            ("evidence_insert", "fixture_request_evidence"),
+        ):
+            with self.subTest(phase=phase):
+                # Distinct synthetic fixture inputs per phase, and a clean
+                # disposable database. The constraint is enforced on new
+                # rows even with NOT VALID, without touching historical rows.
+                self.setUp()
+                token = self.fixture.token(
+                    "intraday", jti="rollback-fixture-" + phase
+                )
+                body = self.body(nonce=("6" if phase == "event_insert"
+                                       else "7") * 32)
+                constraint = "ci_force_abort_" + phase
+                with connect() as conn:
+                    conn.execute(
+                        "ALTER TABLE sender_review_ci." + table +
+                        " ADD CONSTRAINT " + constraint +
+                        " CHECK (false) NOT VALID"
+                    )
+                try:
+                    result = self.submit(token=token, body=body)
+                    self.assertEqual(result.state, "hold")
+                    self.assertFalse(result.journal_recorded)
+                    self.assertFalse(result.request_authorized)
+                    self.assertFalse(result.submit_authorized)
+                    self.assertFalse(result.close_authorized)
+                    self.assertEqual(
+                        result.reason, "disposable-journal-error"
+                    )
+                    for name in tables:
+                        with self.subTest(table=name):
+                            self.assertEqual(self.rows(
+                                "SELECT count(*) FROM sender_review_ci." + name
+                            ), [(0,)])
+                finally:
+                    with connect() as conn:
+                        conn.execute(
+                            "ALTER TABLE sender_review_ci." + table +
+                            " DROP CONSTRAINT " + constraint
+                        )
+                # A fresh DB connection can retry the SAME signed fixture
+                # and nonce after the aborted transaction. This is only a
+                # review-only persistence check, never order retry approval.
+                retried = self.submit(token=token, body=body)
+                self.assertTrue(retried.journal_recorded)
+                self.assertEqual(
+                    retried.state, "persisted_fixture_review_only_HOLD"
+                )
+                self.assertFalse(retried.submit_authorized)
+                for name in tables:
+                    with self.subTest(committed_table=name):
+                        self.assertEqual(self.rows(
+                            "SELECT count(*) FROM sender_review_ci." + name
+                        ), [(1,)])
+
     def test_bad_signature_expiry_and_claims_do_not_touch_database(self):
         token = self.fixture.token("daily")
         cases = (
