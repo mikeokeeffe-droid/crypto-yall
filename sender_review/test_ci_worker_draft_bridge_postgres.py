@@ -134,6 +134,50 @@ class WorkerDraftToJournalOfflineTests(unittest.TestCase):
             "SELECT DISTINCT state FROM sender_review_ci.review_intents"
         ), [("review_only",)])
 
+    def test_worker_fixture_bot_cannot_override_signed_workflow_identity(self):
+        # A caller-controlled fixture_bot only gates local draft formatting.
+        # The database must always attribute a review entry to the bot
+        # derived from the verified fake signed workflow identity instead.
+        for claimed_bot, signed_bot in (
+            ("aggressive", "daily"),
+            ("daily", "intraday"),
+            ("intraday", "aggressive"),
+        ):
+            with self.subTest(claimed_bot=claimed_bot, signed_bot=signed_bot):
+                self.setUp()
+                draft = self.draft(bot=claimed_bot)
+                self.assertEqual(draft.state, "fixture_body_review_only_HOLD")
+                self.assertEqual(draft.fixture_bot, claimed_bot)
+                token = self.signer.token(
+                    bot=signed_bot,
+                    jti="mismatch-" + claimed_bot + "-" + signed_bot,
+                )
+                result = self.review(token, draft.fixture_body)
+                self.assertTrue(result.journal_recorded)
+                self.assertEqual(result.fixture_bot, signed_bot)
+                self.assert_no_trading_authority(result)
+                self.assertEqual(self.rows(
+                    "SELECT bot FROM sender_review_ci.review_intents"
+                ), [(signed_bot,)])
+                self.assertEqual(self.rows(
+                    "SELECT bot FROM sender_review_ci.fixture_identity_receipts"
+                ), [(signed_bot,)])
+                self.assertEqual(self.rows(
+                    "SELECT bot FROM sender_review_ci.fixture_request_evidence"
+                ), [(signed_bot,)])
+        # A fake Aggressive pyramid still cannot pass the entry-only
+        # signed bridge, even when paired with an Aggressive signed token.
+        self.setUp()
+        pyramid = self.draft(bot="aggressive", action="pyramid_long")
+        token = self.signer.token(
+            bot="aggressive", jti="mismatch-pyramid-denied"
+        )
+        result = self.review(token, pyramid.fixture_body)
+        self.assertEqual(result.state, "hold")
+        self.assertFalse(result.journal_recorded)
+        self.assert_no_trading_authority(result)
+        self.assert_empty_db()
+
     def test_pyramid_protective_close_and_leverage_cannot_enter_entry_journal(self):
         cases = (
             ("aggressive", "pyramid_long"),
