@@ -32,6 +32,8 @@ CREATE TABLE IF NOT EXISTS sender_review_ci.review_intents (
     state text NOT NULL DEFAULT 'review_only' CHECK (state IN ('review_only','hold_unknown')),
     created_at timestamptz NOT NULL DEFAULT clock_timestamp(),
     UNIQUE (environment, account, request_nonce),
+    -- Composite identity must match evidence's intent ID + scope + bot.
+    UNIQUE (id,environment,account,request_nonce,bot),
     UNIQUE (environment, account, cloid),
     UNIQUE (environment, account, dex, coin, fence),
     CHECK ((action = 'open_long' AND side = 'long') OR
@@ -163,7 +165,9 @@ CREATE TABLE IF NOT EXISTS sender_review_ci.fixture_identity_receipts (
     request_nonce text NOT NULL CHECK (request_nonce ~ '^[0-9a-f]{32}$'),
     created_at timestamptz NOT NULL DEFAULT clock_timestamp(),
     PRIMARY KEY (environment, account, jti),
-    UNIQUE (environment, account, request_nonce)
+    UNIQUE (environment, account, request_nonce),
+    -- Only the exact receipt identity+nonce may be cited as evidence.
+    UNIQUE (environment,account,jti,bot,request_nonce)
 );
 
 
@@ -183,8 +187,16 @@ CREATE TABLE IF NOT EXISTS sender_review_ci.fixture_request_evidence (
     body_sha256 text NOT NULL CHECK (body_sha256 ~ '^[0-9a-f]{64}$'),
     body_length int NOT NULL CHECK (body_length BETWEEN 1 AND 1024),
     created_at timestamptz NOT NULL DEFAULT clock_timestamp(),
-    FOREIGN KEY (environment,account,request_nonce)
-        REFERENCES sender_review_ci.review_intents(environment,account,request_nonce),
+    -- The intent id, scope, nonce and bot must all match ONE intent.
+    FOREIGN KEY (intent_id,environment,account,request_nonce,bot)
+        REFERENCES sender_review_ci.review_intents(
+            id,environment,account,request_nonce,bot
+        ),
+    -- The signed-fixture receipt must match that exact identity and nonce.
+    FOREIGN KEY (environment,account,jti,bot,request_nonce)
+        REFERENCES sender_review_ci.fixture_identity_receipts(
+            environment,account,jti,bot,request_nonce
+        ),
     UNIQUE (environment,account,jti),
     UNIQUE (environment,account,request_nonce)
 );
