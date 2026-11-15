@@ -432,10 +432,13 @@ print(json.dumps({"claims": results, "repeated_hold": repeat_hold}))
             "SELECT active_nonce,fence FROM sender_review_ci.scope_fences "
             "WHERE coin='SOL'"
         ), [("a" * 32, 1)])
+        # record_review_only may create an unclaimed empty scope row
+        # before detecting account-wide nonce replay. It must NOT
+        # install an active AVAX fence or create another intent.
         self.assertEqual(self.query(
-            "SELECT coin FROM sender_review_ci.scope_fences "
+            "SELECT fence,active_nonce FROM sender_review_ci.scope_fences "
             "WHERE coin='AVAX'"
-        ), [])
+        ), [(0, None)])
 
     def test_review_events_are_append_only_during_uncertain_ack(self):
         # Review-only journal events must not be editable to erase a HOLD
