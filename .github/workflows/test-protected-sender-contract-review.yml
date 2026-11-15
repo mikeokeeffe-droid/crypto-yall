@@ -55,6 +55,8 @@ jobs:
         run: python -m unittest sender_review.test_ci_only_collector_policy_review -v
       - name: Enforce explicit deployment-readiness NO-GO gates offline
         run: python -m unittest sender_review.test_ci_only_deployment_readiness_review -v
+      - name: Verify offline host-evidence request cannot assert attestation
+        run: python -m unittest sender_review.test_host_evidence_request_offline -v
       - name: Verify no signer, socket, DB or HTTP imports in S1 module
         shell: bash
         run: |
