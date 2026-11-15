@@ -51,6 +51,8 @@ jobs:
         run: python -m unittest sender_review.test_mock_hyperliquid_info_collector_offline -v
       - name: Review inert systemd collector unit and reject privilege exceptions
         run: python -m unittest sender_review.test_ci_only_readonly_collector_service -v
+      - name: Check disabled credential and outbound egress policy (offline only)
+        run: python -m unittest sender_review.test_ci_only_collector_policy_review -v
       - name: Verify no signer, socket, DB or HTTP imports in S1 module
         shell: bash
         run: |
