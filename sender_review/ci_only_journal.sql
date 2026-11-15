@@ -219,6 +219,19 @@ BEFORE UPDATE OR DELETE ON sender_review_ci.fixture_request_evidence
 FOR EACH ROW EXECUTE FUNCTION
     sender_review_ci.reject_fixture_evidence_mutation();
 
+-- Preserve the CI review-only transition audit as append-only too.
+-- Unlike fixture_request_evidence, review_events previously allowed owner
+-- UPDATE/DELETE, which could conceal the recorded HOLD transition. These
+-- triggers are defense-in-depth for the disposable harness, NOT proof
+-- against a database superuser, table TRUNCATE, or production tampering.
+DROP TRIGGER IF EXISTS review_events_no_mutate
+  ON sender_review_ci.review_events;
+CREATE TRIGGER review_events_no_mutate
+BEFORE UPDATE OR DELETE ON sender_review_ci.review_events
+FOR EACH ROW EXECUTE FUNCTION
+    sender_review_ci.reject_fixture_evidence_mutation();
+
+
 REVOKE ALL ON ALL TABLES IN SCHEMA sender_review_ci FROM PUBLIC;
 REVOKE ALL ON ALL SEQUENCES IN SCHEMA sender_review_ci FROM PUBLIC;
 REVOKE EXECUTE ON ALL FUNCTIONS IN SCHEMA sender_review_ci FROM PUBLIC;
