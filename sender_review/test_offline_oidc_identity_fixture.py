@@ -156,6 +156,46 @@ class SignedOidcFixtureTests(unittest.TestCase):
                 self.assertEqual(result.state, "hold")
                 self.assert_no_authority(result)
 
+    def test_pinned_workflow_and_source_sha_reject_unreviewed_revisions(self):
+        # A valid fake RSA signature alone is insufficient to claim that
+        # a reviewed workflow or source revision was used. The pins must
+        # be fixed in the verifier policy, never adopted from JWT claims.
+        source = "a" * 40
+        workflow = "b" * 40
+        policy = replace(
+            POLICY, approved_source_sha=source,
+            approved_workflow_sha=workflow,
+        )
+        valid = self.verify(
+            self.token(sha=source, workflow_sha=workflow),
+            policy=policy,
+        )
+        self.assertEqual(valid.state, "verified_fixture_only")
+        self.assert_no_authority(valid)
+        for changes in (
+            {"sha": "c" * 40, "workflow_sha": workflow},
+            {"sha": source, "workflow_sha": "c" * 40},
+            {"sha": source, "workflow_sha": None},
+            {"sha": source, "workflow_sha": True},
+            {"sha": source},
+        ):
+            with self.subTest(changes=changes):
+                outcome = self.verify(self.token(**changes), policy=policy)
+                self.assertEqual(outcome.state, "hold")
+                self.assert_no_authority(outcome)
+        for bad_policy in (
+            replace(policy, approved_workflow_sha="bad"),
+            replace(policy, approved_source_sha="A" * 40),
+            replace(policy, approved_workflow_sha=True),
+        ):
+            with self.subTest(policy=bad_policy):
+                result = self.verify(
+                    self.token(sha=source, workflow_sha=workflow),
+                    policy=bad_policy,
+                )
+                self.assertEqual(result.state, "hold")
+                self.assert_no_authority(result)
+
     def test_no_key_provenance_or_replay_claim_can_be_approved(self):
         # A signed and syntactically valid fixture intentionally remains
         # unapproved even when a user supplies trusted-looking values.
