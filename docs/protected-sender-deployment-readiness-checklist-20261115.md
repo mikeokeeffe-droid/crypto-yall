@@ -15,6 +15,10 @@ runtime credentials, validated HTTPS/JWKS transport, effective host
 sandboxing, live exchange provenance, order reconciliation, signing
 isolation, safe exits, or operator authorization.
 
+The proposed human incident response and open-position rescue requirements are
+tracked in [the review-only outage/rollback runbook](protected-sender-incident-response-review-only-20261115.md).
+It is **not** a verified emergency procedure or approval to operate a signer.
+
 ## Gates to clear outside this PR
 
 1. Real GitHub workload identity and authenticated transport
