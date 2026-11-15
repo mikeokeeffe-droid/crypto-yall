@@ -172,6 +172,8 @@ def verify_fixture_oidc_identity_offline(
                 or claims.get("aud") != policy.audience
                 or claims.get("repository") != policy.repository
                 or claims.get("repository_id") != policy.repository_id
+                or (policy.immutable_subject and
+                    claims.get("repository_owner_id") != policy.repository_owner_id)
                 or claims.get("ref") != policy.ref
                 or claims.get("sub") != policy.subject
                 or claims.get("event_name") not in (
