@@ -9,6 +9,7 @@ Never treat a passing audit as permission to submit or deploy orders.
 from __future__ import annotations
 
 import ast
+import hashlib
 from pathlib import Path
 
 from sender_review.legacy_cutover_audit import LEGACY, ROOT
@@ -37,6 +38,44 @@ _FORBIDDEN_WORKFLOW_TEXT = _FORBIDDEN_TEXT + (
     "test-protected-sender-contract-review.yml",
     "test-protected-sender-postgres-review.yml",
 )
+
+
+# Git blob identifiers confirmed identical on main and PR #42's review
+# branch, 15 Nov 2026. These freeze the original LIVE surface during the
+# separate OFFLINE review. Do not update pins merely to make CI pass: any
+# proposed live edit requires its own coordinated cutover and human review.
+# Git SHA-1 blobs are drift fingerprints, NOT runtime or security attestation.
+_REVIEW_BASELINE_GIT_BLOBS = {
+    "hyperliquid_executor.py": "d98cba6e73507192f5155dfd7f2e414dddc7fcb4",
+    "intraday_executor.py": "2a3984dbe52dfa443de4823c157a22410974eb41",
+    "aggressive_executor.py": "62bd386693c4c76517ba23fd7520b360f373c685",
+    "intraday_profit_protection.py": "f058462709e2a22bcdcd095d28d5d8fc8c4bcf10",
+    "aggressive_profit_protection.py": "9e40fac7eb28c113b4476aada6f0188a64e23269",
+    ".github/workflows/execute-trades.yml": "402f9532bd7fdc8f2ca2728249799f484a48d12e",
+    ".github/workflows/execute-intraday.yml": "3e1f7e2a70c4967738c95bd713b15f4c8afebaee",
+    ".github/workflows/execute-aggressive.yml": "12c95e7bfdd70007951b74c9d90b4f3083bb0860",
+}
+
+
+def git_blob_fingerprint(content: bytes) -> str:
+    """Git content blob ID, for detecting offline working-tree baseline drift."""
+    if type(content) is not bytes:
+        raise TypeError("expected bytes")
+    return hashlib.sha1(
+        b"blob " + str(len(content)).encode("ascii") + b"\0" + content
+    ).hexdigest()
+
+
+def check_frozen_legacy_content(root: Path = ROOT) -> tuple[str, ...]:
+    """Flag ANY byte-level mutation of reviewed legacy source/workflows."""
+    issues = []
+    for path, expected_blob in _REVIEW_BASELINE_GIT_BLOBS.items():
+        file = root / path
+        if not file.is_file():
+            issues.append("missing frozen live path: " + path)
+        elif git_blob_fingerprint(file.read_bytes()) != expected_blob:
+            issues.append("legacy live path changed; re-audit required: " + path)
+    return tuple(sorted(issues))
 
 
 def check_worker_source(source: str) -> tuple[str, ...]:
@@ -79,7 +118,7 @@ def check_workflow_source(source: str) -> tuple[str, ...]:
 def review_fixture_quarantine(root: Path = ROOT) -> dict:
     if set(LEGACY) != {"daily", "intraday", "aggressive"}:
         raise ValueError("bot inventory changed: independent re-audit required")
-    issues = []
+    issues = list(check_frozen_legacy_content(root))
     for path in _LEGACY_EXECUTABLES:
         file = root / path
         if not file.is_file():
