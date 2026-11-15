@@ -1,0 +1,42 @@
+name: Protected Sender Contract Review (offline)
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'sender_review/**'
+      - 'docs/accelerated-coordinated-sender-cutover-20261115.md'
+      - '.github/workflows/test-protected-sender-contract-review.yml'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  offline-request-review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Check strict no-trade sender request contract
+        run: python -m unittest sender_review.test_request_contract -v
+      - name: Verify no signer, socket, DB or HTTP imports in S1 module
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import ast
+          from pathlib import Path
+          path = Path("sender_review/request_contract.py")
+          tree = ast.parse(path.read_text(encoding="utf-8"))
+          allowed = {"dataclasses", "decimal", "json", "re"}
+          for node in ast.walk(tree):
+              if isinstance(node, ast.Import):
+                  assert all(alias.name in allowed for alias in node.names)
+              elif isinstance(node, ast.ImportFrom):
+                  assert node.module in allowed
+          print("S1 source imports are limited to pure standard-library parsing")
+          PY
