@@ -46,6 +46,8 @@ jobs:
         run: python -m unittest sender_review.test_ci_journal_postgres -v
       - name: Verify signed fixture identity, durable replay and fail-closed journal bridge
         run: python -m unittest sender_review.test_ci_identity_bridge_postgres -v
+      - name: Test signer-free worker drafts against signed fixture and review-only journal
+        run: python -m unittest sender_review.test_ci_worker_draft_bridge_postgres -v
       - name: Check denied PostgreSQL role permissions in disposable CI
         run: python -m unittest sender_review.test_ci_journal_permissions_postgres -v
       - name: Test CI-only restricted role and no direct journal permissions
