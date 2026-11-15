@@ -6,6 +6,7 @@ clock, database password, account and policy are all injected TEST fixtures.
 Never deploy or import this as a production authentication boundary.
 """
 from dataclasses import dataclass
+import hashlib
 import json
 import os
 
@@ -112,6 +113,32 @@ def inspect_and_record_signed_fixture_offline(
                         fixture_bot=identity.fixture_bot,
                         fixture_signature_checked=True,
                     )
+                # Bind the EXACT request bytes and signed fixture token to
+                # the durable journal intent within the SAME DB transaction.
+                # Never persist a raw JWT, trading key or executable grant.
+                cur.execute(
+                    "INSERT INTO sender_review_ci.fixture_request_evidence "
+                    "(intent_id,environment,account,request_nonce,bot,jti,"
+                    "token_sha256,body_sha256,body_length) "
+                    "SELECT id,'testnet',%s,%s,%s,%s,%s,%s,%s "
+                    "FROM sender_review_ci.review_intents "
+                    "WHERE environment='testnet' AND account=%s "
+                    "AND request_nonce=%s AND bot=%s AND fence=%s "
+                    "RETURNING intent_id",
+                    (fixed_test_account, request["request_nonce"],
+                     identity.fixture_bot, identity.fixture_jti,
+                     hashlib.sha256(token.encode("ascii")).hexdigest(),
+                     hashlib.sha256(body).hexdigest(), len(body),
+                     fixed_test_account, request["request_nonce"],
+                     identity.fixture_bot, fence),
+                )
+                if cur.fetchone() is None:
+                    conn.rollback()
+                    return FixtureBridgeResult(
+                        reason="intent-evidence-not-bound",
+                        fixture_bot=identity.fixture_bot,
+                        fixture_signature_checked=True,
+                    )
         return FixtureBridgeResult(
             state="persisted_fixture_review_only_HOLD",
             reason="test-only signed identity and journal recorded; "
@@ -121,7 +148,7 @@ def inspect_and_record_signed_fixture_offline(
             journal_recorded=True,
             assigned_fence=fence,
         )
-    except (ImportError, Exception):
+    except Exception:
         # A database or transaction error is always a HOLD, never an approval.
         return FixtureBridgeResult(
             reason="disposable-journal-error",
