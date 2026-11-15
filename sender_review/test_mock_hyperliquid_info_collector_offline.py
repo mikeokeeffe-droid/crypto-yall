@@ -162,7 +162,13 @@ class OfflineMockCollectorTests(unittest.TestCase):
         self.assertFalse(simulate(docs=docs).fixture_consistent)
         docs = baseline_docs()
         docs[2] = docs[2] * 2000
-        self.assertIn("cap", simulate(docs=docs).reason)
+        cap_result = simulate(docs=docs)
+        self.assertFalse(cap_result.fixture_consistent)
+        self.assert_no_authority(cap_result)
+        # A large JSON body may hit the byte limit before the history cap.
+        self.assertTrue(
+            "cap" in cap_result.reason or "malformed" in cap_result.reason
+        )
         docs = baseline_docs()
         docs[3] = docs[3] * 2000
         self.assertFalse(simulate(docs=docs).fixture_consistent)
