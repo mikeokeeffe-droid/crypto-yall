@@ -137,10 +137,17 @@ class SignedIdentityBridgePostgresTests(unittest.TestCase):
             ("daily", "bound-fixture-match-001", "e"*32),
             ("intraday", "nonexistent-fixture", "d"*32),
         )
-        for bot, jti, nonce in cases:
+        for index, (bot, jti, nonce) in enumerate(cases):
             with self.subTest(bot=bot, jti=jti, nonce=nonce):
+                # Composite FK and unique JTI/nonce constraints jointly deny
+                # forged evidence. The first case has no uniqueness collision
+                # and must specifically fail its intent/bot composite FK.
+                expected_error = (
+                    psycopg.errors.ForeignKeyViolation if index == 0
+                    else psycopg.errors.IntegrityError
+                )
                 with connect() as conn:
-                    with self.assertRaises(psycopg.errors.ForeignKeyViolation):
+                    with self.assertRaises(expected_error):
                         conn.execute(
                             "INSERT INTO sender_review_ci.fixture_request_evidence "
                             "(intent_id,environment,account,request_nonce,bot,"
