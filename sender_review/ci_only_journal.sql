@@ -189,6 +189,24 @@ CREATE TABLE IF NOT EXISTS sender_review_ci.fixture_request_evidence (
     UNIQUE (environment,account,request_nonce)
 );
 
+
+-- Block UPDATE/DELETE even by the disposable table owner in ordinary SQL.
+-- CI truncation resets the whole transient test schema between test cases.
+CREATE OR REPLACE FUNCTION sender_review_ci.reject_fixture_evidence_mutation()
+RETURNS trigger
+LANGUAGE plpgsql SECURITY INVOKER SET search_path = pg_catalog
+AS $$
+BEGIN
+    RAISE EXCEPTION 'fixture evidence is append-only';
+END
+$$;
+DROP TRIGGER IF EXISTS fixture_evidence_no_mutate
+  ON sender_review_ci.fixture_request_evidence;
+CREATE TRIGGER fixture_evidence_no_mutate
+BEFORE UPDATE OR DELETE ON sender_review_ci.fixture_request_evidence
+FOR EACH ROW EXECUTE FUNCTION
+    sender_review_ci.reject_fixture_evidence_mutation();
+
 REVOKE ALL ON ALL TABLES IN SCHEMA sender_review_ci FROM PUBLIC;
 REVOKE ALL ON ALL SEQUENCES IN SCHEMA sender_review_ci FROM PUBLIC;
 REVOKE EXECUTE ON ALL FUNCTIONS IN SCHEMA sender_review_ci FROM PUBLIC;
