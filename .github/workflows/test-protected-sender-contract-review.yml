@@ -39,6 +39,8 @@ jobs:
           python -m sender_review.three_bot_cutover_matrix
       - name: Test proposed signer-free protective close and bot intents (offline)
         run: python -m unittest sender_review.test_proposed_intent_interfaces_offline -v
+      - name: Review pure signer-free worker intent fixture builder
+        run: python -m unittest sender_review.test_worker_intent_fixture_builder_offline -v
       - name: Verify synthetic protective-close and unknown-ACK recovery always HOLD
         run: python -m unittest sender_review.test_protective_recovery_simulator_offline -v
       - name: Verify synthetic account-wide ownership and fill reconciliation stays HOLD
