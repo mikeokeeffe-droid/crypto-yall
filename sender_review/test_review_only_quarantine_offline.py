@@ -78,9 +78,9 @@ class ReviewOnlyQuarantineTests(unittest.TestCase):
 
     def test_git_blob_fingerprint_type_and_content(self):
         import hashlib
-        data = b"example\\n"
+        data = b"example\n"
         expected = hashlib.sha1(
-            b"blob " + str(len(data)).encode() + b"\\0" + data
+            b"blob " + str(len(data)).encode() + b"\0" + data
         ).hexdigest()
         self.assertEqual(git_blob_fingerprint(data), expected)
         with self.assertRaises(TypeError):
