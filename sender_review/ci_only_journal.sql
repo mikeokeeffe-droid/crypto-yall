@@ -235,6 +235,18 @@ BEFORE UPDATE OR DELETE ON sender_review_ci.fixture_request_evidence
 FOR EACH ROW EXECUTE FUNCTION
     sender_review_ci.reject_fixture_evidence_mutation();
 
+-- A consumed fake signed JTI and its nonce cannot be reassigned or erased
+-- through ordinary SQL. This is defense-in-depth for CI-only replay tests.
+-- CI superusers, trigger disabling and TRUNCATE can still bypass this guard:
+-- it is NOT operational identity provenance, an immutable ledger, or
+-- authentication of a remote sender.
+DROP TRIGGER IF EXISTS fixture_receipts_no_mutate
+  ON sender_review_ci.fixture_identity_receipts;
+CREATE TRIGGER fixture_receipts_no_mutate
+BEFORE UPDATE OR DELETE ON sender_review_ci.fixture_identity_receipts
+FOR EACH ROW EXECUTE FUNCTION
+    sender_review_ci.reject_fixture_evidence_mutation();
+
 -- Preserve the CI review-only transition audit as append-only too.
 -- Unlike fixture_request_evidence, review_events previously allowed owner
 -- UPDATE/DELETE, which could conceal the recorded HOLD transition. These
