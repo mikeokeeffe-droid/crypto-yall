@@ -251,7 +251,7 @@ time.sleep(30)
         )
         self.assertEqual(
             {item[0] for item in routines},
-            {"record_review_only", "hold_uncertain"},
+            {"record_review_only", "hold_uncertain", "reject_fixture_evidence_mutation"},
         )
         states = self.query(
             "select distinct state from sender_review_ci.review_intents"
