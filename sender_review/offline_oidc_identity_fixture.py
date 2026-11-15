@@ -45,6 +45,10 @@ class OfflineOidcTrustPolicy:
     # Deployment still requires real issuer key and host provenance.
     approved_source_sha: str | None = None
     approved_workflow_sha: str | None = None
+    # A paired fixed run/attempt is an OFFLINE fixture expectation,
+    # NOT proof GitHub authorized that run or that an operator approved it.
+    expected_run_id: str | None = None
+    expected_run_attempt: str | None = None
 
 
 @dataclass(frozen=True)
@@ -132,6 +136,14 @@ def verify_fixture_oidc_identity_offline(
             or (policy.approved_workflow_sha is not None
                 and (type(policy.approved_workflow_sha) is not str
                      or _SHA.fullmatch(policy.approved_workflow_sha) is None))
+            or ((policy.expected_run_id is None)
+                != (policy.expected_run_attempt is None))
+            or (policy.expected_run_id is not None
+                and (type(policy.expected_run_id) is not str
+                     or _DIGITS.fullmatch(policy.expected_run_id) is None))
+            or (policy.expected_run_attempt is not None
+                and (type(policy.expected_run_attempt) is not str
+                     or _DIGITS.fullmatch(policy.expected_run_attempt) is None))
             or type(policy.workflow_bot_refs) is not tuple
             or len(policy.workflow_bot_refs) != 3):
         return hold
@@ -205,6 +217,9 @@ def verify_fixture_oidc_identity_offline(
                 or _DIGITS.fullmatch(claims["run_id"]) is None
                 or type(claims.get("run_attempt")) is not str
                 or _DIGITS.fullmatch(claims["run_attempt"]) is None
+                or (policy.expected_run_id is not None
+                    and (claims["run_id"] != policy.expected_run_id
+                         or claims["run_attempt"] != policy.expected_run_attempt))
                 or any(type(claims.get(t)) is not int
                        for t in ("nbf", "iat", "exp"))):
             return hold
