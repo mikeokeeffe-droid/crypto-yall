@@ -189,3 +189,14 @@ and socket availability, network paths other than these tested AF_INET /
 AF_INET6 socket creations, host-level egress control and independent reviewer
 sign-off remain separate unresolved gates. Do not enable networking, merge,
 connect to Hyperliquid, or authorize trading based on this result.
+
+## Additional operator firewall evidence — 15 November 2026, 21:46
+
+An operator-supplied Ubuntu terminal screenshot from the dedicated offline-test host shows the following **observations, not independently verified assertions**:
+
+- `sudo ufw status verbose`: `Status: active`; `Default: deny (incoming), allow (outgoing), disabled (routed)`; incoming TCP 22 allowed for IPv4/IPv6; no outbound deny shown in that summary.
+- `sudo nft list ruleset | grep -E 'hook output|policy (drop|accept)'`: IPv4 and IPv6 filter output hooks report `policy accept`; input and forward hooks report `policy drop`. This grep-based output does not inspect every rule or network namespace.
+- **Gate disposition: outbound host-network policy is NOT VERIFIED AS RESTRICTED**. Neither UFW nor the reported base output hooks supply an independently established outbound deny barrier. Existing `PrivateNetwork=yes`, `RestrictAddressFamilies=AF_UNIX`, and the actual unit's observed no-IP-socket probe offer narrower process-scoped protection but cannot be used as substitutes for the separate egress gate.
+- Do not switch the host-wide default outgoing policy without a safe, independently reviewed management/network plan. Do not weaken or start the collector unit. Independent reviewer must inspect complete effective firewall/cloud policy, its application to the prospective runtime, and credential access before any one-shot testnet network approval.
+
+**Decision stays HOLD. No service restart/start, testnet networking, exchange submission or live deployment authorised.**
