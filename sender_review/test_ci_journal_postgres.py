@@ -162,7 +162,8 @@ class SenderJournalPostgresTests(unittest.TestCase):
                             "WHERE datname='sender_review_test' "
                             "AND wait_event_type='Lock' "
                             "AND wait_event='advisory' "
-                            "AND query LIKE '%sender_review_ci.record_review_only(%'"
+                            "AND query LIKE %s",
+                            ("%sender_review_ci.record_review_only(%",),
                         )[0][0]
                         if queued == 3:
                             break
