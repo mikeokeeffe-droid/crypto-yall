@@ -36,6 +36,10 @@ class OfflineOidcTrustPolicy:
     ref: str
     subject: str
     workflow_bot_refs: tuple[tuple[str, str], ...]
+    # Repositories created on/after GitHub's 2026-07-15 rollout require
+    # immutable owner/repository IDs in the default OIDC subject.
+    repository_owner_id: str | None = None
+    immutable_subject: bool = False
 
 
 @dataclass(frozen=True)
@@ -100,8 +104,23 @@ def verify_fixture_oidc_identity_offline(
             or type(policy.ref) is not str
             or not policy.ref.startswith("refs/heads/")
             or type(policy.subject) is not str
-            or policy.subject != "repo:" + policy.repository +
-               ":ref:" + policy.ref
+            or type(policy.immutable_subject) is not bool
+            or (policy.immutable_subject and (
+                type(policy.repository_owner_id) is not str
+                or _DIGITS.fullmatch(policy.repository_owner_id) is None
+            ))
+            or (not policy.immutable_subject and
+                policy.repository_owner_id is not None)
+            or policy.repository.count("/") != 1
+            or not all(policy.repository.split("/"))
+            or policy.subject != (
+                ("repo:" + policy.repository.split("/")[0] + "@" +
+                 policy.repository_owner_id + "/" +
+                 policy.repository.split("/")[1] + "@" +
+                 policy.repository_id + ":ref:" + policy.ref)
+                if policy.immutable_subject else
+                ("repo:" + policy.repository + ":ref:" + policy.ref)
+            )
             or type(policy.workflow_bot_refs) is not tuple
             or len(policy.workflow_bot_refs) != 3):
         return hold
