@@ -104,6 +104,32 @@ class SenderJournalPostgresTests(unittest.TestCase):
         self.assertEqual(len(self.query(
             "select coin from sender_review_ci.review_intents"
         )), 1)
+        # A losing concurrent replay must not leave a second empty scope
+        # row even if the competing winner used a different coin.
+        winning_coin = self.query(
+            "select coin from sender_review_ci.review_intents"
+        )[0][0]
+        self.assertEqual(self.query(
+            "select coin,active_nonce from sender_review_ci.scope_fences"
+        ), [(winning_coin, "f" * 32)])
+
+    def test_rejected_cross_coin_replay_leaves_no_new_scope_row(self):
+        self.assertTrue(record("daily", "SOL", "a" * 32)[0])
+        self.assertFalse(record("intraday", "AVAX", "a" * 32)[0])
+        self.assertEqual(self.query(
+            "select coin,fence,active_nonce from "
+            "sender_review_ci.scope_fences"
+        ), [("SOL", 1, "a" * 32)])
+        self.assertEqual(self.query(
+            "select coin,bot from sender_review_ci.review_intents"
+        ), [("SOL", "daily")])
+        # A genuinely new request on AVAX still works independently,
+        # keeping each coin's scope fenced after a successful claim.
+        self.assertTrue(record("intraday", "AVAX", "b" * 32)[0])
+        self.assertEqual(self.query(
+            "select coin,fence,active_nonce from "
+            "sender_review_ci.scope_fences order by coin"
+        ), [("AVAX", 1, "b" * 32), ("SOL", 1, "a" * 32)])
 
     def test_uncertain_ack_persists_hold_and_survives_new_connection(self):
         accepted = record()
@@ -432,13 +458,12 @@ print(json.dumps({"claims": results, "repeated_hold": repeat_hold}))
             "SELECT active_nonce,fence FROM sender_review_ci.scope_fences "
             "WHERE coin='SOL'"
         ), [("a" * 32, 1)])
-        # record_review_only may create an unclaimed empty scope row
-        # before detecting account-wide nonce replay. It must NOT
-        # install an active AVAX fence or create another intent.
+        # Account-wide nonce replay is denied before creating an
+        # unrelated AVAX scope row. No new intent/fence may appear.
         self.assertEqual(self.query(
             "SELECT fence,active_nonce FROM sender_review_ci.scope_fences "
             "WHERE coin='AVAX'"
-        ), [(0, None)])
+        ), [])
 
     def test_review_events_are_append_only_during_uncertain_ack(self):
         # Review-only journal events must not be editable to erase a HOLD
