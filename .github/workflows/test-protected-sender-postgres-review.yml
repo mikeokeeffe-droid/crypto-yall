@@ -54,6 +54,8 @@ jobs:
         run: python -m unittest sender_review.test_ci_journal_permissions_postgres -v
       - name: Test CI-only restricted role and no direct journal permissions
         run: python -m unittest sender_review.test_ci_restricted_role_postgres -v
+      - name: Verify simulated durable attempt lifecycle has no order sender
+        run: python -m unittest sender_review.test_ci_attempt_lifecycle_postgres -v
       - name: Verify no trade-authorizing SQL state or send function
         shell: bash
         run: |
