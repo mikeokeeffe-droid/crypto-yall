@@ -196,6 +196,41 @@ class SignedOidcFixtureTests(unittest.TestCase):
                 self.assertEqual(result.state, "hold")
                 self.assert_no_authority(result)
 
+    def test_exact_workflow_run_and_attempt_policy(self):
+        # The supplied run/attempt values are accepted ONLY when matching
+        # a separate fixed test policy. This does not verify run status,
+        # GitHub provenance or any external authorization.
+        policy = replace(
+            POLICY, expected_run_id="1234567", expected_run_attempt="2"
+        )
+        valid = self.verify(
+            self.token(run_id="1234567", run_attempt="2"), policy=policy
+        )
+        self.assertEqual(valid.state, "verified_fixture_only")
+        self.assert_no_authority(valid)
+        for claims in (
+            {"run_id": "1234568", "run_attempt": "2"},
+            {"run_id": "1234567", "run_attempt": "1"},
+            {"run_id": "1234567", "run_attempt": "3"},
+            {"run_id": 1234567, "run_attempt": "2"},
+            {"run_id": "1234567", "run_attempt": 2},
+        ):
+            with self.subTest(claims=claims):
+                result = self.verify(self.token(**claims), policy=policy)
+                self.assertEqual(result.state, "hold")
+                self.assert_no_authority(result)
+        for bad_policy in (
+            replace(POLICY, expected_run_id="1234567"),
+            replace(POLICY, expected_run_attempt="2"),
+            replace(POLICY, expected_run_id="0", expected_run_attempt="2"),
+            replace(POLICY, expected_run_id="1234567", expected_run_attempt="02"),
+            replace(POLICY, expected_run_id=True, expected_run_attempt="2"),
+        ):
+            with self.subTest(policy=bad_policy):
+                result = self.verify(self.token(), policy=bad_policy)
+                self.assertEqual(result.state, "hold")
+                self.assert_no_authority(result)
+
     def test_no_key_provenance_or_replay_claim_can_be_approved(self):
         # A signed and syntactically valid fixture intentionally remains
         # unapproved even when a user supplies trusted-looking values.
