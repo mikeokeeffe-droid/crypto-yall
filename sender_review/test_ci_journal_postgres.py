@@ -7,6 +7,8 @@ workload authentication, exchange acknowledgements, or actual fill ownership.
 import concurrent.futures
 import os
 from pathlib import Path
+import subprocess
+import sys
 import unittest
 
 import psycopg
@@ -166,6 +168,80 @@ class SenderJournalPostgresTests(unittest.TestCase):
         self.assertEqual(self.query(
             "select 1 from sender_review_ci.scope_fences"
         ), [])
+
+    def test_killed_worker_after_committed_review_cannot_release_fence(self):
+        # Crash an isolated child after DB commit, not a running bot.
+        # Parent connection must observe durable active review lock.
+        child = """
+from sender_review.test_ci_journal_postgres import record
+import os,sys,time
+result=record(bot="aggressive",coin="SOL",nonce="e"*32)
+assert result[0], result
+print("RECORDED", flush=True)
+time.sleep(30)
+"""
+        env = dict(os.environ)
+        env["PYTHONPATH"] = str(ROOT)
+        worker = subprocess.Popen(
+            [sys.executable, "-c", child],
+            cwd=str(ROOT), env=env, stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE, text=True,
+        )
+        try:
+            self.assertEqual(worker.stdout.readline().strip(), "RECORDED")
+            worker.kill()
+            worker.communicate(timeout=5)
+            self.assertNotEqual(worker.returncode, 0)
+            self.assertFalse(record("daily", "SOL", "f" * 32)[0])
+            self.assertEqual(self.query(
+                "select bot,state,fence from sender_review_ci.review_intents"
+            ), [("aggressive", "review_only", 1)])
+            self.assertEqual(self.query(
+                "select active_nonce from sender_review_ci.scope_fences"
+            ), [("e" * 32,)])
+        finally:
+            if worker.poll() is None:
+                worker.kill()
+                worker.communicate(timeout=5)
+
+    def test_killed_transaction_does_not_claim_committed_intent(self):
+        # Force a child to hold an uncommitted DB scope lock. Terminating
+        # this disposable worker must roll back its review-only mutation.
+        child = """
+import os,psycopg,sys,time
+conn=psycopg.connect(host="127.0.0.1",port=5432,
+    dbname="sender_review_test",user="postgres",
+    password=os.environ["PGPASSWORD"])
+conn.execute("insert into sender_review_ci.scope_fences"
+    "(environment,account,dex,coin,fence,active_nonce)"
+    " values ('testnet',%s,'','SOL',1,%s)",
+    ("0x"+"1"*40,"f"*32))
+print("UNCOMMITTED", flush=True)
+time.sleep(30)
+"""
+        worker = subprocess.Popen(
+            [sys.executable, "-c", child],
+            cwd=str(ROOT), env=dict(os.environ),
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+        )
+        try:
+            self.assertEqual(worker.stdout.readline().strip(), "UNCOMMITTED")
+            worker.kill()
+            worker.communicate(timeout=5)
+            self.assertNotEqual(worker.returncode, 0)
+            self.assertEqual(self.query(
+                "select 1 from sender_review_ci.scope_fences"
+            ), [])
+            # With no committed intent, a new independent review can record
+            # a request. No exchange sends are possible in these tests.
+            self.assertTrue(record("intraday", "SOL", "a" * 32)[0])
+            self.assertEqual(len(self.query(
+                "select 1 from sender_review_ci.review_intents"
+            )), 1)
+        finally:
+            if worker.poll() is None:
+                worker.kill()
+                worker.communicate(timeout=5)
 
     def test_no_release_send_or_trade_function_exists(self):
         routines = self.query(
