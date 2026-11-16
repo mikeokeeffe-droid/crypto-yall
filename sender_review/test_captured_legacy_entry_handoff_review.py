@@ -4,7 +4,7 @@ Only AST-extracted legacy execute_trade code runs with the inert capture
 adapter. The bridge never imports/runs a full trading bot, signer, SDK,
 network client, database, or actual request transport. Every outcome HOLD.
 """
-from dataclasses import replace
+from copy import copy
 import hashlib
 import json
 import unittest
@@ -88,7 +88,11 @@ class CapturedLegacyEntryHandoffTests(unittest.TestCase):
         ]
         for changes in variants:
             with self.subTest(changes=changes):
-                capture = replace(original, **changes)
+                # Simulate post-construction tampering; __post_init__ correctly
+                # refuses invalid scopes when constructing fresh captures.
+                capture = copy(original)
+                for key, value in changes.items():
+                    setattr(capture, key, value)
                 result = prepare_captured_legacy_entry_handoff_review_only(
                     capture=capture,
                     candidate_runner_jwt=self.fixture.token("daily"),
