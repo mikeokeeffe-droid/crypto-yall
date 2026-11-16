@@ -133,6 +133,13 @@ def inspect_testnet_recent_history_review(
             return RecentHistoryReview(reason="no matching history evidence")
         if any(item[2] != "filled" for item in historical.values()):
             return RecentHistoryReview(reason="open/canceled historical order")
+        # Every order marked filled must have its own matched fills inside
+        # this bounded window. Otherwise a partial history can look coherent
+        # because only the orders referenced by returned fills are checked.
+        if set(historical) != set(fills):
+            return RecentHistoryReview(
+                reason="historical filled order missing matching fill records",
+            )
         for oid, entries in fills.items():
             expected = historical.get(oid)
             if expected is None or expected[2] != "filled":
