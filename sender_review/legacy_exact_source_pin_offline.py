@@ -1,6 +1,6 @@
 """Exact Git-blob fingerprints for original three-bot strategies/protection.
 
-This inventories the EXISTING 8 original files on PR #42's reviewed baseline.
+This inventories 13 original bot, protection and direct signal/loss-lock source files on PR #42's reviewed baseline.
 Unlike counts of SDK calls, it also detects changes to sizing, stops and
 workflow conditions that leave the same number of call sites.
 
@@ -35,6 +35,16 @@ EXPECTED_GIT_BLOBS = {
         "f058462709e2a22bcdcd095d28d5d8fc8c4bcf10",
     "aggressive_profit_protection.py":
         "9e40fac7eb28c113b4476aada6f0188a64e23269",
+    "usd_loss_cap.py":
+        "4b3cbbf2207713bfb718204531fea75efab5ac83",
+    "reentry_lock.py":
+        "28aaf65ad6623ee546c1542695ae3bde78ba4c4c",
+    "strategy.py":
+        "4f927f235b0fc6a8182c701de6ef6c75a3fea31e",
+    "intraday_strategy.py":
+        "8ad689bfc22637341c0b8d8e0831458b267fe983",
+    "aggressive_strategy.py":
+        "9d309f2a51b7ea8c48a03a0f47b4ccc53dcda3b0",
 }
 _MAX_SOURCE_BYTES = 256_000
 
@@ -60,7 +70,7 @@ def _git_blob_sha1(raw: bytes) -> str:
 
 
 def inspect_legacy_source_bytes_offline(root: Path = ROOT) -> LegacySourceReview:
-    """Read only 8 fixed checkout files; return NO_GO even on exact match."""
+    """Read only 13 fixed checkout files; return NO_GO even on exact match."""
     if not isinstance(root, Path):
         return LegacySourceReview(reason="invalid audit checkout")
     matching, changed = [], []
@@ -83,7 +93,7 @@ def inspect_legacy_source_bytes_offline(root: Path = ROOT) -> LegacySourceReview
         except (OSError, ValueError):
             changed.append(relative)
     return LegacySourceReview(
-        reason=("8 original source bytes match an untrusted audit baseline; "
+        reason=("13 original source bytes match an untrusted audit baseline; "
                 "independent runtime and protection verification still absent"
                 if not changed else
                 "legacy bot/workflow bytes differ or are missing; re-audit "
