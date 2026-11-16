@@ -50,6 +50,8 @@ jobs:
         run: python -m unittest sender_review.test_ci_worker_draft_bridge_postgres -v
       - name: Test fake signed remote envelope to disposable review-only journal
         run: python -m unittest sender_review.test_ci_remote_journal_boundary_postgres -v
+      - name: Exercise original three-bot sizing into signed disposable HOLD journal
+        run: python -m unittest sender_review.test_ci_legacy_capture_journal_postgres -v
       - name: Check denied PostgreSQL role permissions in disposable CI
         run: python -m unittest sender_review.test_ci_journal_permissions_postgres -v
       - name: Test CI-only restricted role and no direct journal permissions
