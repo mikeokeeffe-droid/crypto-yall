@@ -9,6 +9,7 @@ or authorization. Manual reviewer must inspect actual host security controls.
 """
 import hashlib
 import json
+import os
 from pathlib import Path
 import stat
 import subprocess
@@ -21,6 +22,7 @@ PIN = "collector_review/deployment/observed-source-fingerprints-20261115.json"
 # or credentials' CONTENTS, and never print systemctl's raw output.
 _PROPERTIES = (
     "LoadState", "UnitFileState", "ActiveState", "SubState",
+    "Result", "ExecMainStatus",
     "DynamicUser", "NoNewPrivileges", "PrivateNetwork",
     "RestrictAddressFamilies", "IPAddressDeny", "IPAddressAllow",
     "ProtectHome", "ProtectSystem", "PrivateDevices",
@@ -31,6 +33,9 @@ _REQUIRED = {
     "LoadState": "loaded",
     "UnitFileState": "static",
     "ActiveState": "inactive",
+    "SubState": "dead",
+    "Result": "success",
+    "ExecMainStatus": "0",
     "DynamicUser": "yes",
     "NoNewPrivileges": "yes",
     "PrivateNetwork": "yes",
@@ -80,15 +85,33 @@ def _parse_unit_show(raw):
 
 def _safe_file_digest(path):
     """Reject symlinks, non-regular and writable-by-others files."""
+    fd = None
     try:
-        metadata = path.lstat()
+        # Hash the opened descriptor, not a path re-opened after lstat:
+        # prevents following a substituted source-file symlink.
+        fd = os.open(path, os.O_RDONLY | os.O_CLOEXEC | os.O_NOFOLLOW)
+        metadata = os.fstat(fd)
         if (not stat.S_ISREG(metadata.st_mode)
                 or metadata.st_mode & 0o022
                 or not 0 <= metadata.st_size <= 1048576):
             return None
-        return hashlib.sha256(path.read_bytes()).hexdigest()
+        hasher = hashlib.sha256()
+        count = 0
+        while count < metadata.st_size:
+            data = os.read(fd, min(65536, metadata.st_size - count))
+            if not data:
+                return None
+            hasher.update(data)
+            count += len(data)
+        # Detect unexpectedly growing files (not just changed metadata).
+        if os.read(fd, 1):
+            return None
+        return hasher.hexdigest()
     except (OSError, ValueError):
         return None
+    finally:
+        if fd is not None:
+            os.close(fd)
 
 
 def _source_fingerprints(root):
@@ -173,6 +196,9 @@ def collect_readonly_host_evidence(*, root=ROOT, runner=subprocess.run):
             fields["LoadState"] == "loaded"
             and fields["ActiveState"] == "inactive"
             and fields["UnitFileState"] == "static"
+            and fields["SubState"] == "dead"
+            and fields["Result"] == "success"
+            and fields["ExecMainStatus"] == "0"
         )
         packet["unit_restrictions_candidate"] = (
             all(fields.get(k) == v for k, v in _REQUIRED.items())
