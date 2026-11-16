@@ -22,7 +22,7 @@ class LegacyExactSourcePinTests(unittest.TestCase):
     def test_all_eight_original_sources_match_commit_baseline_only(self):
         outcome = inspect_legacy_source_bytes_offline()
         self.assert_never_authorized(outcome)
-        self.assertTrue(outcome.exact_bytes_match)
+        self.assertTrue(outcome.exact_bytes_match, outcome.changed_or_missing_paths)
         self.assertEqual(len(outcome.matched_paths), 8)
         self.assertEqual(outcome.changed_or_missing_paths, ())
         self.assertEqual(set(outcome.matched_paths), set(EXPECTED_GIT_BLOBS))
@@ -34,7 +34,7 @@ class LegacyExactSourcePinTests(unittest.TestCase):
                 path = root / relative
                 path.parent.mkdir(parents=True, exist_ok=True)
                 path.write_bytes((ROOT / relative).read_bytes())
-            self.assertTrue(inspect_legacy_source_bytes_offline(root).exact_bytes_match)
+            self.assertTrue(inspect_legacy_source_bytes_offline(root).exact_bytes_match, inspect_legacy_source_bytes_offline(root).changed_or_missing_paths)
             for relative in EXPECTED_GIT_BLOBS:
                 target = root / relative
                 original = target.read_bytes()
