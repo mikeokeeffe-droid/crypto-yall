@@ -5,6 +5,14 @@ on:
     branches: [main]
     paths:
       - 'sender_review/**'
+      - '.github/workflows/execute-trades.yml'
+      - '.github/workflows/execute-intraday.yml'
+      - '.github/workflows/execute-aggressive.yml'
+      - 'hyperliquid_executor.py'
+      - 'intraday_executor.py'
+      - 'aggressive_executor.py'
+      - 'intraday_profit_protection.py'
+      - 'aggressive_profit_protection.py'
       - 'docs/accelerated-coordinated-sender-cutover-20261115.md'
       - '.github/workflows/test-protected-sender-contract-review.yml'
   workflow_dispatch: {}
