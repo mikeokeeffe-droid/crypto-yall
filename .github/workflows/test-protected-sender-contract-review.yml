@@ -71,6 +71,8 @@ jobs:
         run: python -m unittest sender_review.test_hyperliquid_readonly_collection_plan_offline -v
       - name: Validate opt-in read-only testnet info snapshot using HTTPS mocks only
         run: python -m unittest sender_review.test_hyperliquid_testnet_readonly_snapshot_review -v
+      - name: Verify combined six-frame read-only position and history HOLD
+        run: python -m unittest sender_review.test_coordinated_testnet_readset_review -v
       - name: Check bounded recent testnet order and fill history with HTTP mocks only
         run: python -m unittest sender_review.test_hyperliquid_testnet_recent_history_review -v
       - name: Validate mock-only Hyperliquid info responses and zero trade authority
