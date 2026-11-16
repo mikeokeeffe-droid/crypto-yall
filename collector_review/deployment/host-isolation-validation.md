@@ -228,3 +228,41 @@ review remains **NOT COMPLETE**. Preserve the offline unit unchanged.
 
 **Disposition:** configuration checked; runtime network isolation NOT
 independently attested; testnet networking and live trading remain NO-GO.
+
+
+## 16 November — redacted host evidence command (not yet run on test host)
+
+PR #41 now includes `collector_review.readonly_host_evidence`, a **read-only**
+observation helper to simplify independent review. GitHub CI tests only its
+synthetic/mocked responses; no operator has yet supplied output from the test
+host. Once the **current reviewed source** is safely staged, an authorized
+operator on the dedicated offline test host may run:
+
+```sh
+cd /opt/crypto-yall
+python3 -B -m collector_review.readonly_host_evidence
+```
+
+It collects hashes of local collector source/doc files, the local Git commit
+and dirty-worktree status, a SHA-256 digest (not contents) of the effective
+`systemctl cat` unit output, and a narrow allowlist of `systemctl show`
+properties. It reports **booleans and hashes**, not environment values,
+credential paths, raw unit contents, arbitrary systemd output, private keys,
+IP addresses or exchange data. It never requests sudo, starts or reloads
+services, changes firewall policy, or connects to the network.
+
+**Review limitations:** a field ending in `_candidate` is NOT an independent
+attestation. If a unit property is unavailable or unexpected, the helper
+reports it as unverified; do not modify host settings just to get a green
+observation. Git cleanliness and matching old six hashes are not proof of an
+entire deployment or of installed Python dependency identities. The
+`effective_unit_sha256` requires an **independent reviewer to inspect and
+compare the underlying actual unit and drop-ins** on the host. Effective
+network egress, absence of accessible secrets, testnet approval and trading
+authorization are **always false**, even for matching observations.
+
+Do not install/run this on a production or trading-bot machine. The old
+offline oneshot remains untouched, static and network-denied. After the host
+evidence is collected, independent security review, reviewed restricted egress
+for a **new** collector runtime, and a separate operator decision are still
+mandatory before any real testnet request. **LIVE / TESTNET NO-GO.**
