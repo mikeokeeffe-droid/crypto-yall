@@ -49,6 +49,8 @@ jobs:
         run: python -m unittest sender_review.test_legacy_order_capture_preview -v
       - name: Capture original sized protective closes offline without execution
         run: python -m unittest sender_review.test_legacy_protective_close_capture_offline -v
+      - name: Reconcile original close proposals with synthetic account-wide read-set (HOLD)
+        run: python -m unittest sender_review.test_legacy_close_reconciliation_handoff_offline -v
       - name: Audit original three-bot signing and order paths (NO-GO)
         run: |
           python -m unittest sender_review.test_legacy_cutover_audit -v
