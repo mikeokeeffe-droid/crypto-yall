@@ -43,6 +43,16 @@ async def inspect_asgi_to_disposable_journal_offline(
     denied = CIOnlyAsgiJournalReview()
     received_chunks = []
     responses = []
+    # Capture immutable request metadata before untrusted receive callbacks
+    # can mutate the scope/header list after the ASGI validator checks it.
+    try:
+        initial_request = (
+            scope.get("type"), scope.get("method"), scope.get("path"),
+            scope.get("raw_path"), scope.get("query_string"),
+            tuple(tuple(item) for item in scope["headers"]),
+        )
+    except (TypeError, ValueError, AttributeError, KeyError):
+        initial_request = None
 
     async def local_receive():
         message = await receive()
@@ -73,7 +83,17 @@ async def inspect_asgi_to_disposable_journal_offline(
         return denied
 
     # An accidental future 2xx or 3xx from the validator is NOT forwarded.
-    if len(responses) != 2 or responses[0].get("status", 0) < 400:
+    if (
+        len(responses) != 2
+        or type(responses[0]) is not dict
+        or type(responses[1]) is not dict
+        or responses[0].get("type") != "http.response.start"
+        or type(responses[0].get("status")) is not int
+        or responses[0]["status"] < 400
+        or responses[1].get("type") != "http.response.body"
+        or type(responses[1].get("body")) is not bytes
+        or responses[1].get("more_body", False) is not False
+    ):
         response = b'{"state":"HOLD","reason":"review boundary unavailable"}'
         await send({
             "type": "http.response.start", "status": 503,
@@ -85,14 +105,26 @@ async def inspect_asgi_to_disposable_journal_offline(
 
     # Only the exact normal (not failed) 503 from the checked-in handler
     # is eligible for a disposable fake journal receipt.
+    try:
+        same_request = initial_request is not None and initial_request == (
+            scope.get("type"), scope.get("method"), scope.get("path"),
+            scope.get("raw_path"), scope.get("query_string"),
+            tuple(tuple(item) for item in scope["headers"]),
+        )
+    except (TypeError, ValueError, AttributeError, KeyError):
+        same_request = False
     expected = b'{"state":"HOLD","reason":"no authenticated sender deployed"}'
     eligible = (
-        type(scope) is dict
+        same_request
+        and type(scope) is dict
         and scope.get("type") == "http"
         and scope.get("method") == "POST"
         and scope.get("path") == "/v1/review-only/entry-intents"
         and responses[0].get("status") == 503
         and responses[1].get("body") == expected
+        and responses[0].get("type") == "http.response.start"
+        and responses[1].get("type") == "http.response.body"
+        and responses[1].get("more_body", False) is False
         and os.environ.get("SENDER_REVIEW_DISPOSABLE_CI") == "1"
         and os.environ.get("PGDATABASE") == "sender_review_test"
         and os.environ.get("PGHOST") == "127.0.0.1"
