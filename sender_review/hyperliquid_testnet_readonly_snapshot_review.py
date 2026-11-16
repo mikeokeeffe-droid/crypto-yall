@@ -9,7 +9,7 @@ Observed state can never prove position ownership, history completeness,
 that no intervening fill occurred, or permission to close, retry or trade.
 Even consistent snapshots always return HOLD.
 """
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from decimal import Decimal, InvalidOperation
 import hashlib
 import json
@@ -32,6 +32,9 @@ class ReadOnlyTestnetSnapshot:
     positions_digest: str | None = None
     position_count: int = 0
     open_order_count: int = 0
+    # Raw public position sizes for future read-only reconciliation; never
+    # trusted as provenance or permission. Excluded from repr to avoid logs.
+    observed_positions: tuple = field(default=(), repr=False)
     # No source of operational authority exists here.
     account_ownership_verified: bool = False
     historical_completeness_verified: bool = False
@@ -115,7 +118,7 @@ def _positions(document):
 def _orders(document):
     if type(document) is not list or len(document) > 5000:
         raise ValueError("invalid open orders document")
-    seen = set()
+    orders = {}
     for order in document:
         if type(order) is not dict:
             raise ValueError("invalid order record")
@@ -123,20 +126,22 @@ def _orders(document):
             order.get("oid"), order.get("coin"),
             order.get("side"), order.get("sz"),
         )
-        if (type(oid) is not int or oid <= 0 or oid in seen
+        if (type(oid) is not int or oid <= 0 or oid in orders
                 or type(coin) is not str or _COIN.fullmatch(coin) is None
                 or side not in ("A", "B")
                 or type(size) is not str or _SIZE.fullmatch(size) is None
-                or Decimal(size) <= 0):
+                or Decimal(size) < 0):
             raise ValueError("invalid/duplicate order")
-        seen.add(oid)
-    return len(document)
+        # A zero-sized open order is possible in the provider response;
+        # the presence of ANY order, regardless of quantity, blocks readiness.
+        orders[oid] = (coin, side, format(Decimal(size).normalize(), "f"))
+    return orders
 
 
 def inspect_testnet_info_readonly_snapshot(
     *, configured_public_account, enabled_readonly_testnet_network=False,
 ):
-    """Make exactly three public /info requests only after an explicit opt-in.
+    """Make exactly four public /info requests only after an explicit opt-in.
 
     The account is an *untrusted input*, expected to be pinned separately
     by a future verified host. It cannot determine real trading ownership.
@@ -155,27 +160,36 @@ def inspect_testnet_info_readonly_snapshot(
         before = _positions(_info_query(
             opener, account=configured_public_account, kind="clearinghouseState"
         ))
-        open_orders = _orders(_info_query(
+        orders_before = _orders(_info_query(
+            opener, account=configured_public_account, kind="openOrders"
+        ))
+        orders_after = _orders(_info_query(
             opener, account=configured_public_account, kind="openOrders"
         ))
         after = _positions(_info_query(
             opener, account=configured_public_account, kind="clearinghouseState"
         ))
-        if before != after:
+        if before != after or orders_before != orders_after:
             return ReadOnlyTestnetSnapshot(
-                reason="position quantities changed between observations"
+                reason="positions or open orders changed during read; HOLD"
+            )
+        if orders_after:
+            return ReadOnlyTestnetSnapshot(
+                reason="outstanding orders require account-wide reconciliation",
+                open_order_count=len(orders_after),
             )
         digest = hashlib.sha256(json.dumps(
             before, sort_keys=True, separators=(",", ":")
         ).encode("ascii")).hexdigest()
         return ReadOnlyTestnetSnapshot(
             state="OBSERVED_TESTNET_READONLY_HOLD",
-            reason="testnet /info response shapes consistent; no historical "
-                   "or trade/close/retry authority and no host attestation",
+            reason="two matching position reads, two empty order reads; "
+                   "not atomic, no history, trade or close authority",
             snapshot_consistent=True,
             positions_digest=digest,
             position_count=len(after),
-            open_order_count=open_orders,
+            open_order_count=0,
+            observed_positions=tuple(sorted(after.items())),
         )
     except (ValueError, TypeError, UnicodeError, OSError, OverflowError):
         return hold
