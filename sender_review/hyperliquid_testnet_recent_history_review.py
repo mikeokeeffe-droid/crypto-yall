@@ -69,12 +69,12 @@ def _orders(document):
         if (not _oid(oid) or oid in seen or type(coin) is not str
                 or _COIN.fullmatch(coin) is None or side not in ("A", "B")):
             raise ValueError("invalid or duplicate historical order")
-        _positive_amount(record.get("origSz"))
+        original_size = _positive_amount(record.get("origSz"))
         if (type(record.get("timestamp")) is not int
                 or not 0 <= record["timestamp"] <= 9007199254740991):
             raise ValueError("invalid historical timestamp")
         seen.add(oid)
-        orders[oid] = (coin, side, item["status"])
+        orders[oid] = (coin, side, item["status"], original_size)
     return orders
 
 
@@ -95,9 +95,9 @@ def _fills(document, *, start_time_ms, end_time_ms):
                 or side not in ("A", "B") or type(stamp) is not int
                 or not start_time_ms <= stamp <= end_time_ms):
             raise ValueError("invalid, stale or duplicate fill")
-        _positive_amount(record.get("sz"))
+        fill_size = _positive_amount(record.get("sz"))
         tids.add(tid)
-        fills.setdefault(oid, []).append((coin, side))
+        fills.setdefault(oid, []).append((coin, side, fill_size))
     return fills, len(tids)
 
 
@@ -126,18 +126,32 @@ def inspect_testnet_recent_history_review(
             opener, account=configured_public_account, kind="userFillsByTime",
             start_time_ms=start_time_ms, end_time_ms=end_time_ms,
         ), start_time_ms=start_time_ms, end_time_ms=end_time_ms)
-        # Missing historical orders, mixed sides, or unsettled matching
-        # orders prevent even a limited coherence claim.
+        # The provider may cap/omit older records. Any unresolved order,
+        # unmatched fill, overfill or partially observed filled order cannot
+        # even be described as a coherent bounded order/fill sample.
+        if not historical or not fills:
+            return RecentHistoryReview(reason="no matching history evidence")
+        if any(item[2] != "filled" for item in historical.values()):
+            return RecentHistoryReview(reason="open/canceled historical order")
         for oid, entries in fills.items():
             expected = historical.get(oid)
             if expected is None or expected[2] != "filled":
-                raise ValueError("fill with missing or unsettled order")
-            if any((coin, side) != expected[:2] for coin, side in entries):
-                raise ValueError("order/fill side or coin conflict")
+                return RecentHistoryReview(reason="fill lacks settled order")
+            if any((coin, side) != expected[:2]
+                   for coin, side, _ in entries):
+                return RecentHistoryReview(reason="fill/order direction conflict")
+            fill_total = sum((amount for _, _, amount in entries), Decimal("0"))
+            if fill_total != expected[3]:
+                # A partial result might simply be outside this bounded
+                # time window. Never extrapolate a missing fill.
+                return RecentHistoryReview(
+                    reason="filled quantity differs from recorded original; "
+                           "partial, truncated or overfilled order",
+                )
         return RecentHistoryReview(
             state="RECENT_TESTNET_HISTORY_REVIEW_ONLY_HOLD",
-            reason="bounded order/fill shapes agree, but retention, earlier "
-                   "manual activity, partial fills and baseline unverified",
+            reason="bounded matched order/fill quantities agree; older "
+                   "activity, unobserved orders and flat baseline unverified",
             recent_records_consistent=True,
             recent_order_count=len(historical),
             recent_fill_count=fill_count,
