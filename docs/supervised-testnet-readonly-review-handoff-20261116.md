@@ -36,6 +36,45 @@ separate drafts; do not merge/activate a bot, collector, or signer.
   A real network transport is **not installed or approved** and requires a
   separate reviewed code change after independent host sign-off.
 
+## First operator handoff — minimal non-secret observations
+
+For the operator using SSH/Termius, begin with these **read-only** commands
+on the *intended test host*; none of them enables a service, reads an
+environment variable, fetches a secret or contacts the exchange:
+
+```sh
+systemctl show testnet-collector-offline-review.service \
+  -p Id -p LoadState -p ActiveState -p SubState -p UnitFileState \
+  -p FragmentPath -p DropInPaths -p DynamicUser -p NoNewPrivileges \
+  -p PrivateNetwork -p RestrictAddressFamilies -p IPAddressDeny \
+  -p IPAddressAllow -p ProtectSystem -p ProtectHome -p PrivateDevices \
+  -p CapabilityBoundingSet -p AmbientCapabilities --no-pager
+systemd-analyze security --no-pager testnet-collector-offline-review.service
+```
+
+**Before sharing:** review the output for private hostnames, addresses, paths or
+other details that should be redacted. A service not found, a missing value, or
+an unexpectedly permissive setting means **UNVERIFIED/HOLD**, not a reason to
+start/reconfigure it. These commands describe the existing **offline** unit;
+even apparently strict settings and a good security score cannot establish
+effective egress, a clean future runtime, or authorized testnet connectivity.
+
+The **independent reviewer**, not the operator's screenshot alone, must inspect
+the actual installed unit and *all drop-ins*, effective process privileges,
+credential sources **privately** and cloud/network policy in both IP families.
+Do not paste raw `systemctl cat`, `systemctl show -p Environment`,
+`journalctl`, process command lines, JWTs, wallet keys, credentials or full
+firewall rulesets into this PR or a chat. The existing offline unit stays
+untouched. Do not run deployment or connectivity tests at this stage.
+
+**Handoff disposition form** (fill by independent reviewer only, with no
+secrets): host identity privately verified [yes/no]; exact source revision
+verified [yes/no]; installed unit/drop-ins verified [yes/no]; credentials
+isolated [yes/no]; per-process IPv4/IPv6/DNS/proxy/edge egress verified
+[yes/no]; independent reviewer and date [redacted reference]; outcome
+**UNVERIFIED / HOLD** until all required evidence is reviewed. This form
+alone grants no approval.
+
 ## Independent review packet — evidence to obtain without changing the host
 
 A reviewer **other than the implementer** must verify the exact reviewed Git
