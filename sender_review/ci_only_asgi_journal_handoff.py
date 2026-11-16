@@ -132,9 +132,16 @@ async def inspect_asgi_to_disposable_journal_offline(
         and scope.get("type") == "http"
         and scope.get("method") == "POST"
         and scope.get("path") == "/v1/review-only/entry-intents"
+        and scope.get("raw_path") == b"/v1/review-only/entry-intents"
+        and scope.get("query_string") == b""
         and responses[0].get("status") == 503
         and responses[1].get("body") == expected
         and responses[0].get("type") == "http.response.start"
+        and responses[0].get("headers") == [
+            (b"content-type", b"application/json"),
+            (b"cache-control", b"no-store"),
+            (b"content-length", str(len(expected)).encode("ascii")),
+        ]
         and responses[1].get("type") == "http.response.body"
         and responses[1].get("more_body", False) is False
         and os.environ.get("SENDER_REVIEW_DISPOSABLE_CI") == "1"
@@ -172,6 +179,13 @@ async def inspect_asgi_to_disposable_journal_offline(
             payload = b"".join(received_chunks)
             if not 0 < len(payload) <= 1024:
                 raise ValueError("invalid payload")
+            # Never treat a spoofed 503 HOLD as validation when its request
+            # envelope disagrees with what the checked-in ASGI accepts.
+            if names[b"content-type"] != b"application/json":
+                raise ValueError("invalid content type")
+            length = names.get(b"content-length")
+            if length is not None and length != str(len(payload)).encode("ascii"):
+                raise ValueError("invalid content length")
             audit = review_remote_fixture_to_disposable_journal_offline(
                 method="POST", path="/v1/review-only/entry-intents",
                 headers=[
