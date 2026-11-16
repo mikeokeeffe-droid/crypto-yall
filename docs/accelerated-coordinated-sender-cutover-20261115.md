@@ -115,6 +115,11 @@ GitHub Actions Aggressive ┘                                       │
 - [ ] Independent security and trading-risk sign-off on exact revision
 - [ ] Separate explicit live deployment authorisation
 
-**Current status:** planning/review workstream started; no sender implementation,
-no new real API access or deployment. All steps are intentionally unapproved
-until their specific evidence is available.
+**Current status (16 November):** review-only identity, entry-capture, disposable
+PostgreSQL journal, six-frame read-only transport and reconciliation prototypes
+exist on PR #42 and passed offline CI at `0d4de69e`. No approved runtime
+identity, operational signer, verified exchange provenance or live bot cutover
+exists. The next external milestone is the independent host-isolation and
+read-only testnet evidence gate documented in
+[`supervised-testnet-readonly-review-handoff-20261116.md`](supervised-testnet-readonly-review-handoff-20261116.md).
+No new real API access or deployment is approved. Stay **LIVE / TESTNET NO-GO**.
