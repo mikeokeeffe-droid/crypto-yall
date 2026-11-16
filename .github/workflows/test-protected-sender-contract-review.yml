@@ -78,6 +78,8 @@ jobs:
         run: python -m unittest sender_review.test_pre_submit_leverage_risk_review_offline -v
       - name: Test proposed signer-free protective close and bot intents (offline)
         run: python -m unittest sender_review.test_proposed_intent_interfaces_offline -v
+      - name: Test signer-free account snapshot extraction and spot fallback (offline)
+        run: python -m unittest sender_review.test_signer_free_account_view_offline -v
       - name: Review pure signer-free worker intent fixture builder
         run: python -m unittest sender_review.test_worker_intent_fixture_builder_offline -v
       - name: Quarantine CI-only sender fixtures from all five legacy execution paths
