@@ -54,8 +54,8 @@ def orders():
 class ReadonlySnapshotTests(unittest.TestCase):
     def check(self, responses=None):
         if responses is None:
-            responses = [Response(body(positions())), Response(body(orders())),
-                         Response(body(positions()))]
+            responses = [Response(body(positions())), Response(body([])),
+                         Response(body([])), Response(body(positions()))]
         fake = FakeOpener(responses)
         with patch.object(read.urllib.request, "build_opener", return_value=fake):
             answer = read.inspect_testnet_info_readonly_snapshot(
@@ -85,21 +85,22 @@ class ReadonlySnapshotTests(unittest.TestCase):
                     self.assertEqual(r.state, "HOLD")
                     self.deny_authority(r)
 
-    def test_three_exact_readonly_requests_always_hold(self):
+    def test_four_exact_readonly_requests_always_hold(self):
         result, fake = self.check()
         self.assertEqual(result.state, "OBSERVED_TESTNET_READONLY_HOLD")
         self.assertTrue(result.snapshot_consistent)
         self.assertEqual(result.position_count, 1)
-        self.assertEqual(result.open_order_count, 1)
+        self.assertEqual(result.open_order_count, 0)
+        self.assertEqual(result.observed_positions, (("SOL", "0.2"),))
         self.assertEqual(len(result.positions_digest), 64)
-        self.assertEqual(len(fake.calls), 3)
+        self.assertEqual(len(fake.calls), 4)
         for index, (url, method, data, timeout) in enumerate(fake.calls):
             self.assertEqual(url, read._URL)
             self.assertEqual(method, "POST")
             self.assertEqual(timeout, 5)
             request = json.loads(data)
             self.assertEqual(request, {
-                "type": "openOrders" if index == 1 else "clearinghouseState",
+                "type": "openOrders" if index in (1, 2) else "clearinghouseState",
                 "user": ACCOUNT, "dex": "",
             })
         self.deny_authority(result)
@@ -107,10 +108,43 @@ class ReadonlySnapshotTests(unittest.TestCase):
     def test_position_changed_between_reads_stays_hold(self):
         result, fake = self.check([
             Response(body(positions("0.20"))), Response(body([])),
-            Response(body(positions("0.30"))),
+            Response(body([])), Response(body(positions("0.30"))),
         ])
         self.assertFalse(result.snapshot_consistent)
         self.assertEqual(len(fake.calls), 3)
+        self.deny_authority(result)
+
+    def test_outstanding_orders_and_changed_orders_block_readiness(self):
+        cases = (
+            [Response(body(positions())), Response(body(orders())),
+             Response(body(orders())), Response(body(positions()))],
+            [Response(body(positions())), Response(body([])),
+             Response(body(orders())), Response(body(positions()))],
+            [Response(body(positions())), Response(body(orders())),
+             Response(body([])), Response(body(positions()))],
+        )
+        for replies in cases:
+            with self.subTest(changed_orders=[r.data.getvalue() for r in replies]):
+                result, fake = self.check(replies)
+                self.assertEqual(result.state, "HOLD")
+                self.assertFalse(result.snapshot_consistent)
+                self.assertEqual(len(fake.calls), 4)
+                self.assertFalse(result.observed_positions)
+                self.deny_authority(result)
+
+    def test_position_reordering_without_quantity_change_is_stable(self):
+        first = {"assetPositions": [
+            {"position": {"coin": "SOL", "szi": "0.20"}},
+            {"position": {"coin": "AVAX", "szi": "-0.3"}},
+        ]}
+        last = {"assetPositions": list(reversed(first["assetPositions"]))}
+        result, _ = self.check([
+            Response(body(first)), Response(body([])),
+            Response(body([])), Response(body(last)),
+        ])
+        self.assertTrue(result.snapshot_consistent)
+        self.assertEqual(result.observed_positions,
+                         (("AVAX", "-0.3"), ("SOL", "0.2")))
         self.deny_authority(result)
 
     def test_malformed_and_bad_http_response_refused(self):
