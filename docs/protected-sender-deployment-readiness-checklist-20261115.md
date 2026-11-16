@@ -19,6 +19,41 @@ The proposed human incident response and open-position rescue requirements are
 tracked in [the review-only outage/rollback runbook](protected-sender-incident-response-review-only-20261115.md).
 It is **not** a verified emergency procedure or approval to operate a signer.
 
+## Immediate implementation handoff (not yet completed)
+
+**Dependencies verified on 16 November 2026:** PR #40 (original
+execution-path characterization), PR #41 (isolated read-only testnet
+collector), and PR #42 (protected sender review) are all still open drafts.
+The three-bot cutover cannot be treated as approved by PR #42 CI alone.
+
+The next implementation must deliver independent, observable evidence for:
+
+1. **Authenticated service ingress:** deployed verifier using real GitHub
+   issuer/JWKS over authenticated transport, validated audience/immutable
+   repository/workflow/ref/run claims, bounded clocks, persistent replay
+   handling and exact body binding; test forgery, stale keys and restart.
+2. **Real read-only exchange reconciliation:** separately approved testnet
+   connectivity, complete account-wide positions, open/historical orders
+   and fills, including manual and legacy positions, with provenance and
+   retention-gap treatment. Missing/contradictory history keeps HOLD.
+3. **Single writer with measured isolation:** dedicated signer-held
+   service, real least-privilege DB role/ACL and fencing, no signing keys,
+   exchange order egress or leverage mutation in any of the five legacy
+   execution paths. Prove the controls on the *actual* host, not just CI.
+4. **Existing-position protection:** independent risk-owner-reviewed
+   explicit-size reduce-only close and monitored emergency response; test
+   partial fills, unknown ACK, delayed/rejected closes, restart, outage,
+   cutover and rollback without re-enabling multiple writers.
+5. **Independent approval:** reviewers sign off on the exact commit,
+   deployed artifact, host isolation, risk drill evidence and operator scope
+   before separately approved bounded testnet actions. Production requires
+   a separate later decision.
+
+**Do not unlock a simulated attempt, repurpose a fake OIDC credential or
+infer an open position is safe merely because no new entries are allowed.**
+The CI-only attempt incident view is a diagnostic fixture and its permissions
+are tested only against disposable PostgreSQL roles.
+
 ## Gates to clear outside this PR
 
 1. Real GitHub workload identity and authenticated transport
