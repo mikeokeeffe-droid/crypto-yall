@@ -95,12 +95,14 @@ class EvidenceTests(unittest.TestCase):
             {"LoadCredential": "sensitive.location"},
             {"EnvironmentFiles": "/etc/secret"},
             {"ActiveState": "active"},
+            {"Result": "exit-code"},
+            {"ExecMainStatus": "1"},
         ):
             with self.subTest(changes=changes), tempfile.TemporaryDirectory() as t:
                 root = self.root(Path(t))
                 run, commands = self.fake_runner(overrides=changes)
                 record = collect_readonly_host_evidence(root=root, runner=run)
-                if changes == {"ActiveState": "active"}:
+                if any(k in changes for k in ("ActiveState", "Result", "ExecMainStatus")):
                     self.assertFalse(record["unit_not_running_candidate"])
                 else:
                     self.assertFalse(record["unit_restrictions_candidate"])
@@ -118,6 +120,27 @@ class EvidenceTests(unittest.TestCase):
             target.unlink()
             target.symlink_to(root / "collector_review/test_1.py")
             self.assertIsNone(_source_fingerprints(root))
+
+    def test_source_symlink_and_file_replacement_denied(self):
+        with tempfile.TemporaryDirectory() as t:
+            root = self.root(Path(t))
+            target = root / "collector_review/test_0.py"
+            other = root / "collector_review/test_1.py"
+            target.unlink()
+            target.symlink_to(other)
+            self.assertIsNone(_source_fingerprints(root))
+
+    def test_last_unit_failure_is_not_reported_as_stopped_success(self):
+        with tempfile.TemporaryDirectory() as t:
+            root = self.root(Path(t))
+            run, commands = self.fake_runner(overrides={
+                "ActiveState": "inactive", "Result": "exit-code",
+                "ExecMainStatus": "1",
+            })
+            record = collect_readonly_host_evidence(root=root, runner=run)
+            self.assertFalse(record["unit_not_running_candidate"])
+            self.assertFalse(record["unit_restrictions_candidate"] is False)
+            self.denied_fields(record)
 
     def test_observation_errors_fail_closed(self):
         with tempfile.TemporaryDirectory() as t:
