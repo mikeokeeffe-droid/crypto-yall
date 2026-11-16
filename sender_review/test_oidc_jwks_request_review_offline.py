@@ -4,9 +4,8 @@ import unittest
 from sender_review.oidc_jwks_request_review_offline import (
     inspect_remote_with_public_jwks_fixture_offline,
 )
-from sender_review.test_oidc_jwks_keyset_offline import (
-    OfflinePublicJwksTests, encoded,
-)
+from sender_review.test_oidc_jwks_keyset_offline import b64int, encoded
+from sender_review.test_offline_oidc_identity_fixture import SignedOidcFixtureTests
 from sender_review.test_remote_request_boundary_offline import (
     OfflineRemoteRequestBoundaryTests, NOW,
 )
@@ -14,9 +13,14 @@ from sender_review.test_remote_request_boundary_offline import (
 class OfflineJwksRequestBoundaryTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        OfflinePublicJwksTests.setUpClass()
+        # Initialize the signed-token fixture exactly once. Reinitializing
+        # it generates a new RSA key, making the JWKS and JWT disagree.
         OfflineRemoteRequestBoundaryTests.setUpClass()
-        cls.key = OfflinePublicJwksTests.key
+        n, e = SignedOidcFixtureTests.keys["ci-fixture"]
+        cls.key = {
+            "kty": "RSA", "kid": "ci-fixture", "use": "sig", "alg": "RS256",
+            "n": b64int(n), "e": b64int(e),
+        }
         cls.fixture = OfflineRemoteRequestBoundaryTests()
 
     def check(self, keyset=None, token=None, body=None, headers=None):
