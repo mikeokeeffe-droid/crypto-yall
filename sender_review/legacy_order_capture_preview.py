@@ -2,9 +2,12 @@
 
 Draft compatibility proof: the three existing execute_trade() functions can
 call this object IN AN ISOLATED TEST without a Hyperliquid signer, wallet,
-SDK or network. It NEVER opens/closes a trade or modifies leverage; only
-captures syntactically reviewed proposed ENTRY bytes. It rejects every close,
-including sized closes, because caller-provided ownership is insufficient.
+SDK or network. It NEVER opens/closes a trade or modifies leverage. It captures
+syntactically reviewed ENTRY and explicitly parent-scoped Aggressive
+PYRAMID proposals only, always HOLD. Legacy market_open does not carry
+position ownership or pyramid context: the test harness must supply both
+as UNTRUSTED out-of-band fixture metadata. It rejects every close, including
+sized closes, because caller-provided ownership is insufficient.
 
 DO NOT inject into a running executor, protection loop or workflow. No
 production migration or permission follows from a successful capture.
@@ -33,6 +36,9 @@ class LegacyOrderCapturePreview:
     # Mandatory, out-of-band context from the calling strategy decision.
     # A bare legacy market_open call does not distinguish pyramids.
     expected_action: str
+    # Untrusted reference for an existing position in a synthetic review.
+    # Required ONLY for Aggressive pyramids; never proves actual ownership.
+    fixture_parent_position_ref: str | None = None
     proposed_body: bytes | None = field(default=None, repr=False)
     proposed_action: str | None = None
     observed_leverage: int | None = None
@@ -48,7 +54,19 @@ class LegacyOrderCapturePreview:
                 or self.fixture_bot not in _BOTS
                 or type(self.fixture_nonce) is not str
                 or _NONCE.fullmatch(self.fixture_nonce) is None
-                or self.expected_action not in ("open_long", "open_short")):
+                or self.expected_action not in (
+                    "open_long", "open_short", "pyramid_long", "pyramid_short",
+                )
+                or (
+                    self.expected_action.startswith("pyramid_")
+                    and (self.fixture_bot != "aggressive"
+                         or type(self.fixture_parent_position_ref) is not str
+                         or _NONCE.fullmatch(self.fixture_parent_position_ref) is None)
+                )
+                or (
+                    not self.expected_action.startswith("pyramid_")
+                    and self.fixture_parent_position_ref is not None
+                )):
             raise ValueError("invalid inert preview scope")
 
     def update_leverage(self, leverage, coin, is_cross):
@@ -77,15 +95,22 @@ class LegacyOrderCapturePreview:
             size_text = format(quantity, "f")
         except (InvalidOperation, ValueError, OverflowError):
             raise ReviewOnlyMutationBlocked("invalid size") from None
-        action = "open_long" if is_buy else "open_short"
-        if action != self.expected_action:
+        # market_open has no argument distinguishing pyramid from entry.
+        # The expected strategy action is mandatory fixture-only context;
+        # it MUST be established independently, never inferred from size.
+        action = self.expected_action
+        if is_buy != action.endswith("_long"):
             raise ReviewOnlyMutationBlocked("strategy action context mismatch")
+        fields = {
+            "rounded_size": size_text,
+            "requested_leverage": self.observed_leverage,
+        }
+        if action.startswith("pyramid_"):
+            fields["parent_position_ref"] = self.fixture_parent_position_ref
         preview = build_worker_intent_fixture_offline(
             fixture_bot=self.fixture_bot, action=action,
             coin=coin, side="long" if is_buy else "short",
-            request_nonce=self.fixture_nonce,
-            rounded_size=size_text,
-            requested_leverage=self.observed_leverage,
+            request_nonce=self.fixture_nonce, **fields,
         )
         if preview.state != "fixture_body_review_only_HOLD":
             raise ReviewOnlyMutationBlocked("invalid entry request")
