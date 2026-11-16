@@ -272,6 +272,50 @@ os._exit(0)
         self.assertFalse(self.start()[0])
         self.assertFalse(self.hold()[0])
 
+    def test_incident_view_flags_missing_or_changed_fence(self):
+        self.seed()
+        self.assertTrue(self.start()[0])
+        query = (
+            "SELECT fence_still_held,incident_attention FROM "
+            "sender_review_ci.simulated_unresolved_attempts"
+        )
+        self.assertEqual(self.query(query), [
+            (True, "CRITICAL_OUTCOME_UNCONFIRMED")
+        ])
+        with connect() as db:
+            db.execute(
+                "UPDATE sender_review_ci.scope_fences "
+                "SET active_nonce=NULL WHERE coin='SOL'"
+            )
+        self.assertEqual(self.query(query), [
+            (False, "CRITICAL_FENCE_MISSING_OR_CHANGED")
+        ])
+        # Restore ONLY within this disposable test for later assertions.
+        with connect() as db:
+            db.execute(
+                "UPDATE sender_review_ci.scope_fences "
+                "SET active_nonce=%s WHERE coin='SOL'", ("a" * 32,)
+            )
+        self.assertTrue(self.hold()[0])
+        self.assertEqual(self.query(query), [
+            (True, "CRITICAL_UNKNOWN_OUTCOME")
+        ])
+
+    def test_incident_view_detects_missing_unknown_hold_event(self):
+        # Inject a deliberately inconsistent state into disposable CI.
+        # A missing event must never be presented as a settled order.
+        self.seed()
+        self.assertTrue(self.start()[0])
+        with connect() as db:
+            db.execute(
+                "UPDATE sender_review_ci.review_intents "
+                "SET state='hold_unknown' WHERE coin='SOL'"
+            )
+        self.assertEqual(self.query(
+            "SELECT incident_attention,fence_still_held "
+            "FROM sender_review_ci.simulated_unresolved_attempts"
+        ), [("CRITICAL_HOLD_EVENT_MISSING", True)])
+
     def test_untrusted_role_cannot_read_unresolved_attempt_view(self):
         # View access is denied even for a separate created read-only role.
         # No public observer endpoint or service authentication exists.
