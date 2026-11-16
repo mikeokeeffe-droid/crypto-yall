@@ -13,6 +13,11 @@ on:
       - 'aggressive_executor.py'
       - 'intraday_profit_protection.py'
       - 'aggressive_profit_protection.py'
+      - 'usd_loss_cap.py'
+      - 'reentry_lock.py'
+      - 'strategy.py'
+      - 'intraday_strategy.py'
+      - 'aggressive_strategy.py'
       - 'docs/accelerated-coordinated-sender-cutover-20261115.md'
       - '.github/workflows/test-protected-sender-contract-review.yml'
   workflow_dispatch: {}
