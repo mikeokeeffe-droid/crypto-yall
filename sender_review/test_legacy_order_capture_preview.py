@@ -49,10 +49,13 @@ def isolated_legacy_execute_trade(filename):
 
 class LegacyCapturePreviewTests(unittest.TestCase):
     def run_legacy(self, bot, action="open_long", close_size=None,
-                   capital=1000, leverage=2):
+                   capital=1000, leverage=2, parent_ref=None):
         exchange = LegacyOrderCapturePreview(
             fixture_bot=bot, fixture_nonce="a" * 32,
-            expected_action=action if action in ("open_long", "open_short") else "open_long",
+            expected_action=action if action in (
+                "open_long", "open_short", "pyramid_long", "pyramid_short",
+            ) else "open_long",
+            fixture_parent_position_ref=parent_ref,
         )
         trade = {"hl_coin": "SOL", "action": action}
         if close_size is not None:
@@ -82,20 +85,57 @@ class LegacyCapturePreviewTests(unittest.TestCase):
                     self.assertFalse(exchange.signing_enabled)
                     self.assertFalse(exchange.leverage_authorized)
 
-    def test_aggressive_pyramid_is_rejected_by_action_context(self):
-        # Legacy market_open cannot identify pyramids by itself. Require
-        # the calling strategy's explicit action and refuse pyramid context.
-        for action in ("pyramid_long", "pyramid_short"):
+    def test_aggressive_pyramid_reuses_original_smaller_size_without_sending(self):
+        # Existing original pyramid sizing is 5% vs 10% entry capital;
+        # no changes to original Aggressive strategy or its executor.
+        for action, side in (("pyramid_long", "long"),
+                             ("pyramid_short", "short")):
             with self.subTest(action=action):
-                with self.assertRaises(ValueError):
-                    LegacyOrderCapturePreview(
-                        fixture_bot="aggressive", fixture_nonce="a" * 32,
-                        expected_action=action,
-                    )
-        # A mismatched direction also fails before producing an intent.
+                result, exchange = self.run_legacy(
+                    "aggressive", action=action, parent_ref="b" * 32,
+                )
+                self.assertEqual(result["status"], "NO_SEND_REVIEW_ONLY")
+                self.assertEqual(result["exchange_response"]["status"], "error")
+                self.assertEqual(exchange.calls, [
+                    "reviewed_leverage_only", "entry_proposal_only",
+                ])
+                body = json.loads(exchange.proposed_body)
+                self.assertEqual(body["action"], action)
+                self.assertEqual(body["side"], side)
+                self.assertEqual(body["parent_position_ref"], "b" * 32)
+                self.assertEqual(body["rounded_size"], "1.0")
+                self.assertEqual(body["requested_leverage"], 2)
+                self.assertFalse(exchange.submit_authorized)
+                self.assertFalse(exchange.signing_enabled)
+                self.assertFalse(exchange.close_authorized)
+                self.assertFalse(exchange.leverage_authorized)
+
+    def test_unscoped_wrong_bot_or_mismatched_pyramid_never_captured(self):
+        for bot, parent in (
+            ("daily", "b" * 32),
+            ("intraday", "b" * 32),
+            ("aggressive", None),
+            ("aggressive", "bad"),
+        ):
+            for action in ("pyramid_long", "pyramid_short"):
+                with self.subTest(bot=bot, action=action, parent=parent):
+                    with self.assertRaises(ValueError):
+                        LegacyOrderCapturePreview(
+                            fixture_bot=bot, fixture_nonce="a" * 32,
+                            expected_action=action,
+                            fixture_parent_position_ref=parent,
+                        )
+        for action in ("open_long", "open_short"):
+            with self.subTest(action=action), self.assertRaises(ValueError):
+                LegacyOrderCapturePreview(
+                    fixture_bot="aggressive", fixture_nonce="a" * 32,
+                    expected_action=action,
+                    fixture_parent_position_ref="b" * 32,
+                )
         exchange = LegacyOrderCapturePreview(
             fixture_bot="aggressive", fixture_nonce="a" * 32,
-            expected_action="open_short",
+            expected_action="pyramid_short",
+            fixture_parent_position_ref="b" * 32,
         )
         exchange.update_leverage(2, "SOL", True)
         with self.assertRaises(ReviewOnlyMutationBlocked):
