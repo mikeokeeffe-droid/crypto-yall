@@ -30,6 +30,9 @@ class ReviewOnlyMutationBlocked(RuntimeError):
 class LegacyOrderCapturePreview:
     fixture_bot: str
     fixture_nonce: str
+    # Mandatory, out-of-band context from the calling strategy decision.
+    # A bare legacy market_open call does not distinguish pyramids.
+    expected_action: str
     proposed_body: bytes | None = field(default=None, repr=False)
     proposed_action: str | None = None
     observed_leverage: int | None = None
@@ -44,7 +47,8 @@ class LegacyOrderCapturePreview:
         if (type(self.fixture_bot) is not str
                 or self.fixture_bot not in _BOTS
                 or type(self.fixture_nonce) is not str
-                or _NONCE.fullmatch(self.fixture_nonce) is None):
+                or _NONCE.fullmatch(self.fixture_nonce) is None
+                or self.expected_action not in ("open_long", "open_short")):
             raise ValueError("invalid inert preview scope")
 
     def update_leverage(self, leverage, coin, is_cross):
@@ -74,6 +78,8 @@ class LegacyOrderCapturePreview:
         except (InvalidOperation, ValueError, OverflowError):
             raise ReviewOnlyMutationBlocked("invalid size") from None
         action = "open_long" if is_buy else "open_short"
+        if action != self.expected_action:
+            raise ReviewOnlyMutationBlocked("strategy action context mismatch")
         preview = build_worker_intent_fixture_offline(
             fixture_bot=self.fixture_bot, action=action,
             coin=coin, side="long" if is_buy else "short",
