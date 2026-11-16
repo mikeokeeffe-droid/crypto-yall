@@ -165,6 +165,43 @@ class RecentHistoryTests(unittest.TestCase):
         self.assertFalse(result.bot_position_ownership_verified)
         self.no_authority(result)
 
+    def test_every_filled_order_requires_matching_fills(self):
+        other = {"status": "filled", "order": {
+            "oid": 124, "coin": "AVAX", "side": "A",
+            "origSz": "0.30", "timestamp": 1200,
+        }}
+        # One filled order is present in recent history but its fills are
+        # missing from the bounded time window. Never claim coherence.
+        result, _ = self.inspect([orders() + [other], fills()])
+        self.assertEqual(result.state, "HOLD")
+        self.assertFalse(result.recent_records_consistent)
+        self.assertIn("missing", result.reason)
+        self.no_authority(result)
+
+        # Even if a second trade has the same coin and direction, order IDs
+        # must match individually and cannot borrow another order's fills.
+        other["order"]["coin"] = "SOL"
+        other["order"]["side"] = "B"
+        result, _ = self.inspect([orders() + [other], fills()])
+        self.assertEqual(result.state, "HOLD")
+        self.no_authority(result)
+
+    def test_two_complete_orders_can_only_report_bounded_consistency(self):
+        extra_order = {"status": "filled", "order": {
+            "oid": 124, "coin": "AVAX", "side": "A",
+            "origSz": "0.30", "timestamp": 1200,
+        }}
+        extra_fill = {"oid": 124, "tid": 457, "coin": "AVAX",
+                      "side": "A", "sz": "0.30", "time": 1300}
+        result, _ = self.inspect([orders() + [extra_order],
+                                  fills() + [extra_fill]])
+        self.assertEqual(result.state,
+                         "RECENT_TESTNET_HISTORY_REVIEW_ONLY_HOLD")
+        self.assertEqual(result.recent_order_count, 2)
+        self.assertEqual(result.recent_fill_count, 2)
+        self.assertTrue(result.recent_records_consistent)
+        self.no_authority(result)
+
     def test_invalid_scope_never_fetches(self):
         with patch.object(review.urllib.request, "build_opener",
                           side_effect=AssertionError("no network")):
