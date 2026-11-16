@@ -68,6 +68,32 @@ class OfflineCollectorPlanTests(unittest.TestCase):
         self.assertEqual(result.queries[1].body_json, result.queries[4].body_json)
         self.assertEqual(result.queries[0].body_json, result.queries[5].body_json)
 
+    def test_six_frame_wire_vectors_match_pr41_contract_at_05c423a(self):
+        # Independent golden bytes from collector_review/
+        # six_frame_request_contract_offline.py, PR #41 at 05c423a.
+        # PR #41 is a separate unmerged branch, so do not import its
+        # module into this protected-sender branch or infer runtime trust.
+        result = plan_offline_six_frame_reconciliation_fixture(
+            account=ACCOUNT, start_time_ms=1000, end_time_ms=2000,
+        )
+        self.assert_plan_no_authority(result)
+        account_tail = b'"user":"' + ACCOUNT.encode("ascii") + b'"}'
+        expected = (
+            b'{"dex":"","type":"clearinghouseState",' + account_tail,
+            b'{"dex":"","type":"openOrders",' + account_tail,
+            b'{"type":"historicalOrders",' + account_tail,
+            b'{"aggregateByTime":false,"endTime":2000,"startTime":1000,'
+            b'"type":"userFillsByTime",' + account_tail,
+            b'{"dex":"","type":"openOrders",' + account_tail,
+            b'{"dex":"","type":"clearinghouseState",' + account_tail,
+        )
+        self.assertEqual(
+            tuple(item.body_json.encode("ascii") for item in result.queries),
+            expected,
+        )
+        self.assertEqual({(x.host, x.path, x.method) for x in result.queries},
+                         {("api.hyperliquid-testnet.xyz", "/info", "POST")})
+
     def test_six_frame_fixture_denies_wrong_scope_and_long_history_window(self):
         for args in (
             {"account": "0x" + "2" * 40},
