@@ -31,6 +31,8 @@ jobs:
         run: python -m unittest sender_review.test_oidc_jwks_keyset_offline -v
       - name: Review fake public JWKS to signed HTTP boundary without authority
         run: python -m unittest sender_review.test_oidc_jwks_request_review_offline -v
+      - name: Verify public GitHub OIDC key retrieval is disabled and safely mocked
+        run: python -m unittest sender_review.test_github_oidc_public_keys_transport_review -v
       - name: Test strict offline remote signed identity and request envelope
         run: python -m unittest sender_review.test_remote_request_boundary_offline -v
       - name: Audit original three-bot signing and order paths (NO-GO)
