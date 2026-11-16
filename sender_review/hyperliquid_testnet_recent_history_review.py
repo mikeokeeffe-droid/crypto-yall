@@ -1,19 +1,16 @@
 """Bounded testnet recent order/fill history inspection; NO trading authority.
 
-This intentionally reuses the pinned HTTPS /info transport from the
-read-only snapshot module. It is disabled by default and has no wallet,
-signer, DB, /exchange endpoint, order dispatch or production integration.
-Hyperliquid history is retention-limited. Even a consistent result cannot
-attribute a legacy position, prove a flat starting balance, or allow closes.
+This module validates caller-supplied untrusted historical documents
+OFFLINE only. The Boolean compatibility option is permanently inert:
+there is NO HTTP transport, wallet, signer, DB or production integration.
+Even internally consistent bounded records never establish ownership.
 """
 from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
 import re
-import ssl
-import urllib.request
 
 from sender_review.hyperliquid_testnet_readonly_snapshot_review import (
-    _ACCOUNT, _COIN, _NoRedirect, _info_query,
+    _COIN,
 )
 
 _AMOUNT = re.compile(r"(?:0|[1-9][0-9]*)(?:\.[0-9]{1,12})?\Z", re.ASCII)
@@ -165,31 +162,10 @@ def inspect_testnet_recent_history_review(
     *, configured_public_account, start_time_ms, end_time_ms,
     enabled_readonly_testnet_network=False,
 ):
-    """Review only one bounded window. NEVER infer ownership or release HOLD."""
-    hold = RecentHistoryReview()
-    if (enabled_readonly_testnet_network is not True
-            or type(configured_public_account) is not str
-            or _ACCOUNT.fullmatch(configured_public_account) is None
-            or type(start_time_ms) is not int or type(end_time_ms) is not int
-            or not 0 <= start_time_ms < end_time_ms <= 9007199254740991
-            or end_time_ms - start_time_ms > 86400000):
-        return hold
-    try:
-        opener = urllib.request.build_opener(
-            urllib.request.ProxyHandler({}), _NoRedirect(),
-            urllib.request.HTTPSHandler(context=ssl.create_default_context()),
-        )
-        historical_document = _info_query(
-            opener, account=configured_public_account, kind="historicalOrders",
-        )
-        fills_document = _info_query(
-            opener, account=configured_public_account, kind="userFillsByTime",
-            start_time_ms=start_time_ms, end_time_ms=end_time_ms,
-        )
-        return inspect_recent_history_documents_offline(
-            historical_document=historical_document,
-            fills_document=fills_document,
-            start_time_ms=start_time_ms, end_time_ms=end_time_ms,
-        )
-    except (ValueError, TypeError, UnicodeError, OSError, OverflowError):
-        return hold
+    """Always HOLD: no network access is available via this compatibility API.
+
+    Only inspect_recent_history_documents_offline() may review supplied
+    fixtures. Reintroducing a network sender requires independent host and
+    code review plus explicit separate approval.
+    """
+    return RecentHistoryReview()
