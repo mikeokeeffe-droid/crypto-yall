@@ -333,6 +333,77 @@ os._exit(0)
                 "'sender_review_ci.simulated_unresolved_attempts'::regclass"
             ).fetchone()[0], ["security_invoker=true"])
 
+    def test_untrusted_db_role_denied_recovery_view_and_functions(self):
+        # A deliberately unprivileged, NOLOGIN test role must not obtain
+        # the CI incident view or simulated state-mutation functions.
+        # This checks only the disposable DB privilege setup, not host ACLs.
+        role = "sender_review_attempt_untrusted"
+        with connect() as admin:
+            admin.execute(
+                "CREATE ROLE " + role + " NOLOGIN NOSUPERUSER "
+                "NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS"
+            )
+        try:
+            self.seed()
+            self.assertTrue(self.start()[0])
+            signatures = (
+                "sender_review_ci.record_simulated_attempt_start("
+                "text,text,text,bigint)",
+                "sender_review_ci.hold_simulated_attempt_unknown("
+                "text,text,text,bigint)",
+            )
+            with connect() as admin:
+                self.assertFalse(admin.execute(
+                    "SELECT has_schema_privilege(%s,'sender_review_ci','USAGE')",
+                    (role,)
+                ).fetchone()[0])
+                self.assertFalse(admin.execute(
+                    "SELECT has_table_privilege(%s,"
+                    "'sender_review_ci.simulated_unresolved_attempts','SELECT')",
+                    (role,)
+                ).fetchone()[0])
+                self.assertFalse(admin.execute(
+                    "SELECT has_table_privilege(%s,"
+                    "'sender_review_ci.simulated_attempt_events','SELECT')",
+                    (role,)
+                ).fetchone()[0])
+                for signature in signatures:
+                    with self.subTest(function=signature):
+                        self.assertFalse(admin.execute(
+                            "SELECT has_function_privilege(%s,%s,'EXECUTE')",
+                            (role, signature)
+                        ).fetchone()[0])
+                admin.execute("SET ROLE " + role)
+                try:
+                    for query in (
+                        "SELECT * FROM "
+                        "sender_review_ci.simulated_unresolved_attempts",
+                        "SELECT * FROM sender_review_ci."
+                        "record_simulated_attempt_start("
+                        "'0x1111111111111111111111111111111111111111',"
+                        "'SOL','aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',1)",
+                        "SELECT * FROM sender_review_ci."
+                        "hold_simulated_attempt_unknown("
+                        "'0x1111111111111111111111111111111111111111',"
+                        "'SOL','aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',1)",
+                    ):
+                        with self.subTest(query=query):
+                            with self.assertRaises(
+                                psycopg.errors.InsufficientPrivilege
+                            ):
+                                admin.execute(query)
+                finally:
+                    admin.execute("RESET ROLE")
+            self.assertEqual(self.query(
+                "SELECT state FROM sender_review_ci.review_intents"
+            ), [("review_only",)])
+            self.assertEqual(self.query(
+                "SELECT kind FROM sender_review_ci.simulated_attempt_events"
+            ), [("simulated_attempt_started",)])
+        finally:
+            with connect() as admin:
+                admin.execute("DROP ROLE IF EXISTS " + role)
+
     def test_append_only_attempt_events_reject_changes(self):
         self.seed()
         self.assertTrue(self.start()[0])
