@@ -109,41 +109,45 @@ configuration. It is *not* implemented or called in this PR.
 - **Failure:** abort to `HOLD / NO-GO`; do not fallback to a direct HTTP
   client, current offline service, existing trading bots or mainnet.
 
-## Cross-PR request-contract mismatch — blocker before implementation
+## Cross-PR six-frame contract: offline format now aligned, runtime not built
 
-The existing **disabled** PR #41 public request builder is *not* an
-implementation of the proposed six-frame gateway contract. Its
-`collector_review/testnet_info_https.py` currently accepts fixture kinds
-`clearinghouseState`, `openOrders`, `spotClearinghouseState`,
-`allMids` and `meta`, but it does **not** construct
-`historicalOrders` or `userFillsByTime`. The method that could make HTTPS
-requests is intentionally unreachable; its output cannot authenticate
-exchange history.
+The original PR #41 `collector_review/testnet_info_https.py` remains
+**network-disabled** and must not be adapted by toggling an enable flag.
+The separate `collector_review/six_frame_request_contract_offline.py`
+and `six_frame_sequence_review_offline.py` now describe the exact synthetic
+six-frame sequence. PR #42 independently pins its equivalent request bytes
+in `sender_review/hyperliquid_readonly_collection_plan_offline.py` and
+matches six synthetic request/response pairs in
+`sender_review/six_frame_payload_binding_offline.py`.
+This resolves the **offline-format mismatch only**. The older five-read
+planner with optional `orderStatus` is not a replacement for these six
+requests. No exchange network reader, application-aware gateway, real TLS
+attestation or account authorization exists.
 
-PR #42 contains a **different** isolated offline planner:
-`sender_review/hyperliquid_readonly_collection_plan_offline.py`
-documents a five-request sequence (positions, open orders, historical
-orders, fills, positions) and an *optional* `orderStatus` request. Its
-separate `coordinated_testnet_readset_review.py` validates an offline
-**six-frame** sequence (positions, open orders, historical orders, fills,
-open orders again, positions again), but performs no network I/O.
-Therefore **neither of the existing request builders directly implements
-the exact six-frame contract** specified above.
+The six synthetic `POST /info` steps are:
+1. `clearinghouseState` for the approved testnet account with `dex: ""`
+2. `openOrders` for the same account and `dex: ""`
+3. `historicalOrders` for that account
+4. `userFillsByTime` for that account with bounded millisecond timestamps
+5. `openOrders` repeated exactly
+6. `clearinghouseState` repeated exactly
 
-**Required resolution:** independent security and data-provenance reviewers
-must approve one bounded, versioned contract covering the six exact
-canonical JSON body shapes, public account, fixed `dex`, history-window
-bounds, step order, maximum responses, historic coverage gaps, and the
-gateway's replay/time budget. Build and test any future network reader
-in a **separate reviewed change**; do not simply reuse PR #41's allowed
-kinds, substitute PR #42's optional `orderStatus`, infer an atomic
-snapshot, patch `NETWORK_ENABLED` or remove its unconditional
-`PermissionError` to proceed.
+**Historical coverage remains a release blocker.** Hyperliquid's
+[official Info API documentation](https://hyperliquid.gitbook.io/hyperliquid-docs/for-developers/api/info-endpoint)
+limits `historicalOrders` results to 2,000 orders and
+`userFillsByTime` to 2,000 fills per response; only the most recent
+10,000 fills are available. These limits mean a locally coherent six-frame
+sample **cannot establish a complete history, initial flat account, position
+ownership or safety of protective closes**, especially for old/manual
+positions. The future reviewer must explicitly decide how truncated history,
+missing provenance, partial fills and unknown acknowledgments remain HOLD.
 
-The signed-off implementation must reject *all* request types outside
-the one approved six-frame procedure, including PR #41's unused market
-and spot types. It must record that any successful read is **not** proof
-of complete historical coverage, trade ownership, or order authority.
+The *real* gateway still needs independent security review, an operator-
+approved public testnet account, fixed TLS-validated `POST /info`,
+host-enforced egress isolation, bounded requests/responses and replay controls,
+no signer or arbitrary API access, documented rescue/rollback and separate
+explicit approval. All these runtime controls remain **unbuilt or unverified**.
+Do not enable the old HTTP entrypoint, deploy or alter any legacy worker.
 
 ## Evidence the independent reviewer must obtain (not collected here)
 
