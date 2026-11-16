@@ -27,7 +27,7 @@ All below are screenshot / terminal observations, **not independent attestation*
 
 | Control / evidence | Observation | Accepted as |
 |---|---|---|
-| Source identity | 15 staged collector source/doc files inventoried; six original operator-observed SHA-256 hashes matched; tree digest recorded | *Partial source comparison*, not full deployed-runtime provenance |
+| Source identity | Original six SHA-256 comparisons matched; on 16 Nov, 11 top-level Python files compared with PR #41, **9 matched and 2 test files differed**. The directory is manually staged without `.git`. | *Partial source comparison*, with unresolved drift; not complete runtime provenance |
 | Git provenance | `/opt/crypto-yall` is a manually staged tree, not a Git checkout; `source_sha=null`, `source_worktree_clean=false` | **Unverified** commit/dependency linkage |
 | Offline unit lifecycle | `loaded/static`, `inactive/dead`, last result `success`, last exit `0`; `RefuseManualStart=yes`; no triggers listed | Candidate inactive/blocked-manual-start configuration |
 | Offline sandbox | `DynamicUser=yes`, `NoNewPrivileges=yes`, `PrivateNetwork=yes`, `RestrictAddressFamilies=AF_UNIX`, `IPAddressDeny=0.0.0.0/0 ::/0`, `IPAddressAllow=`; `ProtectHome=yes`, `ProtectSystem=strict`, `PrivateDevices=yes` | Candidate **offline-service** restrictions, not future networked collector |
@@ -50,6 +50,57 @@ It **always** leaves `effective_network_egress_verified`,
 `secret_absence_independently_verified`, `reviewer_signed_off`,
 `testnet_network_authorized` and `trading_authorized` false.
 
+## 16 November operator evidence update — runtime and source drift (NOT attested)
+
+Additional screenshots from the operator's Termius session show:
+
+- `systemctl show` reports `ActiveState=inactive`,
+  `UnitFileState=static`, `RefuseManualStart=yes`,
+  `PrivateNetwork=yes`, `RestrictAddressFamilies=AF_UNIX`,
+  `IPAddressDeny=0.0.0.0/0 ::/0`, and `NoNewPrivileges=yes`.
+  `systemd-analyze security` printed **1.9 OK**; that is only a
+  configuration-risk heuristic for the **offline** unit.
+- The live unit came from `/run/systemd/system/`; its observed drop-in was
+  `/etc/systemd/system/testnet-collector-offline-review.service.d/90-block-manual.conf`.
+  `systemctl list-dependencies --reverse` listed only the unit itself,
+  `TriggeredBy`, `Triggers`, `WantedBy` and `RequiredBy` printed empty.
+  None proves that alternative activation mechanisms are absent.
+- The name-filtered service, timer and process checks found no additional
+  matching programs at the instant observed. This does not rule out generic
+  process names, different schedulers, remote GitHub Actions or other hosts.
+- `ip netns list` reported no **named** namespaces. `sudo lsns -t net`
+  listed the host namespace (`4026531833`) and an additional one
+  (`4026532439`), whose representative process PID 11897 was `polkitd`.
+  This is not evidence that the future testnet collector has a restricted
+  network namespace. The `unshare`, `nsenter`, `ip`, `nft` and
+  `systemd-run` executables were present; tool presence alone proves
+  neither permission nor effective containment.
+- `git -C /opt/crypto-yall rev-parse HEAD` reported **not a Git
+  repository**. A depth-3 `.git` search returned no results; therefore a
+  source commit cannot be inferred from that installed tree.
+- The full top-level `collector_review/*.py` inventory contained 11
+  files. Screenshot SHA-256 results compared against current PR #41 contents
+  had **9 exact matches** and the following **two mismatches**:
+
+  | File in `collector_review/` | Operator-reported SHA-256 | GitHub PR #41 size / server size | Disposition |
+  | --- | --- | --- | --- |
+  | `test_host_isolation_probe.py` | `8369fc62f270d0b9649ed81b888240787d19c74a262ec5868a3d11b28d85a256` | 7223 / 3882 bytes | DRIFT — investigate, do not overwrite |
+  | `test_offline_systemd_unit.py` | `82eb59c5a21aa9e0486463410578c4d6eb765eb89b068a3bbe3ced454bd496e4` | 3716 / 3607 bytes | DRIFT — investigate, do not overwrite |
+
+  Both host files were reported modified at **2026-11-13 23:26:52
+  UTC**. The copies at `/opt/crypto-yall/` had the same hashes as the
+  respective `/opt/crypto-yall/collector_review/` copies. Neither file
+  changed between the PR #41 older reference commit
+  `51957b22c7034ff29d9befbda881ad31574d46c8` and the branch
+  reviewed for this comparison.
+
+**Important interpretation:** These are **test files**, but a mismatched
+host source tree is not verified. The screenshots do not demonstrate
+tampering; they also do not provide a justification to ignore the drift.
+Independently inspect the diff and explain provenance before approving
+any artifact, dependencies, runtime, or testnet experiment. Do not
+install/replace files on the host just to make hashes pass.
+
 ## Single-pass independent reviewer deliverables
 
 The owner must nominate an **independent qualified Linux/network security
@@ -65,7 +116,9 @@ dependency versions/hashes (including imported packages), user-writable
 ancestors, actual invoked files, cgroups, full unit text/drop-ins and
 effective `systemctl show` state. Reconcile the manually staged root-owned
 source tree with a fixed reviewed source commit using signed or independently
-recalculated digests; the six pinned hashes alone are insufficient.
+recalculated digests; resolve the **two mismatched test files** and inventory
+nested files and dependencies as well as the 11 top-level Python files.
+Nine matching top-level hashes are insufficient.
 
 **Gate H2 — Credentials and process separation (PENDING).**
 Verify no wallet/exchange signing keys, trading API tokens, privileged Unix
