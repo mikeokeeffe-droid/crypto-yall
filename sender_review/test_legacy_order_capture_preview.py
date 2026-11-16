@@ -52,6 +52,7 @@ class LegacyCapturePreviewTests(unittest.TestCase):
                    capital=1000, leverage=2):
         exchange = LegacyOrderCapturePreview(
             fixture_bot=bot, fixture_nonce="a" * 32,
+            expected_action=action if action in ("open_long", "open_short") else "open_long",
         )
         trade = {"hl_coin": "SOL", "action": action}
         if close_size is not None:
@@ -81,27 +82,25 @@ class LegacyCapturePreviewTests(unittest.TestCase):
                     self.assertFalse(exchange.signing_enabled)
                     self.assertFalse(exchange.leverage_authorized)
 
-    def test_aggressive_pyramid_is_not_supported_by_entry_only_adapter(self):
-        # The existing Aggressive pyramid is a distinct mutation path.
-        # Refuse it rather than disguise it as a safe entry request.
+    def test_aggressive_pyramid_is_rejected_by_action_context(self):
+        # Legacy market_open cannot identify pyramids by itself. Require
+        # the calling strategy's explicit action and refuse pyramid context.
         for action in ("pyramid_long", "pyramid_short"):
             with self.subTest(action=action):
-                exchange = LegacyOrderCapturePreview(
-                    fixture_bot="aggressive", fixture_nonce="a" * 32,
-                )
-                fn = isolated_legacy_execute_trade(FILES["aggressive"])
-                with patch.dict(os.environ, {"HL_TESTNET": "false"}, clear=True):
-                    # The preview intentionally cannot distinguish a pyramid
-                    # from market_open's boolean: prohibit untrusted mapping.
-                    # Real adapter must include action identity explicitly.
-                    result = fn(None, exchange, {
-                        "hl_coin": "SOL", "action": action,
-                    }, 1000, 2)
-                self.assertEqual(result["status"], "NO_SEND_REVIEW_ONLY")
-                # This is a KNOWN GAP: legacy API loses pyramid action.
-                self.assertEqual(exchange.proposed_action,
-                                 "open_long" if action.endswith("long")
-                                 else "open_short")
+                with self.assertRaises(ValueError):
+                    LegacyOrderCapturePreview(
+                        fixture_bot="aggressive", fixture_nonce="a" * 32,
+                        expected_action=action,
+                    )
+        # A mismatched direction also fails before producing an intent.
+        exchange = LegacyOrderCapturePreview(
+            fixture_bot="aggressive", fixture_nonce="a" * 32,
+            expected_action="open_short",
+        )
+        exchange.update_leverage(2, "SOL", True)
+        with self.assertRaises(ReviewOnlyMutationBlocked):
+            exchange.market_open("SOL", True, 1.0)
+        self.assertIsNone(exchange.proposed_body)
 
     def test_all_legacy_closes_are_denied_without_a_verified_position(self):
         for bot in FILES:
@@ -111,6 +110,7 @@ class LegacyCapturePreviewTests(unittest.TestCase):
                         self.run_legacy(bot, "close", close_size=close_size)
         self.assertFalse(LegacyOrderCapturePreview(
             fixture_bot="daily", fixture_nonce="a" * 32,
+            expected_action="open_long",
         ).close_authorized)
 
     def test_duplicate_mutations_or_bad_size_refused(self):
