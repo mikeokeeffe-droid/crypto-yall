@@ -236,6 +236,55 @@ os._exit(0)
             "SELECT count(*) FROM sender_review_ci.review_intents"
         ), [(1,)])
 
+    def test_independent_session_sees_unresolved_attempt_after_crash(self):
+        # No restart or sender action is needed to surface the unresolved
+        # fake attempt. A fresh DB connection sees one stable incident,
+        # then sees its one-way transition to UNKNOWN_HELD.
+        self.seed()
+        self.assertEqual(self.query(
+            "SELECT count(*) FROM sender_review_ci.simulated_unresolved_attempts"
+        ), [(0,)])
+        self.assertTrue(self.start()[0])
+        with connect() as observer:
+            first = observer.execute(
+                "SELECT bot,coin,request_nonce,fence,journal_state,"
+                "incident_state,fence_still_held "
+                "FROM sender_review_ci.simulated_unresolved_attempts"
+            ).fetchall()
+        self.assertEqual(first, [(
+            "daily", "SOL", "a" * 32, 1, "review_only",
+            "STARTED_OUTCOME_UNCONFIRMED", True,
+        )])
+        self.assertTrue(self.hold()[0])
+        with connect() as observer:
+            second = observer.execute(
+                "SELECT bot,coin,request_nonce,fence,journal_state,"
+                "incident_state,fence_still_held "
+                "FROM sender_review_ci.simulated_unresolved_attempts"
+            ).fetchall()
+        self.assertEqual(second, [(
+            "daily", "SOL", "a" * 32, 1, "hold_unknown",
+            "UNKNOWN_HELD", True,
+        )])
+        self.assertEqual(self.query(
+            "SELECT count(*) FROM sender_review_ci.simulated_unresolved_attempts"
+        ), [(1,)])
+        self.assertFalse(self.start()[0])
+        self.assertFalse(self.hold()[0])
+
+    def test_untrusted_role_cannot_read_unresolved_attempt_view(self):
+        # View access is denied even for a separate created read-only role.
+        # No public observer endpoint or service authentication exists.
+        with connect() as conn:
+            self.assertFalse(conn.execute(
+                "SELECT has_table_privilege('public',"
+                "'sender_review_ci.simulated_unresolved_attempts','SELECT')"
+            ).fetchone()[0])
+            self.assertEqual(conn.execute(
+                "SELECT reloptions FROM pg_class WHERE oid="
+                "'sender_review_ci.simulated_unresolved_attempts'::regclass"
+            ).fetchone()[0], ["security_invoker=true"])
+
     def test_append_only_attempt_events_reject_changes(self):
         self.seed()
         self.assertTrue(self.start()[0])
