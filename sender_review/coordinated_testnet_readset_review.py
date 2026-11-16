@@ -7,6 +7,7 @@ exchange snapshot, account provenance proof, or trading authorization.
 Workflow integration and live client credentials are intentionally absent.
 """
 from dataclasses import dataclass
+from decimal import Decimal
 import hashlib
 import json
 
@@ -14,7 +15,7 @@ from sender_review.hyperliquid_testnet_readonly_snapshot_review import (
     _positions, _orders,
 )
 from sender_review.hyperliquid_testnet_recent_history_review import (
-    inspect_recent_history_documents_offline,
+    inspect_recent_history_documents_offline, _fills,
 )
 
 
@@ -27,6 +28,8 @@ class CoordinatedReadsetReview:
     observed_position_count: int = 0
     reviewed_order_count: int = 0
     reviewed_fill_count: int = 0
+    # Local arithmetic comparison only, never a trusted historical baseline.
+    bounded_fill_net_matches_positions: bool = False
     # ALWAYS false: this is no source of host, historical, or trading trust.
     network_performed: bool = False
     exchange_origin_authenticated: bool = False
@@ -74,6 +77,26 @@ def inspect_coordinated_readset_offline(
             return CoordinatedReadsetReview(
                 reason="historical order/fill evidence incomplete or conflicting",
             )
+        # A bounded order/fill sample can be internally consistent while
+        # accounting for only part of the current exposure. Require the
+        # signed net of those sample fills to match observed positions before
+        # describing the six-frame fixture as *locally* coherent. No such
+        # match establishes a true historical flat baseline or ownership.
+        grouped_fills, _ = _fills(
+            user_fills, start_time_ms=start_time_ms, end_time_ms=end_time_ms,
+        )
+        net = {}
+        for entries in grouped_fills.values():
+            for coin, side, amount in entries:
+                delta = amount if side == "B" else -amount
+                net[coin] = net.get(coin, Decimal("0")) + delta
+        nonzero_net = {coin: value for coin, value in net.items() if value != 0}
+        observed = {coin: Decimal(size) for coin, size in before.items()}
+        if nonzero_net != observed:
+            return CoordinatedReadsetReview(
+                reason="bounded fill net disagrees with position snapshot; "
+                       "older activity or missing events possible",
+            )
         digest = hashlib.sha256(json.dumps(
             before, sort_keys=True, separators=(",", ":"),
         ).encode("ascii")).hexdigest()
@@ -82,6 +105,7 @@ def inspect_coordinated_readset_offline(
             reason="six frames locally consistent only; not an atomic read "
                    "or an authenticated complete account ownership history",
             locally_consistent=True,
+            bounded_fill_net_matches_positions=True,
             observed_positions_sha256=digest,
             observed_position_count=len(before),
             reviewed_order_count=history.recent_order_count,
