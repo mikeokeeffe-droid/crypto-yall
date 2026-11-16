@@ -7,14 +7,19 @@ contract without changing any live bot. The supplied token is UNTRUSTED:
 its apparent JWT shape does not establish GitHub origin, audience, identity
 or safety. No network, DB, exchange client, signer, secrets or trade path.
 It intentionally cannot produce pyramid, leverage, or close operations.
+A separate offline adapter can compare existing legacy entry-sizing capture
+bytes to this strict request format. That comparison never grants authority.
 """
 from dataclasses import dataclass, field
 import hashlib
+import json
 import re
 
 from sender_review.worker_intent_fixture_builder_offline import (
     build_worker_intent_fixture_offline,
 )
+from sender_review.legacy_order_capture_preview import LegacyOrderCapturePreview
+from sender_review.request_contract import inspect_sender_entry_request_offline
 
 _JWT_SHAPE = re.compile(
     r"[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\Z", re.ASCII
@@ -84,3 +89,62 @@ def prepare_runner_entry_handoff_review_only(
         body_sha256=hashlib.sha256(body).hexdigest(),
         fixture_bot=fixture_bot,
     )
+
+
+def prepare_captured_legacy_entry_handoff_review_only(
+    *, capture, candidate_runner_jwt,
+):
+    """Compare an isolated legacy ENTRY-sizing capture to exact envelope bytes.
+
+    A capture is caller-controlled synthetic data, not workload identity,
+    position ownership, an actual order or authority to trade. Check the
+    captured strategy and record before re-creating canonical entry bytes.
+    Pyramid, leverage-only, and close intents never enter this S1 adapter.
+    No networking, database, exchange SDK, signer or secret read occurs.
+    """
+    denied = RunnerEntryHandoffReview()
+    if (
+        type(capture) is not LegacyOrderCapturePreview
+        or capture.expected_action not in ("open_long", "open_short")
+        or capture.proposed_action != capture.expected_action
+        or type(capture.proposed_body) is not bytes
+        or capture.calls != ["reviewed_leverage_only", "entry_proposal_only"]
+        or capture.fixture_parent_position_ref is not None
+        or type(capture.observed_coin) is not str
+        or type(capture.observed_leverage) is not int
+        or capture.signing_enabled is not False
+        or capture.submit_authorized is not False
+        or capture.close_authorized is not False
+        or capture.leverage_authorized is not False
+    ):
+        return denied
+    parsed = inspect_sender_entry_request_offline(
+        body=capture.proposed_body, asserted_bot=capture.fixture_bot,
+    )
+    if parsed.state != "review_only":
+        return denied
+    try:
+        # The strict entry parser has rejected any duplicates/extra fields.
+        doc = json.loads(capture.proposed_body)
+    except (ValueError, TypeError, UnicodeError):
+        return denied
+    if (
+        doc["action"] != capture.expected_action
+        or doc["coin"] != capture.observed_coin
+        or doc["request_nonce"] != capture.fixture_nonce
+        or doc["requested_leverage"] != capture.observed_leverage
+    ):
+        return denied
+    envelope = prepare_runner_entry_handoff_review_only(
+        candidate_runner_jwt=candidate_runner_jwt,
+        fixture_bot=capture.fixture_bot,
+        action=capture.expected_action,
+        coin=capture.observed_coin,
+        side=doc["side"],
+        request_nonce=capture.fixture_nonce,
+        rounded_size=doc["rounded_size"],
+        requested_leverage=capture.observed_leverage,
+    )
+    if envelope.body != capture.proposed_body:
+        return denied
+    return envelope
