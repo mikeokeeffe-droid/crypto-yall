@@ -130,12 +130,18 @@ async def review_only_asgi_app(scope, receive, send):
         await _reply(send, 400, "invalid entry contract")
         return
 
-    # Keep the ingress permanently unable to fetch keys or authorize orders.
-    # Even a future successful candidate preflight cannot change its result.
-    inspect_server_oidc_preflight_review(
-        token=token, request_body=exact_body,
-        approved_readonly_key_fetch=False,
-    )
+    # This review-only preflight is non-authorizing and cannot enable
+    # key fetches. An unexpected diagnostic failure must not leak the
+    # identity token, traceback, or an order-success response.
+    try:
+        inspect_server_oidc_preflight_review(
+            token=token, request_body=exact_body,
+            approved_readonly_key_fetch=False,
+        )
+    except Exception:
+        await _reply(send, 503, "identity preflight unavailable")
+        return
+    # Even a falsely successful preflight result does not grant authority.
     await _reply(send, 503, "no authenticated sender deployed")
 
 
