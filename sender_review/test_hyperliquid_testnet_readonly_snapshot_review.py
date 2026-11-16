@@ -1,190 +1,64 @@
-"""Strictly mocked testnet /info snapshot transport: zero real networking."""
-import io
-import json
+"""Offline snapshot validation and hard-denial regression tests."""
 import unittest
-from unittest.mock import patch
 
-from sender_review import hyperliquid_testnet_readonly_snapshot_review as read
-
-ACCOUNT = "0x" + "1" * 40
+from sender_review import hyperliquid_testnet_readonly_snapshot_review as r
 
 
-class Response:
-    def __init__(self, body, *, status=200, url=read._URL, content_type="application/json"):
-        self.data = io.BytesIO(body)
-        self.status = status
-        self.url = url
-        self.headers = {"Content-Type": content_type}
-
-    def geturl(self):
-        return self.url
-
-    def read(self, n):
-        return self.data.read(n)
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, *args):
-        return False
-
-
-class FakeOpener:
-    def __init__(self, responses):
-        self.responses = list(responses)
-        self.calls = []
-
-    def open(self, request, timeout):
-        self.calls.append((request.full_url, request.get_method(), request.data, timeout))
-        return self.responses.pop(0)
-
-
-def body(value):
-    return json.dumps(value, separators=(",", ":")).encode()
-
-
-def positions(size="0.20"):
-    return {"assetPositions": [{"position": {"coin": "SOL", "szi": size}}]}
-
-
-def orders():
-    return [{"oid": 123, "coin": "SOL", "side": "B", "sz": "0.10"}]
-
-
-class ReadonlySnapshotTests(unittest.TestCase):
-    def check(self, responses=None):
-        if responses is None:
-            responses = [Response(body(positions())), Response(body([])),
-                         Response(body([])), Response(body(positions()))]
-        fake = FakeOpener(responses)
-        with patch.object(read.urllib.request, "build_opener", return_value=fake):
-            answer = read.inspect_testnet_info_readonly_snapshot(
-                configured_public_account=ACCOUNT, enabled_readonly_testnet_network=True,
-            )
-        return answer, fake
-
-    def deny_authority(self, result):
-        for name in (
-            "account_ownership_verified", "historical_completeness_verified",
-            "fills_reconciled", "position_ownership_verified",
-            "runtime_identity_authenticated", "replay_consumed",
-            "journal_recorded", "submit_authorized", "close_authorized",
-            "signing_enabled",
-        ):
-            self.assertFalse(getattr(result, name), name)
-
-    def test_default_never_attempts_network(self):
-        with patch.object(read.urllib.request, "build_opener",
-                          side_effect=AssertionError("network unavailable")):
-            for enabled in (False, None, "yes", 1):
-                with self.subTest(enabled=enabled):
-                    r = read.inspect_testnet_info_readonly_snapshot(
-                        configured_public_account=ACCOUNT,
-                        enabled_readonly_testnet_network=enabled,
+class SnapshotOfflineTests(unittest.TestCase):
+    def test_transport_always_hold_and_authority_denied(self):
+        for flag in (True, False, None, "true", 1):
+            for account in ("0x" + "1" * 40, "bad", None):
+                with self.subTest(flag=flag, account=account):
+                    result = r.inspect_testnet_info_readonly_snapshot(
+                        configured_public_account=account,
+                        enabled_readonly_testnet_network=flag,
                     )
-                    self.assertEqual(r.state, "HOLD")
-                    self.deny_authority(r)
+                    self.assertEqual(result.state, "HOLD")
+                    self.assertFalse(result.snapshot_consistent)
+                    self.assertEqual(result.observed_positions, ())
+                    for field in (
+                        "account_ownership_verified", "historical_completeness_verified",
+                        "fills_reconciled", "position_ownership_verified",
+                        "runtime_identity_authenticated", "replay_consumed",
+                        "journal_recorded", "submit_authorized", "close_authorized",
+                        "signing_enabled",
+                    ):
+                        self.assertFalse(getattr(result, field), field)
 
-    def test_four_exact_readonly_requests_always_hold(self):
-        result, fake = self.check()
-        self.assertEqual(result.state, "OBSERVED_TESTNET_READONLY_HOLD")
-        self.assertTrue(result.snapshot_consistent)
-        self.assertEqual(result.position_count, 1)
-        self.assertEqual(result.open_order_count, 0)
-        self.assertEqual(result.observed_positions, (("SOL", "0.2"),))
-        self.assertEqual(len(result.positions_digest), 64)
-        self.assertEqual(len(fake.calls), 4)
-        for index, (url, method, data, timeout) in enumerate(fake.calls):
-            self.assertEqual(url, read._URL)
-            self.assertEqual(method, "POST")
-            self.assertEqual(timeout, 5)
-            request = json.loads(data)
-            self.assertEqual(request, {
-                "type": "openOrders" if index in (1, 2) else "clearinghouseState",
-                "user": ACCOUNT, "dex": "",
-            })
-        self.deny_authority(result)
-
-    def test_position_changed_between_reads_stays_hold(self):
-        result, fake = self.check([
-            Response(body(positions("0.20"))), Response(body([])),
-            Response(body([])), Response(body(positions("0.30"))),
-        ])
-        self.assertFalse(result.snapshot_consistent)
-        self.assertEqual(len(fake.calls), 4)
-        self.deny_authority(result)
-
-    def test_outstanding_orders_and_changed_orders_block_readiness(self):
-        cases = (
-            [Response(body(positions())), Response(body(orders())),
-             Response(body(orders())), Response(body(positions()))],
-            [Response(body(positions())), Response(body([])),
-             Response(body(orders())), Response(body(positions()))],
-            [Response(body(positions())), Response(body(orders())),
-             Response(body([])), Response(body(positions()))],
-        )
-        for replies in cases:
-            with self.subTest(changed_orders=[r.data.getvalue() for r in replies]):
-                result, fake = self.check(replies)
-                self.assertEqual(result.state, "HOLD")
-                self.assertFalse(result.snapshot_consistent)
-                self.assertEqual(len(fake.calls), 4)
-                self.assertFalse(result.observed_positions)
-                self.deny_authority(result)
-
-    def test_position_reordering_without_quantity_change_is_stable(self):
-        first = {"assetPositions": [
+    def test_offline_positions_normalize_decimal(self):
+        payload = {"assetPositions": [
             {"position": {"coin": "SOL", "szi": "0.20"}},
-            {"position": {"coin": "AVAX", "szi": "-0.3"}},
+            {"position": {"coin": "AVAX", "szi": "-0.30"}},
         ]}
-        last = {"assetPositions": list(reversed(first["assetPositions"]))}
-        result, _ = self.check([
-            Response(body(first)), Response(body([])),
-            Response(body([])), Response(body(last)),
-        ])
-        self.assertTrue(result.snapshot_consistent)
-        self.assertEqual(result.observed_positions,
-                         (("AVAX", "-0.3"), ("SOL", "0.2")))
-        self.deny_authority(result)
+        self.assertEqual(r._positions(payload), {"SOL": "0.2", "AVAX": "-0.3"})
+        payload["assetPositions"].reverse()
+        self.assertEqual(r._positions(payload), {"AVAX": "-0.3", "SOL": "0.2"})
 
-    def test_malformed_and_bad_http_response_refused(self):
-        responses = [
-            Response(b'{"assetPositions":[],"assetPositions":[]}'),
-            Response(b'{"assetPositions":NaN}'),
-            Response(b"not json"),
-            Response(b"x" * (read._LIMIT + 1)),
-            Response(body(positions()), status=500),
-            Response(body(positions()), url="https://evil.invalid/info"),
-            Response(body(positions()), content_type="text/html"),
-            Response(body({"assetPositions": [
-                {"position": {"coin": "SOL", "szi": "0.2"}},
-                {"position": {"coin": "SOL", "szi": "0.3"}},
-            ]})),
-            Response(body(positions("NaN"))),
-        ]
-        for bad in responses:
-            with self.subTest(case=bad.status, raw=bad.data.getvalue()[:30]):
-                result, fake = self.check([bad])
-                self.assertEqual(result.state, "HOLD")
-                self.deny_authority(result)
+    def test_offline_positions_reject_invalid(self):
+        bad = (
+            {"assetPositions": "no"},
+            {"assetPositions": [{"position": {"coin": "SOL", "szi": "NaN"}}]},
+            {"assetPositions": [{"position": {"coin": "SOL", "szi": "0"}}]},
+            {"assetPositions": [{"position": {"coin": "SOL", "szi": "0.2"}},
+                                 {"position": {"coin": "SOL", "szi": "0.3"}}]},
+        )
+        for value in bad:
+            with self.subTest(value=value), self.assertRaises(ValueError):
+                r._positions(value)
 
-    def test_untrusted_account_and_duplicate_orders_fail_closed(self):
-        for account in (None, "0x" + "g" * 40, "0x" + "2" * 39, True):
-            with self.subTest(account=account), patch.object(
-                read.urllib.request, "build_opener",
-                side_effect=AssertionError("network unavailable"),
-            ):
-                result = read.inspect_testnet_info_readonly_snapshot(
-                    configured_public_account=account,
-                    enabled_readonly_testnet_network=True,
-                )
-                self.assertEqual(result.state, "HOLD")
-        duplicate = orders() * 2
-        result, _ = self.check([
-            Response(body(positions())), Response(body(duplicate)),
-        ])
-        self.assertEqual(result.state, "HOLD")
-        self.deny_authority(result)
+    def test_offline_open_orders_are_never_execution_authority(self):
+        orders = [{"oid": 1, "coin": "SOL", "side": "B", "sz": "0.20"}]
+        self.assertEqual(r._orders(orders), {1: ("SOL", "B", "0.2")})
+        for invalid in ([orders[0], orders[0]], [{"oid": 1, "coin": "SOL",
+                                                 "side": "B", "sz": "-0.1"}],
+                        [{"oid": True, "coin": "SOL", "side": "B", "sz": "1"}]):
+            with self.subTest(invalid=invalid), self.assertRaises(ValueError):
+                r._orders(invalid)
+
+    def test_no_reachable_http_helpers_remain(self):
+        self.assertFalse(hasattr(r, "_info_query"))
+        self.assertFalse(hasattr(r, "_NoRedirect"))
+        self.assertFalse(hasattr(r, "urllib"))
 
 
 if __name__ == "__main__":
