@@ -1,6 +1,8 @@
 """Disposable PostgreSQL test-only simulated attempt lifecycle; NO orders."""
 import concurrent.futures
 import os
+import subprocess
+import sys
 from pathlib import Path
 import unittest
 
@@ -151,6 +153,87 @@ class SimulatedAttemptLifecyclePostgresTests(unittest.TestCase):
         self.assertEqual(sum(bool(row[0]) for row in results), 1)
         self.assertEqual(self.query(
             "SELECT count(*) FROM sender_review_ci.simulated_attempt_events"
+        ), [(1,)])
+
+    def test_worker_crash_after_durable_start_forces_new_process_to_hold(self):
+        # Two independent Python worker processes simulate interruption
+        # between a durably COMMITTED fake start and its unknown outcome.
+        # No exchange sender exists; the child only accesses disposable CI.
+        self.seed()
+        child_code = """
+import os
+import sys
+from sender_review.test_ci_journal_postgres import ACCOUNT, connect
+
+action = sys.argv[1]
+with connect() as db:
+    if action == "start":
+        row = db.execute(
+            "SELECT recorded,reason FROM "
+            "sender_review_ci.record_simulated_attempt_start(%s,%s,%s,%s)",
+            (ACCOUNT, "SOL", "a" * 32, 1),
+        ).fetchone()
+        if row != (True, "simulated-start-recorded-no-send"):
+            os._exit(21)
+    elif action == "restart":
+        row = db.execute(
+            "SELECT recorded,reason FROM "
+            "sender_review_ci.record_simulated_attempt_start(%s,%s,%s,%s)",
+            (ACCOUNT, "SOL", "a" * 32, 1),
+        ).fetchone()
+        if row != (False, "simulated-attempt-already-recorded"):
+            os._exit(22)
+        row = db.execute(
+            "SELECT held,reason FROM "
+            "sender_review_ci.hold_simulated_attempt_unknown(%s,%s,%s,%s)",
+            (ACCOUNT, "SOL", "a" * 32, 1),
+        ).fetchone()
+        if row != (True, "unknown-held-no-retry-or-release"):
+            os._exit(23)
+    else:
+        os._exit(24)
+# Abrupt process exit, not a clean application shutdown. All earlier
+# SQL calls used autocommit and must persist across that process exit.
+os._exit(0)
+"""
+        for action in ("start", "restart"):
+            with self.subTest(worker=action):
+                worker = subprocess.run(
+                    [sys.executable, "-c", child_code, action],
+                    capture_output=True, text=True, timeout=10,
+                    check=False,
+                )
+                self.assertEqual(
+                    worker.returncode, 0,
+                    "mock worker failed: " + worker.stderr[-1000:],
+                )
+                if action == "start":
+                    self.assertEqual(self.query(
+                        "SELECT state FROM sender_review_ci.review_intents"
+                    ), [("review_only",)])
+                    self.assertEqual(self.query(
+                        "SELECT kind FROM sender_review_ci.simulated_attempt_events"
+                    ), [("simulated_attempt_started",)])
+        self.assertEqual(self.query(
+            "SELECT state FROM sender_review_ci.review_intents"
+        ), [("hold_unknown",)])
+        self.assertEqual(self.query(
+            "SELECT kind FROM sender_review_ci.simulated_attempt_events "
+            "ORDER BY event_id"
+        ), [("simulated_attempt_started",), ("simulated_unknown_held",)])
+        self.assertEqual(self.query(
+            "SELECT fence,active_nonce FROM sender_review_ci.scope_fences"
+        ), [(1, "a" * 32)])
+        self.assertFalse(self.start()[0])
+        self.assertFalse(self.hold()[0])
+        from sender_review.test_ci_journal_postgres import record
+        collision = record(
+            bot="aggressive", coin="SOL", nonce="b" * 32
+        )
+        self.assertFalse(collision[0])
+        self.assertEqual(collision[2], "active-scope-held")
+        self.assertEqual(self.query(
+            "SELECT count(*) FROM sender_review_ci.review_intents"
         ), [(1,)])
 
     def test_append_only_attempt_events_reject_changes(self):
