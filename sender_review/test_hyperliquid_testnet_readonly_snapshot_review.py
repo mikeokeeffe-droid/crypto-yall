@@ -111,7 +111,7 @@ class ReadonlySnapshotTests(unittest.TestCase):
             Response(body([])), Response(body(positions("0.30"))),
         ])
         self.assertFalse(result.snapshot_consistent)
-        self.assertEqual(len(fake.calls), 3)
+        self.assertEqual(len(fake.calls), 4)
         self.deny_authority(result)
 
     def test_outstanding_orders_and_changed_orders_block_readiness(self):
