@@ -116,6 +116,7 @@ class LegacyCapturePreviewTests(unittest.TestCase):
     def test_duplicate_mutations_or_bad_size_refused(self):
         exchange = LegacyOrderCapturePreview(
             fixture_bot="daily", fixture_nonce="a" * 32,
+            expected_action="open_long",
         )
         with self.assertRaises(ReviewOnlyMutationBlocked):
             exchange.market_open("SOL", True, 1.0)
