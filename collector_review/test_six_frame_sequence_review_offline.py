@@ -22,9 +22,9 @@ def fixture():
         for i, frame in enumerate(plan.frames))
 
 
-def review(frames, **changes):
+def review(baseline, **changes):
     data = dict(account=FIXTURE_ACCOUNT, start_ms=START, end_ms=END,
-                frames=frames)
+                frames=baseline)
     return inspect_untrusted_six_frame_sequence_offline(**dict(data, **changes))
 
 
