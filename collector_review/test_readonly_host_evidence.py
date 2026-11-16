@@ -139,7 +139,7 @@ class EvidenceTests(unittest.TestCase):
             })
             record = collect_readonly_host_evidence(root=root, runner=run)
             self.assertFalse(record["unit_not_running_candidate"])
-            self.assertTrue(record["unit_restrictions_candidate"])
+            self.assertFalse(record["unit_restrictions_candidate"])
             self.denied_fields(record)
 
     def test_observation_errors_fail_closed(self):
