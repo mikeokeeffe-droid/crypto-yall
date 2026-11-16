@@ -6,6 +6,7 @@ import unittest
 
 from sender_review.hyperliquid_readonly_collection_plan_offline import (
     plan_offline_readonly_testnet_collection,
+    plan_offline_six_frame_reconciliation_fixture,
     inspect_historical_coverage_fixture_offline,
 )
 
@@ -48,6 +49,38 @@ class OfflineCollectorPlanTests(unittest.TestCase):
                             for x in result.queries))
         self.assertEqual(json.loads(result.queries[3].body_json)["startTime"],1000)
         self.assertEqual(json.loads(result.queries[3].body_json)["endTime"],2000)
+
+    def test_new_six_frame_fixture_matches_coordinated_reconciliation(self):
+        result = plan_offline_six_frame_reconciliation_fixture(
+            account=ACCOUNT, start_time_ms=1000, end_time_ms=2000,
+        )
+        self.assert_plan_no_authority(result)
+        self.assertEqual(
+            [json.loads(x.body_json)["type"] for x in result.queries],
+            ["clearinghouseState", "openOrders", "historicalOrders",
+             "userFillsByTime", "openOrders", "clearinghouseState"],
+        )
+        self.assertEqual(len(result.queries), 6)
+        self.assertEqual(json.loads(result.queries[3].body_json),
+                         {"type": "userFillsByTime", "user": ACCOUNT,
+                          "startTime": 1000, "endTime": 2000,
+                          "aggregateByTime": False})
+        self.assertEqual(result.queries[1].body_json, result.queries[4].body_json)
+        self.assertEqual(result.queries[0].body_json, result.queries[5].body_json)
+
+    def test_six_frame_fixture_denies_wrong_scope_and_long_history_window(self):
+        for args in (
+            {"account": "0x" + "2" * 40},
+            {"account": ACCOUNT.upper()},
+            {"start_time_ms": True},
+            {"end_time_ms": 1000},
+            {"end_time_ms": 1000 + 86400001},
+        ):
+            scope = dict(account=ACCOUNT, start_time_ms=1000, end_time_ms=2000)
+            scope.update(args)
+            result = plan_offline_six_frame_reconciliation_fixture(**scope)
+            self.assert_plan_no_authority(result)
+            self.assertEqual(result.queries, ())
 
     def test_optional_order_lookup_is_still_read_only(self):
         result=plan(optional_order_lookup=CLOID)
