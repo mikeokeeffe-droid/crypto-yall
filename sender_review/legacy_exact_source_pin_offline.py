@@ -61,7 +61,7 @@ def _git_blob_sha1(raw: bytes) -> str:
 
 def inspect_legacy_source_bytes_offline(root: Path = ROOT) -> LegacySourceReview:
     """Read only 8 fixed checkout files; return NO_GO even on exact match."""
-    if type(root) is not Path:
+    if not isinstance(root, Path):
         return LegacySourceReview(reason="invalid audit checkout")
     matching, changed = [], []
     for relative, expected in EXPECTED_GIT_BLOBS.items():
