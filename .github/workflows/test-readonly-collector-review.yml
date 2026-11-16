@@ -30,6 +30,8 @@ jobs:
         run: python -m unittest collector_review.test_egress_boundary_review_offline -v
       - name: Offline-only order and history planning (no network)
         run: python -m unittest collector_review.test_offline_history_query_plan -v
+      - name: Verify six-frame synthetic /info request contract never authorizes network
+        run: python -m unittest collector_review.test_six_frame_request_contract_offline -v
       - name: Offline-only untrusted fill funding and order response review
         run: python -m unittest collector_review.test_offline_history_response_review -v
       - name: Offline-only synthetic hash-chain integrity tests
