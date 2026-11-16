@@ -1,21 +1,13 @@
-"""Opt-in, testnet-only /info snapshot reader; never an exchange sender.
+"""OFFLINE testnet /info snapshot validation primitives; ALWAYS HOLD.
 
-Prepares a real HTTPS-only public-data route for later *independent* host
-attestation and operator approval. It has no wallet, private key, signer,
-Hyperliquid SDK, /exchange endpoint, DB write, retry or order operation.
-Disabled by default; no existing workflow or server invokes this module.
-
-Observed state can never prove position ownership, history completeness,
-that no intervening fill occurred, or permission to close, retry or trade.
-Even consistent snapshots always return HOLD.
+No HTTP implementation, signer, wallet, keys, or network activation is
+included. A boolean argument cannot enable networking. The helper parsers
+inspect untrusted caller-supplied documents only. All permissions remain
+false; a future authorized collector requires a separate reviewed change.
 """
 from dataclasses import dataclass, field
 from decimal import Decimal, InvalidOperation
-import hashlib
-import json
 import re
-import ssl
-import urllib.request
 
 _URL = "https://api.hyperliquid-testnet.xyz/info"
 _ACCOUNT = re.compile(r"0x[0-9a-f]{40}\Z", re.ASCII)
@@ -46,68 +38,6 @@ class ReadOnlyTestnetSnapshot:
     submit_authorized: bool = False
     close_authorized: bool = False
     signing_enabled: bool = False
-
-
-class _NoRedirect(urllib.request.HTTPRedirectHandler):
-    def redirect_request(self, request, fp, code, msg, headers, newurl):
-        return None
-
-
-def _no_duplicates(pairs):
-    result = {}
-    for key, value in pairs:
-        if key in result:
-            raise ValueError("duplicate JSON property")
-        result[key] = value
-    return result
-
-
-def _no_constants(_):
-    raise ValueError("nonfinite JSON constant")
-
-
-def _info_query(opener, *, account, kind, start_time_ms=None,
-                end_time_ms=None):
-    # A single pinned transport for exact allowlisted PUBLIC /info queries.
-    # Never accept an arbitrary request body, URL or HTTP method.
-    if kind in ("clearinghouseState", "openOrders"):
-        if start_time_ms is not None or end_time_ms is not None:
-            raise ValueError("unexpected time scope")
-        request_data = {"type": kind, "user": account, "dex": ""}
-    elif kind == "historicalOrders":
-        if start_time_ms is not None or end_time_ms is not None:
-            raise ValueError("unexpected historical order scope")
-        request_data = {"type": kind, "user": account}
-    elif kind == "userFillsByTime":
-        if (type(start_time_ms) is not int
-                or type(end_time_ms) is not int
-                or not 0 <= start_time_ms < end_time_ms <= 9007199254740991
-                or end_time_ms - start_time_ms > 86400000):
-            raise ValueError("invalid bounded fill time scope")
-        request_data = {
-            "type": kind, "user": account, "startTime": start_time_ms,
-            "endTime": end_time_ms, "aggregateByTime": False,
-        }
-    else:
-        raise ValueError("unsupported read-only info request")
-    body = json.dumps(
-        request_data, sort_keys=True, separators=(",", ":"),
-    ).encode("ascii")
-    req = urllib.request.Request(
-        _URL, data=body, method="POST",
-        headers={"Content-Type": "application/json",
-                 "Accept": "application/json"},
-    )
-    with opener.open(req, timeout=5) as response:
-        if (response.status != 200 or response.geturl() != _URL
-                or response.headers.get("Content-Type", "").split(";")[0]
-                .strip().lower() != "application/json"):
-            raise ValueError("unexpected response")
-        raw = response.read(_LIMIT + 1)
-    if not 0 < len(raw) <= _LIMIT:
-        raise ValueError("invalid response length")
-    return json.loads(raw.decode("utf-8"), object_pairs_hook=_no_duplicates,
-                      parse_constant=_no_constants)
 
 
 def _positions(document):
@@ -161,55 +91,10 @@ def _orders(document):
 def inspect_testnet_info_readonly_snapshot(
     *, configured_public_account, enabled_readonly_testnet_network=False,
 ):
-    """Make exactly four public /info requests only after an explicit opt-in.
+    """Deliberately inert compatibility API, regardless of any caller input.
 
-    The account is an *untrusted input*, expected to be pinned separately
-    by a future verified host. It cannot determine real trading ownership.
-    No token, wallet key, account secret, URL or action is accepted.
+    This draft cannot make a public /info request or certify a snapshot.
+    To add transport requires a separate reviewed code change and explicit
+    approval following independent host/runtime/network security assessment.
     """
-    hold = ReadOnlyTestnetSnapshot()
-    if (enabled_readonly_testnet_network is not True
-            or type(configured_public_account) is not str
-            or _ACCOUNT.fullmatch(configured_public_account) is None):
-        return hold
-    try:
-        opener = urllib.request.build_opener(
-            urllib.request.ProxyHandler({}), _NoRedirect(),
-            urllib.request.HTTPSHandler(context=ssl.create_default_context()),
-        )
-        before = _positions(_info_query(
-            opener, account=configured_public_account, kind="clearinghouseState"
-        ))
-        orders_before = _orders(_info_query(
-            opener, account=configured_public_account, kind="openOrders"
-        ))
-        orders_after = _orders(_info_query(
-            opener, account=configured_public_account, kind="openOrders"
-        ))
-        after = _positions(_info_query(
-            opener, account=configured_public_account, kind="clearinghouseState"
-        ))
-        if before != after or orders_before != orders_after:
-            return ReadOnlyTestnetSnapshot(
-                reason="positions or open orders changed during read; HOLD"
-            )
-        if orders_after:
-            return ReadOnlyTestnetSnapshot(
-                reason="outstanding orders require account-wide reconciliation",
-                open_order_count=len(orders_after),
-            )
-        digest = hashlib.sha256(json.dumps(
-            before, sort_keys=True, separators=(",", ":")
-        ).encode("ascii")).hexdigest()
-        return ReadOnlyTestnetSnapshot(
-            state="OBSERVED_TESTNET_READONLY_HOLD",
-            reason="two matching position reads, two empty order reads; "
-                   "not atomic, no history, trade or close authority",
-            snapshot_consistent=True,
-            positions_digest=digest,
-            position_count=len(after),
-            open_order_count=0,
-            observed_positions=tuple(sorted(after.items())),
-        )
-    except (ValueError, TypeError, UnicodeError, OSError, OverflowError):
-        return hold
+    return ReadOnlyTestnetSnapshot()
