@@ -122,6 +122,42 @@ def plan_offline_readonly_testnet_collection(
     )
 
 
+
+def plan_offline_six_frame_reconciliation_fixture(
+    *, account, start_time_ms, end_time_ms,
+):
+    """Describe the agreed six-frame PR #41 / PR #42 synthetic review shape.
+
+    Intentionally distinct from the earlier five-frame/optional-orderStatus
+    plan, which remains unchanged for its earlier compatibility tests.
+    No HTTP, externally confirmed scope, credential, history proof or signing.
+    The fixed account is a synthetic test identifier, NOT user authorization.
+    """
+    held = ReadOnlyCollectorPlan()
+    if (
+        type(account) is not str or account != _TEST_ACCOUNT
+        or type(start_time_ms) is not int or type(end_time_ms) is not int
+        or not 0 < start_time_ms < end_time_ms <= 9007199254740991
+        or end_time_ms - start_time_ms > 86_400_000
+    ):
+        return held
+    bodies = (
+        {"type": "clearinghouseState", "user": account, "dex": ""},
+        {"type": "openOrders", "user": account, "dex": ""},
+        {"type": "historicalOrders", "user": account},
+        {"type": "userFillsByTime", "user": account,
+         "startTime": start_time_ms, "endTime": end_time_ms,
+         "aggregateByTime": False},
+        {"type": "openOrders", "user": account, "dex": ""},
+        {"type": "clearinghouseState", "user": account, "dex": ""},
+    )
+    return ReadOnlyCollectorPlan(
+        reason="six synthetic /info query envelopes ONLY; complete account "
+               "provenance, full history, runtime and all order authority absent",
+        queries=tuple(_query(body) for body in bodies),
+    )
+
+
 def inspect_historical_coverage_fixture_offline(
     *, request_type, record_count, claimed_oldest_reached, claimed_full_history,
 ):
