@@ -122,6 +122,87 @@ class ReviewOnlyAsgiTests(unittest.TestCase):
         self.assertIsNone(status)
         self.assertEqual(preflight.call_count, 0)
 
+    def test_preflight_exception_returns_redacted_503_hold(self):
+        # Exercise the actual ASGI callable, not the request() helper's mock.
+        # A damaged identity preflight must neither escape nor expose a JWT.
+        token = self.fixture.token()
+        body = self.fixture.body()
+        scope = {
+            "type": "http", "method": "POST",
+            "path": "/v1/review-only/entry-intents",
+            "raw_path": b"/v1/review-only/entry-intents",
+            "query_string": b"",
+            "headers": [
+                (b"content-type", b"application/json"),
+                (b"authorization", ("Bearer " + token).encode()),
+                (b"content-length", str(len(body)).encode()),
+            ],
+        }
+        async def exercise(mock_result=None, failure=None):
+            response = []
+            async def receive():
+                return {"type": "http.request", "body": body, "more_body": False}
+            async def send(message):
+                response.append(message)
+            with patch(
+                "sender_review.asgi_review_only_ingress."
+                "inspect_server_oidc_preflight_review",
+                return_value=mock_result, side_effect=failure,
+            ) as mocked:
+                await application(scope, receive, send)
+            return response, mocked
+
+        for failure in (RuntimeError("secret-token-do-not-leak"),
+                        ValueError("untrusted-key-error")):
+            with self.subTest(failure=type(failure).__name__):
+                messages, mocked = asyncio.run(exercise(failure=failure))
+                self.assertEqual(len(messages), 2)
+                self.assertEqual(messages[0]["status"], 503)
+                self.assertEqual(messages[0]["type"], "http.response.start")
+                self.assertEqual(messages[1]["type"], "http.response.body")
+                decoded = json.loads(messages[1]["body"])
+                self.assertEqual(decoded, {
+                    "state": "HOLD", "reason": "identity preflight unavailable",
+                })
+                self.assertEqual(mocked.call_count, 1)
+                self.assertIs(mocked.call_args.kwargs[
+                    "approved_readonly_key_fetch"], False)
+                self.assertNotIn(token, repr(messages))
+                self.assertNotIn("secret-token", repr(messages))
+
+    def test_forged_successful_preflight_still_returns_503_hold(self):
+        body = self.fixture.body()
+        token = self.fixture.token()
+        scope = {
+            "type": "http", "method": "POST",
+            "path": "/v1/review-only/entry-intents",
+            "raw_path": b"/v1/review-only/entry-intents",
+            "query_string": b"",
+            "headers": [
+                (b"content-type", b"application/json"),
+                (b"authorization", ("Bearer " + token).encode()),
+                (b"content-length", str(len(body)).encode()),
+            ],
+        }
+        responses = []
+        async def receive():
+            return {"type": "http.request", "body": body, "more_body": False}
+        async def send(message):
+            responses.append(message)
+        # Even a deliberately forged diagnostic result is NOT permission.
+        with patch(
+            "sender_review.asgi_review_only_ingress."
+            "inspect_server_oidc_preflight_review",
+            return_value={"state": "APPROVED", "submit_authorized": True},
+        ) as preflight:
+            asyncio.run(application(scope, receive, send))
+        self.assertEqual(preflight.call_count, 1)
+        self.assertEqual(responses[0]["status"], 503)
+        self.assertEqual(json.loads(responses[1]["body"]), {
+            "state": "HOLD", "reason": "no authenticated sender deployed",
+        })
+        self.assertNotIn(token, repr(responses))
+
     def test_no_outbound_transport_possible_even_with_fake_preflight(self):
         body = self.fixture.body()
         with patch("sender_review.asgi_review_only_ingress."
