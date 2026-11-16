@@ -138,6 +138,7 @@ SELECT
     i.state AS journal_state,
     a.created_at AS simulated_started_at,
     CASE
+        WHEN a.intent_id IS NULL THEN 'UNKNOWN_HELD_MISSING_START'
         WHEN i.state = 'hold_unknown' AND EXISTS (
             SELECT 1 FROM sender_review_ci.simulated_attempt_events AS e
              WHERE e.intent_id=i.id
@@ -152,6 +153,8 @@ SELECT
         WHEN s.fence IS DISTINCT FROM i.fence
           OR s.active_nonce IS DISTINCT FROM i.request_nonce
           THEN 'CRITICAL_FENCE_MISSING_OR_CHANGED'
+        WHEN a.intent_id IS NULL
+          THEN 'CRITICAL_START_EVENT_MISSING'
         WHEN i.state='hold_unknown' AND NOT EXISTS (
             SELECT 1 FROM sender_review_ci.simulated_attempt_events AS e
             WHERE e.intent_id=i.id AND e.kind='simulated_unknown_held'
@@ -164,13 +167,14 @@ SELECT
         ELSE 'CRITICAL_OUTCOME_UNCONFIRMED'
     END::text AS incident_attention
 FROM sender_review_ci.review_intents AS i
-JOIN sender_review_ci.simulated_attempt_events AS a
+LEFT JOIN sender_review_ci.simulated_attempt_events AS a
   ON a.intent_id=i.id AND a.kind='simulated_attempt_started'
 LEFT JOIN sender_review_ci.scope_fences AS s
   ON s.environment=i.environment AND s.account=i.account
  AND s.dex=i.dex AND s.coin=i.coin
 WHERE i.environment='testnet'
-  AND i.state IN ('review_only','hold_unknown');
+  AND i.state IN ('review_only','hold_unknown')
+  AND (a.intent_id IS NOT NULL OR i.state='hold_unknown');
 
 REVOKE ALL ON sender_review_ci.simulated_unresolved_attempts FROM PUBLIC;
 
