@@ -161,20 +161,17 @@ class CoordinatedReadsetReviewTests(unittest.TestCase):
     def test_transport_true_flag_never_imports_or_uses_urllib(self):
         # Deliberate fail-close if any future edit tries to turn this
         # function into a network capability by reusing helper imports.
-        with patch.object(
-            transport, "__dict__", transport.__dict__, create=True,
-        ):
-            self.assertFalse(hasattr(transport, "_info_query"))
-            self.assertFalse(hasattr(transport, "urllib"))
-            denied = transport.inspect_coordinated_testnet_readset_transport_review(
-                configured_public_account="0x" + "1" * 40,
-                start_time_ms=1000, end_time_ms=2000,
-                enabled_readonly_testnet_network=True,
-            )
-            self.assertEqual(denied.state, "HOLD")
-            self.assertFalse(denied.network_performed)
-            self.assertFalse(denied.submit_authorized)
-            self.assertFalse(denied.close_authorized)
+        self.assertFalse(hasattr(transport, "_info_query"))
+        self.assertFalse(hasattr(transport, "urllib"))
+        denied = transport.inspect_coordinated_testnet_readset_transport_review(
+            configured_public_account="0x" + "1" * 40,
+            start_time_ms=1000, end_time_ms=2000,
+            enabled_readonly_testnet_network=True,
+        )
+        self.assertEqual(denied.state, "HOLD")
+        self.assertFalse(denied.network_performed)
+        self.assertFalse(denied.submit_authorized)
+        self.assertFalse(denied.close_authorized)
 
     def test_malformed_input_cannot_claim_coherence(self):
         for field, value in (
