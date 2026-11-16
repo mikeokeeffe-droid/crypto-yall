@@ -42,6 +42,8 @@ async def inspect_asgi_to_disposable_journal_offline(
     """
     denied = CIOnlyAsgiJournalReview()
     received_chunks = []
+    request_complete = False
+    request_invalid = False
     responses = []
     # Capture immutable request metadata before untrusted receive callbacks
     # can mutate the scope/header list after the ASGI validator checks it.
@@ -55,10 +57,20 @@ async def inspect_asgi_to_disposable_journal_offline(
         initial_request = None
 
     async def local_receive():
+        nonlocal request_complete, request_invalid
         message = await receive()
-        if type(message) is dict and message.get("type") == "http.request":
-            if type(message.get("body", b"")) is bytes:
-                received_chunks.append(message.get("body", b""))
+        # A spoofed HOLD response must not journal a partially read stream,
+        # a disconnect or a second message after the terminal body.
+        if type(message) is not dict or message.get("type") != "http.request":
+            request_invalid = True
+        elif (request_complete
+              or type(message.get("body", b"")) is not bytes
+              or type(message.get("more_body", False)) is not bool):
+            request_invalid = True
+        else:
+            received_chunks.append(message.get("body", b""))
+            if not message.get("more_body", False):
+                request_complete = True
         return message
 
     async def local_send(message):
@@ -128,7 +140,9 @@ async def inspect_asgi_to_disposable_journal_offline(
         and os.environ.get("SENDER_REVIEW_DISPOSABLE_CI") == "1"
         and os.environ.get("PGDATABASE") == "sender_review_test"
         and os.environ.get("PGHOST") == "127.0.0.1"
-        and type(received_chunks) is list
+        and request_complete
+        and not request_invalid
+        and 0 < len(received_chunks) <= 32
     )
     recorded = False
     if eligible:
