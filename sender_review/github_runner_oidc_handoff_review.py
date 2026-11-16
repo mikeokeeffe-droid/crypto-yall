@@ -15,7 +15,7 @@ import urllib.request
 
 AUDIENCE = "urn:crypto-yall:protected-sender:testnet:review"
 RUNNER_OIDC_HOST = "pipelines.actions.githubusercontent.com"
-_JWT = re.compile(r"[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\Z", re.ASCII)
+_JWT = re.compile(r"[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\Z", re.ASCII)
 
 
 @dataclass(frozen=True)
@@ -89,7 +89,7 @@ def request_runner_oidc_token_review(
     if (explicitly_enabled is not True
             or type(actions_request_token) is not str
             or not 20 <= len(actions_request_token) <= 8192
-            or any(x in actions_request_token for x in "\\r\\n\\0")):
+            or any(x in actions_request_token for x in "\r\n\0")):
         return denied
     url = _token_endpoint_url(actions_request_url)
     if url is None:
