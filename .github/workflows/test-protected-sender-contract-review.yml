@@ -59,6 +59,8 @@ jobs:
         run: |
           python -m unittest sender_review.test_three_bot_cutover_matrix -v
           python -m sender_review.three_bot_cutover_matrix
+      - name: Pin exact original strategy and protection file bytes (offline)
+        run: python -m unittest sender_review.test_legacy_exact_source_pin_offline -v
       - name: Test proposed signer-free protective close and bot intents (offline)
         run: python -m unittest sender_review.test_proposed_intent_interfaces_offline -v
       - name: Review pure signer-free worker intent fixture builder
