@@ -101,8 +101,8 @@ class SixFrameContractReviewTests(unittest.TestCase):
                 self.assertFalse(review.matches_fixture)
 
     def test_existing_collector_stays_network_denied(self):
-        with patch.object(existing.http.client, "HTTPSConnection") as conn, \\
-             patch.object(existing.ssl, "create_default_context") as tls:
+        with (patch.object(existing.http.client, "HTTPSConnection") as conn,
+              patch.object(existing.ssl, "create_default_context") as tls):
             result = existing.collect_testnet_readonly_review(
                 account=ACCOUNT, kind="openOrders")
             self.assertEqual(result.state, "hold")
