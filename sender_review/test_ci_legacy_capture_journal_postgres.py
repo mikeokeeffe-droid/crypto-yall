@@ -21,6 +21,9 @@ from sender_review.test_legacy_order_capture_preview import (
 from sender_review.ci_only_remote_journal_boundary import (
     review_remote_fixture_to_disposable_journal_offline,
 )
+from sender_review.runner_entry_request_handoff_review import (
+    prepare_captured_legacy_entry_handoff_review_only,
+)
 from sender_review.test_remote_request_boundary_offline import (
     OfflineRemoteRequestBoundaryTests, NOW,
 )
@@ -57,7 +60,7 @@ class LegacySizingToDisposableJournalTests(unittest.TestCase):
         with connect() as db:
             return db.execute(statement).fetchall()
 
-    def capture(self, *, bot, coin, action, nonce):
+    def capture(self, *, bot, coin, action, nonce, return_preview=False):
         # Explicit action metadata is mandatory; never convert pyramids
         # or closes into a generic market_open intent.
         fake_exchange = LegacyOrderCapturePreview(
@@ -78,7 +81,7 @@ class LegacySizingToDisposableJournalTests(unittest.TestCase):
         self.assertFalse(fake_exchange.signing_enabled)
         self.assertFalse(fake_exchange.submit_authorized)
         self.assertFalse(fake_exchange.close_authorized)
-        return fake_exchange.proposed_body
+        return fake_exchange if return_preview else fake_exchange.proposed_body
 
     def journal(self, *, bot, nonce, body, jti=None):
         token = self.fixture.token(
@@ -153,6 +156,87 @@ class LegacySizingToDisposableJournalTests(unittest.TestCase):
                         "SELECT coin,active_nonce FROM "
                         "sender_review_ci.scope_fences"
                     ), [(coin, nonce)])
+
+    def test_shared_handoff_exact_entry_bytes_reach_disposable_hold(self):
+        # AST-extracted original sizing -> inert capture -> reviewed envelope
+        # -> simulated signed identity -> disposable-only PostgreSQL journal.
+        for bot, action, nonce in (
+            ("daily", "open_long", "a" * 32),
+            ("intraday", "open_short", "b" * 32),
+            ("aggressive", "open_long", "c" * 32),
+        ):
+            with self.subTest(bot=bot):
+                self.setUp()
+                capture = self.capture(
+                    bot=bot, coin="SOL", action=action, nonce=nonce,
+                    return_preview=True,
+                )
+                token = self.fixture.token(
+                    bot, jti="full-offline-handoff-" + bot,
+                )
+                envelope = prepare_captured_legacy_entry_handoff_review_only(
+                    capture=capture, candidate_runner_jwt=token,
+                )
+                self.assertEqual(
+                    envelope.state,
+                    "unsigned_authority_runner_handoff_review_only_HOLD",
+                )
+                self.assertEqual(envelope.body, capture.proposed_body)
+                self.assertFalse(envelope.submit_authorized)
+                result = review_remote_fixture_to_disposable_journal_offline(
+                    method=envelope.method, path=envelope.path,
+                    headers=envelope.headers, body=envelope.body,
+                    trusted_fixture_keys=self.keys,
+                    fixture_now_seconds=NOW,
+                    fixed_test_account=ACCOUNT,
+                    db_password=os.environ["PGPASSWORD"],
+                )
+                self.assertEqual(
+                    result.state, "persisted_remote_fixture_review_only_HOLD",
+                )
+                self.assertTrue(result.journal_recorded)
+                self.assertFalse(result.submit_authorized)
+                self.assertFalse(result.close_authorized)
+                self.assertFalse(result.signing_enabled)
+                self.assertEqual(self.rows(
+                    "SELECT e.body_sha256,e.bot,i.coin,i.action,i.state "
+                    "FROM sender_review_ci.fixture_request_evidence e "
+                    "JOIN sender_review_ci.review_intents i ON i.id=e.intent_id"
+                ), [(
+                    hashlib.sha256(capture.proposed_body).hexdigest(),
+                    bot, "SOL", action, "review_only",
+                )])
+                rival = "intraday" if bot != "intraday" else "daily"
+                rival_capture = self.capture(
+                    bot=rival, coin="SOL", action="open_long",
+                    nonce="f" * 32, return_preview=True,
+                )
+                rival_token = self.fixture.token(
+                    rival, jti="rival-full-offline-" + bot,
+                )
+                rival_envelope = prepare_captured_legacy_entry_handoff_review_only(
+                    capture=rival_capture, candidate_runner_jwt=rival_token,
+                )
+                self.assertEqual(
+                    rival_envelope.state,
+                    "unsigned_authority_runner_handoff_review_only_HOLD",
+                )
+                refused = review_remote_fixture_to_disposable_journal_offline(
+                    method=rival_envelope.method, path=rival_envelope.path,
+                    headers=rival_envelope.headers, body=rival_envelope.body,
+                    trusted_fixture_keys=self.keys,
+                    fixture_now_seconds=NOW,
+                    fixed_test_account=ACCOUNT,
+                    db_password=os.environ["PGPASSWORD"],
+                )
+                self.assertEqual(refused.state, "hold")
+                self.assertFalse(refused.journal_recorded)
+                self.assertEqual(self.rows(
+                    "SELECT COUNT(*) FROM sender_review_ci.review_intents"
+                ), [(1,)])
+                self.assertEqual(self.rows(
+                    "SELECT COUNT(*) FROM sender_review_ci.fixture_identity_receipts"
+                ), [(1,)])
 
     def test_competing_bots_same_coin_cannot_record_second_entry(self):
         first_body = self.capture(
