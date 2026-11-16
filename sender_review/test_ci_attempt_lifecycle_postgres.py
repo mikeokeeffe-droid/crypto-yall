@@ -277,8 +277,12 @@ os._exit(0)
         # No public observer endpoint or service authentication exists.
         with connect() as conn:
             self.assertFalse(conn.execute(
-                "SELECT has_table_privilege('public',"
-                "'sender_review_ci.simulated_unresolved_attempts','SELECT')"
+                "SELECT EXISTS ("
+                "SELECT 1 FROM pg_class c "
+                "CROSS JOIN LATERAL aclexplode(COALESCE("
+                "c.relacl,acldefault('r',c.relowner))) acl "
+                "WHERE c.oid='sender_review_ci.simulated_unresolved_attempts'::regclass "
+                "AND acl.grantee=0 AND acl.privilege_type='SELECT')"
             ).fetchone()[0])
             self.assertEqual(conn.execute(
                 "SELECT reloptions FROM pg_class WHERE oid="
