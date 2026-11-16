@@ -37,6 +37,8 @@ jobs:
         run: python -m unittest sender_review.test_github_runner_oidc_handoff_review -v
       - name: Exercise existing three-bot entry handoff through offline HTTP identity review
         run: python -m unittest sender_review.test_runner_entry_request_handoff_review -v
+      - name: Verify disabled server-clock and GitHub public-key identity preflight with mocks
+        run: python -m unittest sender_review.test_server_oidc_preflight_review -v
       - name: Test strict offline remote signed identity and request envelope
         run: python -m unittest sender_review.test_remote_request_boundary_offline -v
       - name: Audit original three-bot signing and order paths (NO-GO)
