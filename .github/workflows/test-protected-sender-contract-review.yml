@@ -85,6 +85,8 @@ jobs:
         run: python -m unittest sender_review.test_ci_only_deployment_readiness_review -v
       - name: Verify offline host-evidence request cannot assert attestation
         run: python -m unittest sender_review.test_host_evidence_request_offline -v
+      - name: Guard five draft network entrypoints against reactivation
+        run: python -m unittest sender_review.test_review_only_network_import_guard -v
       - name: Verify no signer, socket, DB or HTTP imports in S1 module
         shell: bash
         run: |
