@@ -109,6 +109,42 @@ configuration. It is *not* implemented or called in this PR.
 - **Failure:** abort to `HOLD / NO-GO`; do not fallback to a direct HTTP
   client, current offline service, existing trading bots or mainnet.
 
+## Cross-PR request-contract mismatch — blocker before implementation
+
+The existing **disabled** PR #41 public request builder is *not* an
+implementation of the proposed six-frame gateway contract. Its
+`collector_review/testnet_info_https.py` currently accepts fixture kinds
+`clearinghouseState`, `openOrders`, `spotClearinghouseState`,
+`allMids` and `meta`, but it does **not** construct
+`historicalOrders` or `userFillsByTime`. The method that could make HTTPS
+requests is intentionally unreachable; its output cannot authenticate
+exchange history.
+
+PR #42 contains a **different** isolated offline planner:
+`sender_review/hyperliquid_readonly_collection_plan_offline.py`
+documents a five-request sequence (positions, open orders, historical
+orders, fills, positions) and an *optional* `orderStatus` request. Its
+separate `coordinated_testnet_readset_review.py` validates an offline
+**six-frame** sequence (positions, open orders, historical orders, fills,
+open orders again, positions again), but performs no network I/O.
+Therefore **neither of the existing request builders directly implements
+the exact six-frame contract** specified above.
+
+**Required resolution:** independent security and data-provenance reviewers
+must approve one bounded, versioned contract covering the six exact
+canonical JSON body shapes, public account, fixed `dex`, history-window
+bounds, step order, maximum responses, historic coverage gaps, and the
+gateway's replay/time budget. Build and test any future network reader
+in a **separate reviewed change**; do not simply reuse PR #41's allowed
+kinds, substitute PR #42's optional `orderStatus`, infer an atomic
+snapshot, patch `NETWORK_ENABLED` or remove its unconditional
+`PermissionError` to proceed.
+
+The signed-off implementation must reject *all* request types outside
+the one approved six-frame procedure, including PR #41's unused market
+and spot types. It must record that any successful read is **not** proof
+of complete historical coverage, trade ownership, or order authority.
+
 ## Evidence the independent reviewer must obtain (not collected here)
 
 | Gate | Required observation on a *new* testnet runtime | Current result |
