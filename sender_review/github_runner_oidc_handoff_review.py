@@ -1,17 +1,13 @@
 """GitHub Actions runner OIDC token handoff prototype; NO TRADING.
 
 This helper is not connected to any existing workflow or protected sender.
-No signer, exchange, order transport or database is imported. A runner may
-retrieve a *short-lived token* only when an operator separately enables this
-read-only action and the job has id-token: write. Retrieval is NOT server-side
-authentication or approval to submit orders. NEVER log or persist JWTs.
+No signer, exchange, order transport or database is imported. The reviewed draft never fetches a token, including when passed True.
+Retrieval and server authentication require a separate reviewed change.
+NEVER log or persist JWTs.
 """
 from dataclasses import dataclass, field
-import json
 import re
-import ssl
 import urllib.parse
-import urllib.request
 
 AUDIENCE = "urn:crypto-yall:protected-sender:testnet:review"
 RUNNER_OIDC_HOST = "pipelines.actions.githubusercontent.com"
@@ -32,11 +28,6 @@ class RunnerOidcHandoffReview:
     submit_authorized: bool = False
     close_authorized: bool = False
     signing_enabled: bool = False
-
-
-class _NoRedirect(urllib.request.HTTPRedirectHandler):
-    def redirect_request(self, req, fp, code, msg, headers, newurl):
-        return None
 
 
 def _reject_duplicate_json(pairs):
@@ -78,56 +69,11 @@ def request_runner_oidc_token_review(
     *, explicitly_enabled=False, actions_request_url=None,
     actions_request_token=None,
 ):
-    """Opt-in GitHub runner token retrieval; NEVER approves a sender request.
+    """Always HOLD: the runner's token retrieval is not authorized.
 
-    The URL/token must originate from GitHub runner-provided environment
-    variables, not client JSON. This function does not read env directly,
-    allowing a future trusted caller to enforce provenance. Tests mock all
-    HTTPS calls, and no workflow currently calls this helper.
+    A caller-supplied URL/token or Boolean cannot activate outbound network
+    or authenticate a GitHub identity. Use _token_endpoint_url only for
+    pure offline URL-validation tests. Future remote OIDC handling requires
+    separately reviewed transport and real security approval.
     """
-    denied = RunnerOidcHandoffReview()
-    if (explicitly_enabled is not True
-            or type(actions_request_token) is not str
-            or not 20 <= len(actions_request_token) <= 8192
-            or any(x in actions_request_token for x in "\r\n\0")):
-        return denied
-    url = _token_endpoint_url(actions_request_url)
-    if url is None:
-        return denied
-    try:
-        opener = urllib.request.build_opener(
-            urllib.request.ProxyHandler({}), _NoRedirect(),
-            urllib.request.HTTPSHandler(context=ssl.create_default_context()),
-        )
-        request = urllib.request.Request(url, method="GET", headers={
-            "Authorization": "Bearer " + actions_request_token,
-            "Accept": "application/json",
-        })
-        with opener.open(request, timeout=5) as response:
-            if (response.status != 200 or response.geturl() != url
-                    or response.headers.get("Content-Type", "").split(";")[0]
-                    .strip().lower() != "application/json"):
-                return denied
-            body = response.read(16385)
-        if not 0 < len(body) <= 16384:
-            return denied
-        result = json.loads(body.decode("utf-8"),
-                            object_pairs_hook=_reject_duplicate_json)
-        if (type(result) is not dict
-                or not set(result) <= {"value", "count"}
-                or "value" not in result
-                or ("count" in result and result["count"] != 1)):
-            return denied
-        jwt = result["value"]
-        if (type(jwt) is not str or not 100 <= len(jwt) <= 16000
-                or _JWT.fullmatch(jwt) is None):
-            return denied
-        return RunnerOidcHandoffReview(
-            state="candidate_runner_token_unverified_HOLD",
-            reason="GitHub runner token obtained; remote issuer, claims, "
-                   "replay, service authorization and sender unavailable",
-            bearer_token=jwt,
-            candidate_token_present=True,
-        )
-    except (OSError, ValueError, TypeError, UnicodeError):
-        return denied
+    return RunnerOidcHandoffReview()
