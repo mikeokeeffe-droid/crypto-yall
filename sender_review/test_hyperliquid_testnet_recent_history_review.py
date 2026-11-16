@@ -135,6 +135,36 @@ class RecentHistoryTests(unittest.TestCase):
                 self.assertFalse(result.recent_records_consistent)
                 self.no_authority(result)
 
+    def test_overfill_partial_fill_unsettled_and_empty_history_hold(self):
+        cases = (
+            [orders(), [dict(fills()[0], sz="0.21")]],
+            [orders(), [dict(fills()[0], sz="0.10")]],
+            [orders(), [dict(fills()[0], sz="0.10", tid=456),
+                        dict(fills()[0], sz="0.11", tid=457)]],
+            [orders(), []],
+            [[], []],
+            [[dict(orders()[0], status="canceled")], fills()],
+            [[dict(orders()[0], status="open")], []],
+        )
+        for docs in cases:
+            with self.subTest(docs=str(docs)[:150]):
+                result, _ = self.inspect(docs)
+                self.assertEqual(result.state, "HOLD")
+                self.assertFalse(result.recent_records_consistent)
+                self.no_authority(result)
+
+    def test_multiple_matching_partial_fills_can_only_report_bounded_consistency(self):
+        partial = [
+            dict(fills()[0], sz="0.08", tid=456),
+            dict(fills()[0], sz="0.12", tid=457),
+        ]
+        result, _ = self.inspect([orders(), partial])
+        self.assertEqual(result.state, "RECENT_TESTNET_HISTORY_REVIEW_ONLY_HOLD")
+        self.assertTrue(result.recent_records_consistent)
+        self.assertEqual(result.recent_fill_count, 2)
+        self.assertFalse(result.bot_position_ownership_verified)
+        self.no_authority(result)
+
     def test_invalid_scope_never_fetches(self):
         with patch.object(review.urllib.request, "build_opener",
                           side_effect=AssertionError("no network")):
