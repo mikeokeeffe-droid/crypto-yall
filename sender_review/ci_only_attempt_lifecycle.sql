@@ -145,8 +145,24 @@ SELECT
         ) THEN 'UNKNOWN_HELD'
         ELSE 'STARTED_OUTCOME_UNCONFIRMED'
     END::text AS incident_state,
-    (s.active_nonce=i.request_nonce AND s.fence=i.fence)
-        AS fence_still_held
+    COALESCE(
+        s.active_nonce=i.request_nonce AND s.fence=i.fence, false
+    ) AS fence_still_held,
+    CASE
+        WHEN s.fence IS DISTINCT FROM i.fence
+          OR s.active_nonce IS DISTINCT FROM i.request_nonce
+          THEN 'CRITICAL_FENCE_MISSING_OR_CHANGED'
+        WHEN i.state='hold_unknown' AND NOT EXISTS (
+            SELECT 1 FROM sender_review_ci.simulated_attempt_events AS e
+            WHERE e.intent_id=i.id AND e.kind='simulated_unknown_held'
+        ) THEN 'CRITICAL_HOLD_EVENT_MISSING'
+        WHEN i.state='review_only' AND EXISTS (
+            SELECT 1 FROM sender_review_ci.simulated_attempt_events AS e
+            WHERE e.intent_id=i.id AND e.kind='simulated_unknown_held'
+        ) THEN 'CRITICAL_INCONSISTENT_EVENT'
+        WHEN i.state='hold_unknown' THEN 'CRITICAL_UNKNOWN_OUTCOME'
+        ELSE 'CRITICAL_OUTCOME_UNCONFIRMED'
+    END::text AS incident_attention
 FROM sender_review_ci.review_intents AS i
 JOIN sender_review_ci.simulated_attempt_events AS a
   ON a.intent_id=i.id AND a.kind='simulated_attempt_started'
