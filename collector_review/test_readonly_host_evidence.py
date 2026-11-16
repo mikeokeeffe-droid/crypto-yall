@@ -142,6 +142,53 @@ class EvidenceTests(unittest.TestCase):
             self.assertFalse(record["unit_restrictions_candidate"])
             self.denied_fields(record)
 
+    def test_omitted_environment_files_is_explicitly_unknown(self):
+        with tempfile.TemporaryDirectory() as t:
+            root = self.root(Path(t))
+            runner, _ = self.fake_runner()
+            def omit_env(args, **kwargs):
+                observed = runner(args, **kwargs)
+                if args[:2] == ["systemctl", "show"]:
+                    observed.stdout = "\n".join(
+                        line for line in observed.stdout.splitlines()
+                        if not line.startswith("EnvironmentFiles=")
+                    ) + "\n"
+                return observed
+            result = collect_readonly_host_evidence(root=root, runner=omit_env)
+            self.assertEqual(result["unit_properties_missing"],
+                             ["EnvironmentFiles"])
+            self.assertFalse(result["unit_fields_observed"])
+            self.assertTrue(result["unit_not_running_candidate"])
+            self.assertTrue(result["unit_isolation_settings_candidate"])
+            self.assertFalse(result["unit_restrictions_candidate"])
+            self.denied_fields(result)
+
+    def test_redacted_credential_field_cannot_count_as_empty(self):
+        with tempfile.TemporaryDirectory() as t:
+            root = self.root(Path(t))
+            run, _ = self.fake_runner(overrides={
+                "LoadCredential": "[unprintable]",
+                "LoadCredentialEncrypted": "[unprintable]",
+                "IPAddressDeny": "0.0.0.0/0 ::/0",
+            })
+            result = collect_readonly_host_evidence(root=root, runner=run)
+            self.assertEqual(result["unit_properties_redacted"],
+                             ["LoadCredential", "LoadCredentialEncrypted"])
+            self.assertTrue(result["unit_isolation_settings_candidate"])
+            self.assertFalse(result["unit_restrictions_candidate"])
+            self.denied_fields(result)
+
+    def test_partial_ip_deny_does_not_count_as_full_isolation(self):
+        with tempfile.TemporaryDirectory() as t:
+            root = self.root(Path(t))
+            run, _ = self.fake_runner(overrides={
+                "IPAddressDeny": "0.0.0.0/0",
+            })
+            result = collect_readonly_host_evidence(root=root, runner=run)
+            self.assertFalse(result["unit_isolation_settings_candidate"])
+            self.assertFalse(result["unit_restrictions_candidate"])
+            self.denied_fields(result)
+
     def test_observation_errors_fail_closed(self):
         with tempfile.TemporaryDirectory() as t:
             root = self.root(Path(t))
