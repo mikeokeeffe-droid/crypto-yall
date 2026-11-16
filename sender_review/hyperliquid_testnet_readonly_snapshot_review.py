@@ -66,12 +66,32 @@ def _no_constants(_):
     raise ValueError("nonfinite JSON constant")
 
 
-def _info_query(opener, *, account, kind):
-    if kind not in ("clearinghouseState", "openOrders"):
-        raise ValueError("only two read-only info types supported")
+def _info_query(opener, *, account, kind, start_time_ms=None,
+                end_time_ms=None):
+    # A single pinned transport for exact allowlisted PUBLIC /info queries.
+    # Never accept an arbitrary request body, URL or HTTP method.
+    if kind in ("clearinghouseState", "openOrders"):
+        if start_time_ms is not None or end_time_ms is not None:
+            raise ValueError("unexpected time scope")
+        request_data = {"type": kind, "user": account, "dex": ""}
+    elif kind == "historicalOrders":
+        if start_time_ms is not None or end_time_ms is not None:
+            raise ValueError("unexpected historical order scope")
+        request_data = {"type": kind, "user": account}
+    elif kind == "userFillsByTime":
+        if (type(start_time_ms) is not int
+                or type(end_time_ms) is not int
+                or not 0 <= start_time_ms < end_time_ms <= 9007199254740991
+                or end_time_ms - start_time_ms > 86400000):
+            raise ValueError("invalid bounded fill time scope")
+        request_data = {
+            "type": kind, "user": account, "startTime": start_time_ms,
+            "endTime": end_time_ms, "aggregateByTime": False,
+        }
+    else:
+        raise ValueError("unsupported read-only info request")
     body = json.dumps(
-        {"type": kind, "user": account, "dex": ""},
-        sort_keys=True, separators=(",", ":"),
+        request_data, sort_keys=True, separators=(",", ":"),
     ).encode("ascii")
     req = urllib.request.Request(
         _URL, data=body, method="POST",
