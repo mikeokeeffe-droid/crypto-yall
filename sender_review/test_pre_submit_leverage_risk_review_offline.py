@@ -73,6 +73,26 @@ class OfflinePreSubmitRiskTests(unittest.TestCase):
                 self.assert_denies_authority(r)
                 self.assertFalse(r.synthetic_arithmetic_consistent)
 
+    def test_legacy_aggressive_minimum_order_inflation_exceeds_allocation(self):
+        # Existing aggressive_executor.py testnet branch raises a small
+        # proposed order to $12, but has no equivalent of Intraday's
+        # max_notional=capital*leverage guard before market_open.
+        # Preserve the old code untouched; new sender must reject the
+        # actual size after any minimum-notional adjustment.
+        inflated = json.loads(BODY)
+        inflated["rounded_size"] = "0.12"  # $12.00 at synthetic $100/coin
+        wire = json.dumps(inflated, sort_keys=True,
+                          separators=(",", ":")).encode("ascii")
+        for cap in ("3", "5", "11.99"):
+            with self.subTest(approved_cap=cap):
+                r = review(body=wire, market_price="100", max_notional=cap)
+                self.assert_denies_authority(r)
+                self.assertFalse(r.synthetic_arithmetic_consistent)
+                self.assertIn("exceeds fixture cap", r.reason)
+        r = review(body=wire, market_price="100", max_notional="12")
+        self.assertTrue(r.synthetic_arithmetic_consistent)
+        self.assert_denies_authority(r)  # Matching fixture is NEVER approval.
+
     def test_does_not_import_exchange_or_signer(self):
         import ast
         from pathlib import Path
