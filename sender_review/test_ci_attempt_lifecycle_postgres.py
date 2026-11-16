@@ -316,6 +316,44 @@ os._exit(0)
             "FROM sender_review_ci.simulated_unresolved_attempts"
         ), [("CRITICAL_HOLD_EVENT_MISSING", True)])
 
+    def test_unknown_held_without_start_is_visible_as_critical(self):
+        # Corrupt only disposable CI data to simulate a missing attempt
+        # start event after an unknown transition. This record must not
+        # disappear from the incident view or imply a safe retry.
+        self.seed()
+        with connect() as db:
+            db.execute(
+                "UPDATE sender_review_ci.review_intents "
+                "SET state='hold_unknown' WHERE coin='SOL'"
+            )
+        self.assertEqual(self.query(
+            "SELECT incident_state,incident_attention,"
+            "fence_still_held,simulated_started_at IS NULL "
+            "FROM sender_review_ci.simulated_unresolved_attempts"
+        ), [(
+            "UNKNOWN_HELD_MISSING_START",
+            "CRITICAL_START_EVENT_MISSING", True, True,
+        )])
+        self.assertFalse(self.start()[0])
+        self.assertFalse(self.hold()[0])
+        self.assertEqual(self.query(
+            "SELECT count(*) FROM sender_review_ci.simulated_attempt_events"
+        ), [(0,)])
+        self.assertEqual(self.query(
+            "SELECT active_nonce FROM sender_review_ci.scope_fences"
+        ), [("a" * 32,)])
+
+    def test_unstarted_review_only_intent_is_not_called_attempt(self):
+        self.seed()
+        self.assertEqual(self.query(
+            "SELECT count(*) FROM sender_review_ci.simulated_unresolved_attempts"
+        ), [(0,)])
+        self.assertTrue(self.start()[0])
+        self.assertEqual(self.query(
+            "SELECT incident_attention "
+            "FROM sender_review_ci.simulated_unresolved_attempts"
+        ), [("CRITICAL_OUTCOME_UNCONFIRMED",)])
+
     def test_untrusted_role_cannot_read_unresolved_attempt_view(self):
         # View access is denied even for a separate created read-only role.
         # No public observer endpoint or service authentication exists.
