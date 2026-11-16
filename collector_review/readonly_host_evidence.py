@@ -78,7 +78,10 @@ def _parse_unit_show(raw):
         if key not in _PROPERTIES or key in fields:
             return None
         fields[key] = value.strip()
-    if set(fields) != set(_PROPERTIES):
+    # Some systemd releases omit an unsupported property instead of
+    # emitting an empty value. Preserve observed properties individually;
+    # an omitted property remains UNKNOWN, not safe or empty.
+    if not fields:
         return None
     return fields
 
@@ -166,6 +169,9 @@ def collect_readonly_host_evidence(*, root=ROOT, runner=subprocess.run):
         "source_fingerprints": None,
         "effective_unit_sha256": None,
         "unit_fields_observed": False,
+        "unit_properties_missing": list(_PROPERTIES),
+        "unit_properties_redacted": [],
+        "unit_isolation_settings_candidate": False,
         "unit_restrictions_candidate": False,
         "unit_not_running_candidate": False,
         "effective_network_egress_verified": False,
@@ -190,19 +196,48 @@ def collect_readonly_host_evidence(*, root=ROOT, runner=subprocess.run):
          *("-p" + field for field in _PROPERTIES)), runner,
     )
     fields = _parse_unit_show(show)
-    packet["unit_fields_observed"] = fields is not None
     if fields is not None:
-        packet["unit_not_running_candidate"] = (
-            fields["LoadState"] == "loaded"
-            and fields["ActiveState"] == "inactive"
-            and fields["UnitFileState"] == "static"
-            and fields["SubState"] == "dead"
-            and fields["Result"] == "success"
-            and fields["ExecMainStatus"] == "0"
+        packet["unit_properties_missing"] = [
+            key for key in _PROPERTIES if key not in fields
+        ]
+        packet["unit_properties_redacted"] = [
+            key for key in _PROPERTIES if fields.get(key) == "[unprintable]"
+        ]
+        packet["unit_fields_observed"] = not packet["unit_properties_missing"]
+        # The inactive/stopped observation does not depend on credential
+        # fields or optional systemd properties. Still only a candidate.
+        packet["unit_not_running_candidate"] = all(
+            fields.get(key) == expected for key, expected in (
+                ("LoadState", "loaded"), ("ActiveState", "inactive"),
+                ("UnitFileState", "static"), ("SubState", "dead"),
+                ("Result", "success"), ("ExecMainStatus", "0"),
+            )
         )
+        # On some systemd versions 'any' is printed as explicit IPv4+IPv6
+        # ranges. Only accept the exact full-denial alternatives, never a
+        # subset or an unknown value.
+        full_ip_deny = fields.get("IPAddressDeny") in (
+            "any", "0.0.0.0/0 ::/0", "::/0 0.0.0.0/0",
+        )
+        packet["unit_isolation_settings_candidate"] = (
+            full_ip_deny and all(
+                fields.get(key) == expected
+                for key, expected in _REQUIRED.items()
+                if key not in ("IPAddressDeny", "LoadState", "UnitFileState",
+                               "ActiveState", "SubState", "Result",
+                               "ExecMainStatus")
+            )
+            and fields.get("IPAddressAllow") == ""
+        )
+        # Even with expected isolation flags, missing EnvironmentFiles or
+        # opaque [unprintable] credential fields must NEVER be treated as
+        # verified absence of secrets. Independent host review remains HOLD.
         packet["unit_restrictions_candidate"] = (
-            all(fields.get(k) == v for k, v in _REQUIRED.items())
-            and all(not fields.get(k) for k in _EMPTY)
+            packet["unit_fields_observed"]
+            and not packet["unit_properties_redacted"]
+            and packet["unit_not_running_candidate"]
+            and packet["unit_isolation_settings_candidate"]
+            and all(fields.get(key) == "" for key in _EMPTY)
         )
     unit_text = _run_observation(
         ("systemctl", "cat", UNIT, "--no-pager"), runner,
