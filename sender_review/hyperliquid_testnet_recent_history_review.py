@@ -101,31 +101,26 @@ def _fills(document, *, start_time_ms, end_time_ms):
     return fills, len(tids)
 
 
-def inspect_testnet_recent_history_review(
-    *, configured_public_account, start_time_ms, end_time_ms,
-    enabled_readonly_testnet_network=False,
+
+def inspect_recent_history_documents_offline(
+    *, historical_document, fills_document, start_time_ms, end_time_ms,
 ):
-    """Review only one bounded window. NEVER infer ownership or release HOLD."""
+    """Inspect parsed /info documents WITHOUT network or trading authority.
+
+    Shared by the bounded testnet reader and six-query integrated read-set.
+    This cannot prove that provider history contains all earlier activity.
+    """
     hold = RecentHistoryReview()
-    if (enabled_readonly_testnet_network is not True
-            or type(configured_public_account) is not str
-            or _ACCOUNT.fullmatch(configured_public_account) is None
-            or type(start_time_ms) is not int or type(end_time_ms) is not int
+    if (type(start_time_ms) is not int or type(end_time_ms) is not int
             or not 0 <= start_time_ms < end_time_ms <= 9007199254740991
             or end_time_ms - start_time_ms > 86400000):
         return hold
     try:
-        opener = urllib.request.build_opener(
-            urllib.request.ProxyHandler({}), _NoRedirect(),
-            urllib.request.HTTPSHandler(context=ssl.create_default_context()),
+        historical = _orders(historical_document)
+        fills, fill_count = _fills(
+            fills_document, start_time_ms=start_time_ms,
+            end_time_ms=end_time_ms,
         )
-        historical = _orders(_info_query(
-            opener, account=configured_public_account, kind="historicalOrders",
-        ))
-        fills, fill_count = _fills(_info_query(
-            opener, account=configured_public_account, kind="userFillsByTime",
-            start_time_ms=start_time_ms, end_time_ms=end_time_ms,
-        ), start_time_ms=start_time_ms, end_time_ms=end_time_ms)
         # The provider may cap/omit older records. Any unresolved order,
         # unmatched fill, overfill or partially observed filled order cannot
         # even be described as a coherent bounded order/fill sample.
@@ -162,6 +157,39 @@ def inspect_testnet_recent_history_review(
             recent_records_consistent=True,
             recent_order_count=len(historical),
             recent_fill_count=fill_count,
+        )
+    except (ValueError, TypeError, UnicodeError, OverflowError):
+        return hold
+
+def inspect_testnet_recent_history_review(
+    *, configured_public_account, start_time_ms, end_time_ms,
+    enabled_readonly_testnet_network=False,
+):
+    """Review only one bounded window. NEVER infer ownership or release HOLD."""
+    hold = RecentHistoryReview()
+    if (enabled_readonly_testnet_network is not True
+            or type(configured_public_account) is not str
+            or _ACCOUNT.fullmatch(configured_public_account) is None
+            or type(start_time_ms) is not int or type(end_time_ms) is not int
+            or not 0 <= start_time_ms < end_time_ms <= 9007199254740991
+            or end_time_ms - start_time_ms > 86400000):
+        return hold
+    try:
+        opener = urllib.request.build_opener(
+            urllib.request.ProxyHandler({}), _NoRedirect(),
+            urllib.request.HTTPSHandler(context=ssl.create_default_context()),
+        )
+        historical_document = _info_query(
+            opener, account=configured_public_account, kind="historicalOrders",
+        )
+        fills_document = _info_query(
+            opener, account=configured_public_account, kind="userFillsByTime",
+            start_time_ms=start_time_ms, end_time_ms=end_time_ms,
+        )
+        return inspect_recent_history_documents_offline(
+            historical_document=historical_document,
+            fills_document=fills_document,
+            start_time_ms=start_time_ms, end_time_ms=end_time_ms,
         )
     except (ValueError, TypeError, UnicodeError, OSError, OverflowError):
         return hold
