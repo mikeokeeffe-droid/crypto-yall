@@ -146,6 +146,104 @@ class InProcessAsgiJournalHandoffTests(unittest.TestCase):
                 self.assertGreaterEqual(response[0]["status"], 400)
                 self.assertEqual(self.count("review_intents"), 0)
 
+    def test_malformed_or_spoofed_asgi_responses_never_record(self):
+        # An unexpected response cannot be treated as a validation pass,
+        # even if it contains the former review-only HOLD text.
+        from sender_review import ci_only_asgi_journal_handoff as adapter
+        original=self.fixtures.body()
+        token=self.fixtures.token("daily")
+        headers=[
+            (b"content-type", b"application/json"),
+            (b"authorization", ("Bearer " + token).encode()),
+            (b"content-length", str(len(original)).encode()),
+        ]
+        scope={
+            "type":"http", "method":"POST",
+            "path":"/v1/review-only/entry-intents",
+            "raw_path":b"/v1/review-only/entry-intents",
+            "query_string":b"", "headers":headers,
+        }
+        hold=b'{"state":"HOLD","reason":"no authenticated sender deployed"}'
+        variations=(
+            [{"type":"http.response.body","body":hold},
+             {"type":"http.response.start","status":503}],
+            [{"type":"http.response.start","status":200},
+             {"type":"http.response.body","body":hold}],
+            [{"type":"http.response.start","status":503},
+             {"type":"http.response.body","body":hold,"more_body":True}],
+            [{"type":"http.response.start","status":503},
+             {"type":"http.response.body","body":hold},
+             {"type":"http.response.body","body":b"extra"}],
+        )
+        for outputs in variations:
+            with self.subTest(outputs=outputs):
+                async def fake_asgi(unused_scope, receive, send):
+                    message=await receive()
+                    self.assertEqual(message["body"], original)
+                    for output in outputs:
+                        await send(output)
+                async def run():
+                    responses=[]
+                    async def receive():
+                        return {"type":"http.request","body":original,
+                                "more_body":False}
+                    async def send(message):
+                        responses.append(message)
+                    result=await inspect_asgi_to_disposable_journal_offline(
+                        scope=scope, receive=receive, send=send,
+                        trusted_fixture_keys=self.keys,
+                        fixture_now_seconds=NOW,
+                        fixed_test_account=ACCOUNT,
+                        db_password=os.environ["PGPASSWORD"],
+                    )
+                    return result,responses
+                with patch.object(adapter,"review_only_asgi_app",fake_asgi):
+                    result,responses=asyncio.run(run())
+                self.assertFalse(result.journal_recorded)
+                self.assertEqual(responses[0]["status"],503)
+                self.assertEqual(json.loads(responses[1]["body"])["state"],"HOLD")
+                self.assertEqual(self.count("review_intents"),0)
+
+    def test_mutated_scope_after_validation_never_records(self):
+        # A caller could otherwise change headers while awaiting ASGI.
+        from sender_review import ci_only_asgi_journal_handoff as adapter
+        original=self.fixtures.body()
+        token=self.fixtures.token("daily")
+        scope={
+            "type":"http","method":"POST",
+            "path":"/v1/review-only/entry-intents",
+            "raw_path":b"/v1/review-only/entry-intents",
+            "query_string":b"",
+            "headers":[
+                (b"content-type", b"application/json"),
+                (b"authorization", ("Bearer " + token).encode()),
+                (b"content-length", str(len(original)).encode()),
+            ],
+        }
+        async def changing_asgi(incoming_scope, receive, send):
+            await receive()
+            incoming_scope["headers"][0]=(b"content-type",b"application/javascript")
+            hold=b'{"state":"HOLD","reason":"no authenticated sender deployed"}'
+            await send({"type":"http.response.start","status":503})
+            await send({"type":"http.response.body","body":hold})
+        async def run():
+            responses=[]
+            async def receive():
+                return {"type":"http.request","body":original,"more_body":False}
+            async def send(message):
+                responses.append(message)
+            result=await inspect_asgi_to_disposable_journal_offline(
+                scope=scope,receive=receive,send=send,
+                trusted_fixture_keys=self.keys,fixture_now_seconds=NOW,
+                fixed_test_account=ACCOUNT,db_password=os.environ["PGPASSWORD"],
+            )
+            return result,responses
+        with patch.object(adapter,"review_only_asgi_app",changing_asgi):
+            result,responses=asyncio.run(run())
+        self.assertFalse(result.journal_recorded)
+        self.assertEqual(responses[0]["status"],503)
+        self.assertEqual(self.count("review_intents"),0)
+
     def test_disabled_ci_marker_prevents_all_database_writes(self):
         with patch.dict(os.environ, {CI_MARKER: "0"}):
             result, response=self.request()
