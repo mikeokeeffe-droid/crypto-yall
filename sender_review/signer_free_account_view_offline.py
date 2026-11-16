@@ -79,14 +79,16 @@ def extract_signer_free_account_view_offline(*, user_state, spot_user_state=None
         return SignerFreeAccountView(reason="invalid account equity value")
 
     positions = {}
+    seen_coins = set()
     for raw in raw_positions:
         if type(raw) is not dict or type(raw.get("position")) is not dict:
             return SignerFreeAccountView(reason="invalid position record")
         pos = raw["position"]
         coin = pos.get("coin")
         if (type(coin) is not str or _COIN.fullmatch(coin) is None
-                or coin in positions):
+                or coin in seen_coins):
             return SignerFreeAccountView(reason="duplicate or invalid position coin")
+        seen_coins.add(coin)
         size = _finite_number(pos.get("szi"), allow_negative=True)
         if size is None or abs(size) > _MAX_ABSOLUTE_SIZE:
             return SignerFreeAccountView(reason="invalid signed position size")
