@@ -43,6 +43,8 @@ jobs:
         run: python -m unittest sender_review.test_asgi_review_only_ingress -v
       - name: Test strict offline remote signed identity and request envelope
         run: python -m unittest sender_review.test_remote_request_boundary_offline -v
+      - name: Exercise unchanged executor sizing against inert no-send capture and flag pyramid ambiguity
+        run: python -m unittest sender_review.test_legacy_order_capture_preview -v
       - name: Audit original three-bot signing and order paths (NO-GO)
         run: |
           python -m unittest sender_review.test_legacy_cutover_audit -v
