@@ -25,6 +25,8 @@ class LegacyProtectiveCloseCaptureOffline:
     fixture_position_ref: str
     fixture_observed_position_size: str
     fixture_exit_reason: str
+    # Parsed amount from the original explicit-size call; untrusted fixture.
+    captured_close_size: str | None = None
     proposed_body: bytes | None = field(default=None, repr=False)
     calls: list = field(default_factory=list, repr=False)
     position_ownership_verified: bool = False
@@ -68,6 +70,7 @@ class LegacyProtectiveCloseCaptureOffline:
         )
         if draft.state != "fixture_body_review_only_HOLD":
             raise ReviewOnlyMutationBlocked("untrusted close fixture rejected")
+        self.captured_close_size = close_size
         self.proposed_body = draft.fixture_body
         # Even a bounded and formatted fixture can never be a close ACK.
         raise ReviewOnlyMutationBlocked("NO_SEND_REVIEW_ONLY: close not executed")
