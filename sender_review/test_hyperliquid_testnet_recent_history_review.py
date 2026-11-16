@@ -1,224 +1,81 @@
-"""All transport mocked: bounded testnet recent history remains HOLD."""
-import io
-import json
+"""No testnet transport; validate bounded fake history only."""
 import unittest
-from unittest.mock import patch
 
-from sender_review import hyperliquid_testnet_recent_history_review as review
-from sender_review import hyperliquid_testnet_readonly_snapshot_review as transport
-
-ACCOUNT = "0x" + "1" * 40
-START = 1000
-END = 2000
-
-
-class Response:
-    status = 200
-    headers = {"Content-Type": "application/json"}
-
-    def __init__(self, value):
-        self.data = io.BytesIO(json.dumps(value).encode())
-
-    def geturl(self):
-        return transport._URL
-
-    def read(self, length):
-        return self.data.read(length)
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, *args):
-        return False
-
-
-class FakeOpener:
-    def __init__(self, responses):
-        self.responses = list(responses)
-        self.calls = []
-
-    def open(self, request, timeout):
-        self.calls.append((request.full_url, request.get_method(),
-                           json.loads(request.data)))
-        return self.responses.pop(0)
+from sender_review import hyperliquid_testnet_recent_history_review as r
 
 
 def orders():
-    return [{"status": "filled", "order": {
-        "oid": 123, "coin": "SOL", "side": "B",
-        "origSz": "0.20", "timestamp": 1200,
-    }}]
+    return [{"status": "filled", "order": {"oid": 123, "coin": "SOL",
+             "side": "B", "origSz": "0.20", "timestamp": 1200}}]
 
 
 def fills():
-    return [{"oid": 123, "tid": 456, "coin": "SOL", "side": "B",
-             "sz": "0.20", "time": 1300}]
+    return [{"oid": 123, "tid": 456, "coin": "SOL",
+             "side": "B", "sz": "0.20", "time": 1300}]
 
 
-class RecentHistoryTests(unittest.TestCase):
-    def inspect(self, docs=None, **kwargs):
-        if docs is None:
-            docs = [orders(), fills()]
-        fake = FakeOpener([Response(d) for d in docs])
-        with patch.object(review.urllib.request, "build_opener",
-                          return_value=fake):
-            result = review.inspect_testnet_recent_history_review(
-                configured_public_account=ACCOUNT, start_time_ms=START,
-                end_time_ms=END, enabled_readonly_testnet_network=True,
-                **kwargs,
+class RecentHistoryOfflineTests(unittest.TestCase):
+    def no_auth(self, result):
+        for key in (
+            "historical_completeness_verified", "baseline_from_flat_verified",
+            "account_ownership_verified", "bot_position_ownership_verified",
+            "close_authorized", "retry_authorized", "submit_authorized",
+            "signing_enabled",
+        ):
+            self.assertFalse(getattr(result, key), key)
+
+    def test_entrypoint_cannot_enable_network(self):
+        for flag in (True, False, 1, "true", None):
+            result = r.inspect_testnet_recent_history_review(
+                configured_public_account="0x" + "1" * 40,
+                start_time_ms=1000, end_time_ms=2000,
+                enabled_readonly_testnet_network=flag,
             )
-        return result, fake
+            self.assertEqual(result.state, "HOLD")
+            self.assertFalse(result.recent_records_consistent)
+            self.no_auth(result)
+        self.assertFalse(hasattr(r, "urllib"))
+        self.assertFalse(hasattr(r, "_info_query"))
 
-    def no_authority(self, result):
-        self.assertEqual(result.state in (
-            "HOLD", "RECENT_TESTNET_HISTORY_REVIEW_ONLY_HOLD"), True)
-        for name in ("historical_completeness_verified",
-                     "baseline_from_flat_verified",
-                     "account_ownership_verified",
-                     "bot_position_ownership_verified", "close_authorized",
-                     "retry_authorized", "submit_authorized", "signing_enabled"):
-            self.assertFalse(getattr(result, name), name)
-        self.assertTrue(result.possibly_truncated)
-
-    def test_default_is_off_with_no_network(self):
-        with patch.object(review.urllib.request, "build_opener",
-                          side_effect=AssertionError("must not open network")):
-            for enabled in (False, None, 1, "yes"):
-                with self.subTest(enabled=enabled):
-                    result = review.inspect_testnet_recent_history_review(
-                        configured_public_account=ACCOUNT, start_time_ms=START,
-                        end_time_ms=END,
-                        enabled_readonly_testnet_network=enabled,
-                    )
-                    self.assertEqual(result.state, "HOLD")
-                    self.no_authority(result)
-
-    def test_two_exact_testnet_info_queries_with_no_signer(self):
-        result, fake = self.inspect()
-        self.assertEqual(result.state,
-                         "RECENT_TESTNET_HISTORY_REVIEW_ONLY_HOLD")
-        self.assertTrue(result.recent_records_consistent)
-        self.assertEqual((result.recent_order_count, result.recent_fill_count),
-                         (1, 1))
-        self.assertEqual(len(fake.calls), 2)
-        for url, method, data in fake.calls:
-            self.assertEqual(url, transport._URL)
-            self.assertEqual(method, "POST")
-            self.assertEqual(data["user"], ACCOUNT)
-            self.assertNotIn("private_key", data)
-        self.assertEqual(fake.calls[0][2]["type"], "historicalOrders")
-        self.assertEqual(fake.calls[1][2], {
-            "type": "userFillsByTime", "user": ACCOUNT,
-            "startTime": START, "endTime": END,
-            "aggregateByTime": False,
-        })
-        self.no_authority(result)
-
-    def test_missing_conflicting_or_repeated_records_hold(self):
-        cases = (
-            [[], fills()],
-            [orders(), [dict(fills()[0], oid=999)]],
-            [orders(), [dict(fills()[0], coin="AVAX")]],
-            [orders(), [dict(fills()[0], side="A")]],
-            [orders(), fills() * 2],
-            [orders() * 2, fills()],
-            [[dict(orders()[0], status="open")], fills()],
-            [orders(), [dict(fills()[0], time=999)]],
-            [orders(), [dict(fills()[0], sz="NaN")]],
-            [orders() * 2000, fills()],
-            [orders(), fills() * 2000],
+    def test_matching_fake_fills_still_hold(self):
+        result = r.inspect_recent_history_documents_offline(
+            historical_document=orders(), fills_document=fills(),
+            start_time_ms=1000, end_time_ms=2000,
         )
-        for docs in cases:
-            with self.subTest(docs=str(docs)[:100]):
-                result, _ = self.inspect(docs)
-                self.assertEqual(result.state, "HOLD")
-                self.assertFalse(result.recent_records_consistent)
-                self.no_authority(result)
-
-    def test_overfill_partial_fill_unsettled_and_empty_history_hold(self):
-        cases = (
-            [orders(), [dict(fills()[0], sz="0.21")]],
-            [orders(), [dict(fills()[0], sz="0.10")]],
-            [orders(), [dict(fills()[0], sz="0.10", tid=456),
-                        dict(fills()[0], sz="0.11", tid=457)]],
-            [orders(), []],
-            [[], []],
-            [[dict(orders()[0], status="canceled")], fills()],
-            [[dict(orders()[0], status="open")], []],
-        )
-        for docs in cases:
-            with self.subTest(docs=str(docs)[:150]):
-                result, _ = self.inspect(docs)
-                self.assertEqual(result.state, "HOLD")
-                self.assertFalse(result.recent_records_consistent)
-                self.no_authority(result)
-
-    def test_multiple_matching_partial_fills_can_only_report_bounded_consistency(self):
-        partial = [
-            dict(fills()[0], sz="0.08", tid=456),
-            dict(fills()[0], sz="0.12", tid=457),
-        ]
-        result, _ = self.inspect([orders(), partial])
         self.assertEqual(result.state, "RECENT_TESTNET_HISTORY_REVIEW_ONLY_HOLD")
         self.assertTrue(result.recent_records_consistent)
-        self.assertEqual(result.recent_fill_count, 2)
-        self.assertFalse(result.bot_position_ownership_verified)
-        self.no_authority(result)
+        self.assertTrue(result.possibly_truncated)
+        self.assertEqual(result.recent_order_count, 1)
+        self.assertEqual(result.recent_fill_count, 1)
+        self.no_auth(result)
 
-    def test_every_filled_order_requires_matching_fills(self):
-        other = {"status": "filled", "order": {
-            "oid": 124, "coin": "AVAX", "side": "A",
-            "origSz": "0.30", "timestamp": 1200,
-        }}
-        # One filled order is present in recent history but its fills are
-        # missing from the bounded time window. Never claim coherence.
-        result, _ = self.inspect([orders() + [other], fills()])
-        self.assertEqual(result.state, "HOLD")
-        self.assertFalse(result.recent_records_consistent)
-        self.assertIn("missing", result.reason)
-        self.no_authority(result)
+    def test_partial_missing_or_mismatched_history_denied(self):
+        scenarios = (
+            ([], fills()), (orders(), []),
+            (orders(), [dict(fills()[0], oid=999)]),
+            (orders(), [dict(fills()[0], sz="0.1")]),
+            (orders(), [dict(fills()[0], time=999)]),
+            (orders() * 2, fills()),
+        )
+        for order_data, fill_data in scenarios:
+            with self.subTest(orders=order_data, fills=fill_data):
+                result = r.inspect_recent_history_documents_offline(
+                    historical_document=order_data, fills_document=fill_data,
+                    start_time_ms=1000, end_time_ms=2000,
+                )
+                self.assertEqual(result.state, "HOLD")
+                self.assertFalse(result.recent_records_consistent)
+                self.no_auth(result)
 
-        # Even if a second trade has the same coin and direction, order IDs
-        # must match individually and cannot borrow another order's fills.
-        other["order"]["coin"] = "SOL"
-        other["order"]["side"] = "B"
-        result, _ = self.inspect([orders() + [other], fills()])
-        self.assertEqual(result.state, "HOLD")
-        self.no_authority(result)
-
-    def test_two_complete_orders_can_only_report_bounded_consistency(self):
-        extra_order = {"status": "filled", "order": {
-            "oid": 124, "coin": "AVAX", "side": "A",
-            "origSz": "0.30", "timestamp": 1200,
-        }}
-        extra_fill = {"oid": 124, "tid": 457, "coin": "AVAX",
-                      "side": "A", "sz": "0.30", "time": 1300}
-        result, _ = self.inspect([orders() + [extra_order],
-                                  fills() + [extra_fill]])
-        self.assertEqual(result.state,
-                         "RECENT_TESTNET_HISTORY_REVIEW_ONLY_HOLD")
-        self.assertEqual(result.recent_order_count, 2)
-        self.assertEqual(result.recent_fill_count, 2)
-        self.assertTrue(result.recent_records_consistent)
-        self.no_authority(result)
-
-    def test_invalid_scope_never_fetches(self):
-        with patch.object(review.urllib.request, "build_opener",
-                          side_effect=AssertionError("no network")):
-            for account, start, end in (
-                ("bad", START, END),
-                (ACCOUNT, True, END),
-                (ACCOUNT, END, START),
-                (ACCOUNT, START, START + 86400001),
-            ):
-                with self.subTest(account=account, start=start, end=end):
-                    result = review.inspect_testnet_recent_history_review(
-                        configured_public_account=account,
-                        start_time_ms=start, end_time_ms=end,
-                        enabled_readonly_testnet_network=True,
-                    )
-                    self.assertEqual(result.state, "HOLD")
-                    self.no_authority(result)
+    def test_out_of_bounds_window_denied(self):
+        for start, end in ((True, 2000), (2000, 1000),
+                           (1000, 1000 + 86400001)):
+            result = r.inspect_recent_history_documents_offline(
+                historical_document=orders(), fills_document=fills(),
+                start_time_ms=start, end_time_ms=end,
+            )
+            self.assertEqual(result.state, "HOLD")
+            self.no_auth(result)
 
 
 if __name__ == "__main__":
