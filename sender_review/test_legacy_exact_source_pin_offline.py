@@ -19,11 +19,11 @@ class LegacyExactSourcePinTests(unittest.TestCase):
         ):
             self.assertIs(getattr(reviewed, key), False, key)
 
-    def test_all_eight_original_sources_match_commit_baseline_only(self):
+    def test_all_thirteen_original_sources_match_commit_baseline_only(self):
         outcome = inspect_legacy_source_bytes_offline()
         self.assert_never_authorized(outcome)
         self.assertTrue(outcome.exact_bytes_match, outcome.changed_or_missing_paths)
-        self.assertEqual(len(outcome.matched_paths), 8)
+        self.assertEqual(len(outcome.matched_paths), 13)
         self.assertEqual(outcome.changed_or_missing_paths, ())
         self.assertEqual(set(outcome.matched_paths), set(EXPECTED_GIT_BLOBS))
 
