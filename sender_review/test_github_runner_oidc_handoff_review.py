@@ -26,7 +26,7 @@ class GithubRunnerOidcHandoffTests(unittest.TestCase):
                         "submit_authorized", "close_authorized", "signing_enabled",
                     ):
                         self.assertFalse(getattr(result, field), field)
-        self.assertFalse(hasattr(r, "urllib"))
+        self.assertFalse(hasattr(r, "_NoRedirect"))
 
     def test_offline_url_pinning_is_not_network_permission(self):
         result = r._token_endpoint_url(self.URL)
