@@ -120,6 +120,44 @@ BEGIN
 END
 $$;
 
+-- Recovery visibility for an independent CI test observer. A crashed
+-- worker need not reconnect for a different *read-only* session to see
+-- started-but-not-held and unknown-held incidents. This view grants no
+-- ability to reconcile an actual exchange outcome, retry or clear fences.
+-- SECURITY INVOKER also prevents the view-owner privilege from becoming
+-- an accidental escape hatch if a role gains SELECT on this view later.
+CREATE OR REPLACE VIEW sender_review_ci.simulated_unresolved_attempts
+WITH (security_invoker=true) AS
+SELECT
+    i.id AS intent_id,
+    i.account,
+    i.coin,
+    i.bot,
+    i.request_nonce,
+    i.fence,
+    i.state AS journal_state,
+    a.created_at AS simulated_started_at,
+    CASE
+        WHEN i.state = 'hold_unknown' AND EXISTS (
+            SELECT 1 FROM sender_review_ci.simulated_attempt_events AS e
+             WHERE e.intent_id=i.id
+               AND e.kind='simulated_unknown_held'
+        ) THEN 'UNKNOWN_HELD'
+        ELSE 'STARTED_OUTCOME_UNCONFIRMED'
+    END::text AS incident_state,
+    (s.active_nonce=i.request_nonce AND s.fence=i.fence)
+        AS fence_still_held
+FROM sender_review_ci.review_intents AS i
+JOIN sender_review_ci.simulated_attempt_events AS a
+  ON a.intent_id=i.id AND a.kind='simulated_attempt_started'
+LEFT JOIN sender_review_ci.scope_fences AS s
+  ON s.environment=i.environment AND s.account=i.account
+ AND s.dex=i.dex AND s.coin=i.coin
+WHERE i.environment='testnet'
+  AND i.state IN ('review_only','hold_unknown');
+
+REVOKE ALL ON sender_review_ci.simulated_unresolved_attempts FROM PUBLIC;
+
 -- CI harness owner only. No TEST role, PUBLIC user or live bot may call
 -- these functions or read/write attempt events. These statements do not
 -- attest to production database privileges.
