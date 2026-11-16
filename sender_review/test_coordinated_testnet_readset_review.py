@@ -42,6 +42,7 @@ class CoordinatedReadsetReviewTests(unittest.TestCase):
         self.assertEqual(result.observed_position_count, 1)
         self.assertEqual(result.reviewed_order_count, 1)
         self.assertEqual(result.reviewed_fill_count, 1)
+        self.assertTrue(result.bounded_fill_net_matches_positions)
         self.assertEqual(len(result.observed_positions_sha256), 64)
         self.assert_never_authorized(result)
 
@@ -81,6 +82,55 @@ class CoordinatedReadsetReviewTests(unittest.TestCase):
                 self.assertEqual(result.state, "HOLD")
                 self.assertFalse(result.locally_consistent)
                 self.assert_never_authorized(result)
+
+    def test_signed_fill_net_must_match_observed_position(self):
+        changes = (
+            {"positions_before": {"assetPositions": [
+                {"position": {"coin": "SOL", "szi": "-0.20"}}]},
+             "positions_after": {"assetPositions": [
+                {"position": {"coin": "SOL", "szi": "-0.20"}}]}},
+            {"positions_before": {"assetPositions": [
+                {"position": {"coin": "SOL", "szi": "0.10"}}]},
+             "positions_after": {"assetPositions": [
+                {"position": {"coin": "SOL", "szi": "0.10"}}]}},
+            {"positions_before": {"assetPositions": [
+                {"position": {"coin": "AVAX", "szi": "0.20"}}]},
+             "positions_after": {"assetPositions": [
+                {"position": {"coin": "AVAX", "szi": "0.20"}}]}},
+            {"positions_before": {"assetPositions": []},
+             "positions_after": {"assetPositions": []}},
+        )
+        for change in changes:
+            with self.subTest(change=change):
+                args = sample()
+                args.update(change)
+                result = inspect_coordinated_readset_offline(**args)
+                self.assertEqual(result.state, "HOLD")
+                self.assertFalse(result.locally_consistent)
+                self.assertFalse(result.bounded_fill_net_matches_positions)
+                self.assert_never_authorized(result)
+
+    def test_matching_short_fill_net_still_cannot_claim_ownership(self):
+        args = sample()
+        args["positions_before"] = {"assetPositions": [
+            {"position": {"coin": "SOL", "szi": "-0.20"}},
+        ]}
+        args["positions_after"] = args["positions_before"]
+        args["historical_orders"] = [{
+            "status": "filled", "order": {
+                "oid": 123, "coin": "SOL", "side": "A",
+                "origSz": "0.20", "timestamp": 1200,
+            },
+        }]
+        args["user_fills"] = [{
+            "oid": 123, "tid": 456, "coin": "SOL",
+            "side": "A", "sz": "0.20", "time": 1300,
+        }]
+        result = inspect_coordinated_readset_offline(**args)
+        self.assertTrue(result.locally_consistent)
+        self.assertTrue(result.bounded_fill_net_matches_positions)
+        self.assertEqual(result.state, "COHERENT_SIX_FRAME_FIXTURE_HOLD")
+        self.assert_never_authorized(result)
 
     def test_malformed_input_cannot_claim_coherence(self):
         for field, value in (
