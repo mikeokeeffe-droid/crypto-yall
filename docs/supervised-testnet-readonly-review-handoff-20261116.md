@@ -27,9 +27,14 @@ separate drafts; do not merge/activate a bot, collector, or signer.
 - The existing offline collector is intentionally isolated with
   `PrivateNetwork=yes`, `RestrictAddressFamilies=AF_UNIX`,
   `IPAddressDeny=any` and a fail-closed HTTP helper. **Leave it unchanged.**
-- PR #42 at `0d4de69e01ba5e10d770f7abec897c0e0ef86b06` has a
-  review-only six-query implementation with optional transport. It is **not
-  installed as an approved collector**; passing CI is not deployment approval.
+- PR #42 originally prototyped a six-query optional transport at
+  `0d4de69e01ba5e10d770f7abec897c0e0ef86b06`. That was too easy to
+  activate via an unapproved Boolean input. A later draft change removes the
+  reachable network implementation completely. The exported compatibility
+  entrypoint now always returns HOLD, including with the Boolean set to
+  true. The six-frame **offline** reconciliation parser remains available.
+  A real network transport is **not installed or approved** and requires a
+  separate reviewed code change after independent host sign-off.
 
 ## Independent review packet — evidence to obtain without changing the host
 
