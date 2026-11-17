@@ -140,10 +140,59 @@ LEFT JOIN sender_review_ci.scope_fences AS s
   ON s.environment=h.environment AND s.account=h.account
  AND s.dex=h.dex AND s.coin=h.coin;
 
+-- Independent READ-ONLY recovery audit for a possible interrupted
+-- synthetic handoff. Covers every signed TEST-fixture entry journal record,
+-- including those not intended for this demo handoff: a missing protection
+-- row means ONLY that the second stage has not been evidenced, NOT that a
+-- real trade occurred or any real position is unprotected.
+--
+-- Important: the review-only entry journal can commit BEFORE the separate
+-- fake protection HOLD. A crash/outage between them leaves a fenced intent
+-- but no protection row; relying on simulated_protection_hold_review alone
+-- would hide the missing record entirely. This view makes that condition
+-- independently visible without mutation, retries, release or sends.
+CREATE OR REPLACE VIEW sender_review_ci.simulated_protection_handoff_audit
+WITH (security_invoker=true) AS
+SELECT i.id AS source_intent_id, i.environment, i.account, i.dex, i.coin,
+       i.bot, i.side, i.request_nonce, i.fence,
+       i.state AS journal_state, i.created_at AS journal_recorded_at,
+       (h.source_intent_id IS NOT NULL) AS protection_hold_recorded,
+       COALESCE(
+           s.fence = i.fence AND s.active_nonce = i.request_nonce,
+           false
+       ) AS fence_still_held,
+       CASE
+           WHEN s.fence IS DISTINCT FROM i.fence
+               OR s.active_nonce IS DISTINCT FROM i.request_nonce
+             THEN 'CRITICAL_FENCE_MISSING_OR_CHANGED'
+           WHEN h.source_intent_id IS NULL
+             THEN 'CRITICAL_SIGNED_FIXTURE_WITHOUT_PROTECTION_HOLD'
+           WHEN h.source_intent_id IS DISTINCT FROM i.id
+               OR h.bot IS DISTINCT FROM i.bot
+               OR h.side IS DISTINCT FROM i.side
+               OR h.request_nonce IS DISTINCT FROM i.request_nonce
+               OR h.fence IS DISTINCT FROM i.fence
+             THEN 'CRITICAL_PROTECTION_HOLD_BINDING_MISMATCH'
+           ELSE 'PERSISTED_FIXTURE_HOLD_NO_REAL_PROTECTION'
+       END::text AS review_state
+FROM sender_review_ci.review_intents AS i
+JOIN sender_review_ci.fixture_request_evidence AS e
+  ON e.intent_id=i.id AND e.environment=i.environment
+ AND e.account=i.account AND e.request_nonce=i.request_nonce
+ AND e.bot=i.bot
+LEFT JOIN sender_review_ci.scope_fences AS s
+  ON s.environment=i.environment AND s.account=i.account
+ AND s.dex=i.dex AND s.coin=i.coin
+LEFT JOIN sender_review_ci.simulated_protection_reentry_holds AS h
+  ON h.environment=i.environment AND h.account=i.account
+ AND h.dex=i.dex AND h.coin=i.coin
+WHERE i.environment='testnet';
+
 -- In CI the schema owner is the test harness. The arbitrary untrusted role
 -- and the NOLOGIN restricted role have NO direct table/function/view access.
 REVOKE ALL ON sender_review_ci.simulated_protection_reentry_holds FROM PUBLIC;
 REVOKE ALL ON sender_review_ci.simulated_protection_hold_review FROM PUBLIC;
+REVOKE ALL ON sender_review_ci.simulated_protection_handoff_audit FROM PUBLIC;
 REVOKE EXECUTE ON FUNCTION
     sender_review_ci.record_ci_protection_reentry_hold(
         text,text,text,text,text,bigint,text
