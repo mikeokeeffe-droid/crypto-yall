@@ -48,6 +48,8 @@ jobs:
         run: python -m unittest sender_review.test_github_oidc_public_keys_transport_review -v
       - name: Test isolated fixed-origin OIDC public-key transport candidate without network access
         run: python -m unittest sender_review.test_github_oidc_fixed_origin_transport_candidate -v
+      - name: Verify OIDC fixture identity bound to exact synthetic body remains non-authorizing
+        run: python -m unittest sender_review.test_candidate_identity_body_binding_offline -v
       - name: Verify disabled runner OIDC token handoff using HTTP mocks
         run: python -m unittest sender_review.test_github_runner_oidc_handoff_review -v
       - name: Exercise existing three-bot entry handoff through offline HTTP identity review
