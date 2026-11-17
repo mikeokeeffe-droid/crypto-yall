@@ -102,7 +102,14 @@ async def review_only_asgi_app(scope, receive, send):
     body = bytearray()
     # Bound message count as well as bytes; never consume an infinite stream.
     for _ in range(32):
-        message = await receive()
+        try:
+            message = await receive()
+        except Exception:
+            # Malformed/disconnected stream adapters may raise unexpectedly.
+            # Never leak exception details, JWTs, raw bodies or stack traces.
+            # A remote client cannot turn a stream failure into a 202/GO.
+            await _reply(send, 503, "request stream unavailable")
+            return
         if type(message) is not dict:
             await _reply(send, 400, "invalid request stream")
             return
