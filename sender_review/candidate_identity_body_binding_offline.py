@@ -12,6 +12,7 @@ fixture JTI. The result is irrevocably HOLD, even for matching inputs.
 """
 from dataclasses import dataclass, replace
 import hashlib
+import json
 
 from sender_review.github_oidc_fixed_origin_transport_candidate import (
     FixedOriginPublicKeysCandidate,
@@ -112,7 +113,7 @@ def inspect_candidate_identity_body_binding_offline(
             body_sha256=hashlib.sha256(request_body).hexdigest(),
             token_sha256=hashlib.sha256(token.encode("ascii")).hexdigest(),
             request_nonce_sha256=hashlib.sha256(
-                contract.request_nonce.encode("ascii")
+                json.loads(request_body)["request_nonce"].encode("ascii")
             ).hexdigest(),
             candidate_keyset_sha256=candidate_keys.keyset_sha256,
             fake_identity_and_exact_body_reviewed=True,
