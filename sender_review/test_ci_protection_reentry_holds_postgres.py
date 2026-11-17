@@ -91,7 +91,7 @@ class ProtectionHoldPostgresTests(unittest.TestCase):
             dict(bot="aggressive"), dict(coin="AVAX"),
             dict(side="short"), dict(nonce="b"*32),
             dict(fence=2), dict(account="0x"+"2"*40),
-            dict(outcome="filled"), dict(fence=True),
+            dict(outcome="filled"), dict(fence=0),
         ):
             with self.subTest(changes=changes):
                 self.assertFalse(self.record(**changes)[0])
