@@ -47,7 +47,7 @@ class PostgreSQL18ProvisioningIntegrationTests(unittest.TestCase):
             if ready.returncode == 0:
                 cls.docker(
                     "exec", "--user", "0", cls.container,
-                    "chmod", "0770", "/var/run/postgresql",
+                    "chmod", "00770", "/var/run/postgresql",
                 )
                 return
             time.sleep(1)
