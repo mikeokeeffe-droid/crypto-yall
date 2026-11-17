@@ -111,6 +111,8 @@ def _read_fixed_public_https(path, max_bytes):
         if selected.get("transfer-encoding", "chunked") != "chunked":
             raise ValueError("unsupported response framing")
         length = selected.get("content-length")
+        if length is not None and "transfer-encoding" in selected:
+            raise ValueError("conflicting response framing")
         if length is not None:
             if (not length.isascii() or not length.isdecimal()
                     or len(length) > 10 or int(length) > max_bytes
