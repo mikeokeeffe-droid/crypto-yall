@@ -21,6 +21,7 @@ class PostgreSQL18ProvisioningIntegrationTests(unittest.TestCase):
             "--network", "none",
             "--env", "POSTGRES_HOST_AUTH_METHOD=trust",
             "--env", "POSTGRES_DB=sender_review_test",
+            "--env", "PGHOST=/tmp/pgsocket",
             "--mount", f"type=bind,src={ROOT},dst=/workspace,readonly",
             "--tmpfs", "/tmp/pgsocket:rw,mode=0770,uid=999,gid=999",
             "postgres:18",
