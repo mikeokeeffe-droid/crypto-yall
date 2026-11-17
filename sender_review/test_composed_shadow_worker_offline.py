@@ -23,12 +23,13 @@ def account(*rows, equity="100"):
 
 
 NOW = 1700000000
+_UNSET = object()
 
 
-def shadow(*, bot="intraday", positions=None, signals=None, **changes):
+def shadow(*, bot="intraday", positions=_UNSET, signals=None, **changes):
     args = dict(
         bot=bot,
-        user_state=account() if positions is None else positions,
+        user_state=account() if positions is _UNSET else positions,
         signals={} if signals is None else signals,
         max_positions=2, locks=(), synthetic_now_epoch=NOW,
     )
