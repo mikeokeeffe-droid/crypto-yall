@@ -3,6 +3,8 @@
 import grp
 import os
 from pathlib import Path
+import subprocess
+import sys
 import tempfile
 import unittest
 
@@ -52,6 +54,7 @@ class ProvisioningPackageTests(unittest.TestCase):
             "server_version_num",
             "current_setting('listen_addresses') <> ''",
             "current_setting('unix_socket_permissions') <> '0770'",
+            "current_setting('unix_socket_group') = ''",
             "session_user <> 'postgres'",
             "\\ir ../ci_only_journal.sql",
             "\\ir ../ci_only_restricted_role.sql",
@@ -72,6 +75,27 @@ class ProvisioningPackageTests(unittest.TestCase):
         self.assertNotIn("market_open(", sql)
         self.assertNotIn("market_close(", sql)
 
+    def test_explicit_permission_test_opt_in_cannot_silently_skip(self):
+        env = os.environ.copy()
+        env["SENDER_REVIEW_PG18_OFFLINE"] = "1"
+        env.pop("PGDATABASE", None)
+        env.pop("PGHOST", None)
+        env.pop("PGPORT", None)
+        env.pop("SENDER_REVIEW_PG18_SOCKET_GROUP", None)
+        result = subprocess.run(
+            [
+                sys.executable,
+                "-c",
+                "import sender_review.postgresql18_offline.test_permissions",
+            ],
+            capture_output=True,
+            text=True,
+            env=env,
+            check=False,
+        )
+        self.assertNotEqual(result.returncode, 0)
+        self.assertNotIn("skipped", (result.stdout + result.stderr).lower())
+
     def test_docs_include_disabled_scope_and_rollback(self):
         docs = (
             ROOT / "docs" /
@@ -83,7 +107,7 @@ class ProvisioningPackageTests(unittest.TestCase):
             "0770",
             "NOLOGIN",
             "rollback",
-            "RESTRICT",
+            "DROP SCHEMA sender_review_ci CASCADE",
             "DRAFT",
         ):
             with self.subTest(marker=marker):

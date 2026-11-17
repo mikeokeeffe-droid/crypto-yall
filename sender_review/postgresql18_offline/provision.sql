@@ -17,8 +17,9 @@ BEGIN
         RAISE EXCEPTION 'TCP listening must remain disabled';
     END IF;
     IF current_setting('unix_socket_permissions') <> '0770'
+       OR current_setting('unix_socket_group') = ''
        OR current_setting('unix_socket_directories') = '' THEN
-        RAISE EXCEPTION 'restricted Unix socket configuration required';
+        RAISE EXCEPTION 'restricted Unix socket mode, group, and directory required';
     END IF;
     IF session_user <> 'postgres'
        OR NOT (SELECT rolsuper FROM pg_catalog.pg_roles

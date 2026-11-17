@@ -25,16 +25,23 @@ existing `testnet-collector-offline-review.service` unchanged.
   any service, Unix account, or human login. It must not be exposed as an
   endpoint.
 - `socket_policy.py` is a read-only check for the socket directory's exact
-  `0770` mode and expected group. It does not configure PostgreSQL or alter
-  host state.
+  `0770` mode and the explicitly verified host group. PostgreSQL's
+  `unix_socket_permissions=0770` controls the socket file; it does not set the
+  containing directory's mode or owner. The package does not change either.
 - `test_permissions.py` is an explicit-opt-in, read-only PostgreSQL 18 socket
   check. It requires a local superuser connection and verifies the effective
   socket settings, no-login/no-grant bot roles, denied operations, and the
   restricted fixture role. It does not run migrations or insert journal rows.
-- Existing disposable CI tests remain the concurrency evidence for three-bot
-  shared-fence isolation and the current restricted-role privilege boundary.
-  Those tests run against a transient PostgreSQL 16 service; they are not
-  evidence of this host's PostgreSQL 18 configuration.
+- `test_provisioning_integration.py` executes the exact guarded provisioning
+  SQL in an isolated PostgreSQL 18 container with networking disabled. It
+  verifies transactional rollback, role attributes/grants/memberships,
+  ownership, direct-denial behavior, cross-bot isolation, and the fixture
+  socket's `0770` mode/group. This is CI fixture evidence only, not evidence
+  about the dedicated host.
+- Existing disposable PostgreSQL 16 CI tests remain the concurrency evidence
+  for three-bot shared-fence isolation and the current restricted-role
+  privilege boundary. They are not evidence of this host's PostgreSQL 18
+  configuration.
 
 ## Host-side evidence required before any later approval
 
@@ -45,14 +52,19 @@ capabilities, mounts, and sockets; and absence of trading keys and write-capable
 credentials. Do not paste secret-bearing environment values or unredacted logs
 into GitHub.
 
-Independently verify that `listen_addresses` is empty, the socket group is
-dedicated to approved local reviewers, no unintended users belong to that
-group, and the socket directory mode is exactly `0770`. Run the read-only
-socket check only after that group has been independently confirmed:
+Independently verify that `listen_addresses` is empty, the configured
+`unix_socket_group` and the socket directory's actual group are the approved
+dedicated local reviewer group, no unintended users belong to that group, and
+the socket directory mode is exactly `0770`. The stated host configuration
+only confirms the PostgreSQL socket-file mode; it does not establish directory
+ownership. Do not change group ownership or PostgreSQL settings to make the
+check pass. Stop if the existing group configuration cannot be verified. Run
+the read-only socket check only after the actual group name and socket directory
+have been independently confirmed:
 
 ```sh
 python -m sender_review.postgresql18_offline.socket_policy \
-  --socket-dir /var/run/postgresql --group sender_review_offline
+  --socket-dir /var/run/postgresql --group "$VERIFIED_SOCKET_GROUP"
 ```
 
 The proposed provisioning SQL makes no changes to `postgresql.conf`,
@@ -99,11 +111,13 @@ and no service or other object depends on the review schema:
 
 1. Keep all services stopped and keep TCP disabled. Do not delete journal
    evidence as a way to resolve an unknown outcome.
-2. In `sender_review_test`, drop only the review schema with `RESTRICT`; stop if
-   PostgreSQL reports any dependency:
+2. If any journal or fixture evidence is needed, retain the database unchanged
+   and isolate it; do not use rollback to erase uncertain outcomes. Only after
+   confirming that all evidence may be discarded, drop the package-owned schema
+   and its populated objects with `CASCADE`:
 
    ```sql
-   DROP SCHEMA sender_review_ci RESTRICT;
+   DROP SCHEMA sender_review_ci CASCADE;
    ```
 
 3. Revoke any grants that an operator added outside this package, then drop

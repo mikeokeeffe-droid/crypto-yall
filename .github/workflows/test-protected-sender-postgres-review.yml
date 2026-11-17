@@ -80,3 +80,14 @@ jobs:
               assert marker not in text, marker
           print("CI journal is review-only with no exchange sender")
           PY
+
+  pg18-provisioning-integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Execute guarded PostgreSQL 18 provisioning SQL in disposable container
+        run: python -m unittest sender_review.postgresql18_offline.test_provisioning_integration -v

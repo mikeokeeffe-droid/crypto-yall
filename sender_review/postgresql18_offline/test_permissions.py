@@ -10,8 +10,11 @@ import unittest
 
 try:
     import psycopg
-except ModuleNotFoundError:
+except ModuleNotFoundError as exc:
     psycopg = None
+    _psycopg_import_error = exc
+else:
+    _psycopg_import_error = None
 
 from sender_review.postgresql18_offline.socket_policy import (
     verify_socket_directory,
@@ -25,14 +28,23 @@ ROLES = (
 )
 BOT_ROLES = ROLES[:3]
 _socket_dir = os.environ.get("PGHOST", "")
-_enabled = (
-    psycopg is not None
-    and os.environ.get("SENDER_REVIEW_PG18_OFFLINE") == "1"
-    and os.environ.get("PGDATABASE") == "sender_review_test"
+_opted_in = os.environ.get("SENDER_REVIEW_PG18_OFFLINE") == "1"
+_valid_configuration = (
+    os.environ.get("PGDATABASE") == "sender_review_test"
     and Path(_socket_dir).is_absolute()
     and bool(os.environ.get("SENDER_REVIEW_PG18_SOCKET_GROUP"))
     and not os.environ.get("PGPORT")
 )
+if _opted_in and psycopg is None:
+    raise RuntimeError(
+        "psycopg is required when PostgreSQL 18 permission checks are enabled"
+    ) from _psycopg_import_error
+if _opted_in and not _valid_configuration:
+    raise RuntimeError(
+        "explicit PostgreSQL 18 opt-in requires the dedicated database, "
+        "absolute Unix socket path, socket group, and no PGPORT"
+    )
+_enabled = _opted_in
 
 
 def connect():
@@ -42,13 +54,13 @@ def connect():
         user=os.environ.get("PGUSER", "postgres"),
         password="",
         sslmode="disable",
-        autocommit=True,
+        autocommit=False,
     )
 
 
 @unittest.skipUnless(
     _enabled,
-    "Requires explicit PG18 offline opt-in and a local Unix socket",
+    "PostgreSQL 18 host permission checks were not explicitly enabled",
 )
 class PostgreSQL18PermissionTests(unittest.TestCase):
     @classmethod
@@ -64,16 +76,20 @@ class PostgreSQL18PermissionTests(unittest.TestCase):
 
     def test_server_uses_only_the_restricted_postgresql18_socket(self):
         with connect() as conn:
-            version, listen, socket_mode, socket_dirs = conn.execute(
+            version, listen, socket_mode, socket_group, socket_dirs = conn.execute(
                 "SELECT current_setting('server_version_num')::integer,"
                 "current_setting('listen_addresses'),"
                 "current_setting('unix_socket_permissions'),"
+                "current_setting('unix_socket_group'),"
                 "current_setting('unix_socket_directories')"
             ).fetchone()
         self.assertGreaterEqual(version, 180000)
         self.assertLess(version, 190000)
         self.assertEqual(listen, "")
         self.assertEqual(socket_mode, "0770")
+        self.assertEqual(
+            socket_group, os.environ["SENDER_REVIEW_PG18_SOCKET_GROUP"]
+        )
         self.assertIn(_socket_dir, [item.strip() for item in socket_dirs.split(",")])
 
     def test_bot_roles_are_unloginable_ungranted_and_isolated(self):
@@ -168,11 +184,14 @@ class PostgreSQL18PermissionTests(unittest.TestCase):
         for role in ROLES:
             for statement in statements:
                 with self.subTest(role=role, statement=statement[:30]):
-                    with connect() as conn:
+                    conn = connect()
+                    try:
                         conn.execute(f'SET ROLE "{role}"')
                         with self.assertRaises(psycopg.errors.InsufficientPrivilege):
                             conn.execute(statement)
-                        conn.execute("RESET ROLE")
+                    finally:
+                        conn.rollback()
+                        conn.close()
 
     def test_fixture_role_has_only_its_review_wrapper(self):
         with connect() as conn:
