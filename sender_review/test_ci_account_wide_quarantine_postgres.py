@@ -126,6 +126,82 @@ class AccountWideQuarantinePostgresTests(unittest.TestCase):
                     "SELECT count(*) FROM sender_review_ci.review_intents"
                 ), [(1,)])
 
+    def test_interrupted_signed_handoff_blocks_other_coin_without_event(self):
+        # A signed synthetic request is recorded before the separate
+        # protection-HOLD step. An interrupted second stage does not
+        # insert a quarantine event, yet must still deny ALL bot entries.
+        self.signed()
+        self.assertEqual(self.rows("SELECT count(*) FROM " + EVENTS), [(0,)])
+        self.assertEqual(self.rows(
+            "SELECT explicit_incident_count,critical_handoff_count,review_state "
+            "FROM sender_review_ci.simulated_account_admission_review"
+        ), [(0,1,"ACCOUNT_ADMISSION_FROZEN_CI_REVIEW_ONLY")])
+        for bot,coin,nonce in (
+            ("daily","AVAX","b"*32),
+            ("intraday","LINK","c"*32),
+            ("aggressive","SUI","d"*32),
+        ):
+            with self.subTest(bot=bot,coin=coin):
+                denied = record(bot,coin,nonce)
+                self.assertEqual(denied[0],False)
+                self.assertEqual(denied[2],"duplicate-claim-held")
+        self.assertEqual(self.rows(
+            "SELECT COUNT(*) FROM sender_review_ci.review_intents"
+        ), [(1,)])
+        self.assertEqual(self.rows(
+            "SELECT COUNT(*) FROM sender_review_ci.fixture_request_evidence"
+        ), [(1,)])
+        self.assertEqual(self.rows("SELECT count(*) FROM "+EVENTS), [(0,)])
+
+    def test_interrupted_handoff_racing_three_bots_all_denied(self):
+        self.signed()
+        jobs=(("daily","AVAX","b"*32),("intraday","LINK","c"*32),
+              ("aggressive","SUI","d"*32))
+        with concurrent.futures.ThreadPoolExecutor(max_workers=3) as pool:
+            responses=list(pool.map(lambda params:record(*params),jobs))
+        self.assertEqual([result[0] for result in responses],
+                         [False,False,False])
+        self.assertEqual(self.rows(
+            "SELECT count(*) FROM sender_review_ci.review_intents"
+        ), [(1,)])
+
+    def test_corrupted_signed_scope_fence_blocks_other_coins(self):
+        self.signed()
+        with connect() as db:
+            db.execute(
+                "UPDATE sender_review_ci.scope_fences "
+                "SET active_nonce=NULL WHERE account=%s AND coin='SOL'",
+                (ACCOUNT,),
+            )
+        self.assertEqual(self.rows(
+            "SELECT review_state FROM "
+            "sender_review_ci.simulated_protection_handoff_audit"
+        ), [("CRITICAL_FENCE_MISSING_OR_CHANGED",)])
+        self.assertFalse(record("intraday","AVAX","b"*32)[0])
+        self.assertEqual(self.rows(
+            "SELECT critical_handoff_count FROM "
+            "sender_review_ci.simulated_account_admission_review"
+        ), [(1,)])
+
+    def test_healthy_protection_hold_does_not_forge_clearance(self):
+        # A fake protection hold creates an explicit quarantine event.
+        # The handoff audit then becomes locally coherent, yet admission
+        # must still be frozen across coins and identities.
+        self.signed()
+        with connect() as db:
+            recorded=db.execute(
+                "SELECT recorded FROM "
+                "sender_review_ci.record_ci_protection_reentry_hold("
+                "%s,%s,%s,%s,%s,%s,%s)",
+                (ACCOUNT,"daily","SOL","long","a"*32,1,"claimed_closed"),
+            ).fetchone()[0]
+        self.assertTrue(recorded)
+        self.assertEqual(self.rows(
+            "SELECT explicit_incident_count,critical_handoff_count "
+            "FROM sender_review_ci.simulated_account_admission_review"
+        ), [(1,0)])
+        self.assertFalse(record("aggressive","AVAX","b"*32)[0])
+
     def test_separate_account_does_not_inherit_quarantine(self):
         self.assertTrue(record()[0])
         self.assertTrue(self.hold_unknown())
