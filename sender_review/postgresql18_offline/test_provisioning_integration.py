@@ -21,12 +21,12 @@ class PostgreSQL18ProvisioningIntegrationTests(unittest.TestCase):
             "--network", "none",
             "--env", "POSTGRES_HOST_AUTH_METHOD=trust",
             "--env", "POSTGRES_DB=sender_review_test",
-            "--env", "PGHOST=/tmp/pgsocket",
+            "--env", "PGHOST=/var/run/postgresql",
             "--mount", f"type=bind,src={ROOT},dst=/workspace,readonly",
-            "--tmpfs", "/tmp/pgsocket:rw,mode=0770,uid=999,gid=999",
+            "--tmpfs", "/var/run/postgresql:rw,mode=0770,uid=999,gid=999",
             "postgres:18",
             "-c", "listen_addresses=",
-            "-c", "unix_socket_directories=/tmp/pgsocket",
+            "-c", "unix_socket_directories=/var/run/postgresql",
             "-c", "unix_socket_permissions=0770",
             "-c", "unix_socket_group=postgres",
         ]
@@ -40,7 +40,7 @@ class PostgreSQL18ProvisioningIntegrationTests(unittest.TestCase):
         deadline = time.monotonic() + 90
         while time.monotonic() < deadline:
             ready = cls.docker(
-                "exec", cls.container, "pg_isready", "-h", "/tmp/pgsocket",
+                "exec", cls.container, "pg_isready", "-h", "/var/run/postgresql",
                 "-U", "postgres",
                 "-d", "sender_review_test", check=False,
             )
