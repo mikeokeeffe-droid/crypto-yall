@@ -39,6 +39,8 @@ class CandidateIdentityBodyTests(unittest.TestCase):
 
     def deny_authority(self, result):
         for key in (
+            "jwt_cryptographically_signs_body", "bearer_replay_prevented",
+            "independently_verified_request_origin",
             "runtime_identity_authenticated", "exact_body_authenticated",
             "replay_consumed", "durable_fence_reserved", "journal_recorded",
             "submit_authorized", "close_authorized", "signing_enabled",
@@ -58,6 +60,21 @@ class CandidateIdentityBodyTests(unittest.TestCase):
                 self.assertEqual(len(report.candidate_jti_sha256), 64)
                 self.assertNotIn(self.fixture.token(bot), repr(report))
                 self.deny_authority(report)
+
+    def test_same_bearer_token_different_valid_bodies_never_prove_origin(self):
+        token = self.fixture.token()
+        first = self.check(token=token, body=self.fixture.body())
+        second = self.check(token=token, body=self.fixture.body(
+            coin="AVAX", request_nonce="b"*32,
+        ))
+        self.assertTrue(first.fake_identity_and_exact_body_reviewed)
+        self.assertTrue(second.fake_identity_and_exact_body_reviewed)
+        self.assertEqual(first.candidate_jti_sha256, second.candidate_jti_sha256)
+        self.assertEqual(first.token_sha256, second.token_sha256)
+        self.assertNotEqual(first.body_sha256, second.body_sha256)
+        self.assertNotEqual(first.request_nonce_sha256, second.request_nonce_sha256)
+        self.deny_authority(first)
+        self.deny_authority(second)
 
     def test_changed_body_approved_flag_and_invalid_schema_hold(self):
         for body in (
@@ -101,7 +118,7 @@ class CandidateIdentityBodyTests(unittest.TestCase):
             elif isinstance(node, ast.ImportFrom):
                 imports.add(node.module)
         self.assertEqual(imports, {
-            "dataclasses", "hashlib",
+            "dataclasses", "hashlib", "json",
             "sender_review.github_oidc_fixed_origin_transport_candidate",
             "sender_review.offline_oidc_identity_fixture",
             "sender_review.remote_request_boundary_offline",
