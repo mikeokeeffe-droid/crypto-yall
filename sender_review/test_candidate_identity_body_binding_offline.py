@@ -63,7 +63,7 @@ class CandidateIdentityBodyTests(unittest.TestCase):
         for body in (
             b"{}", b'{"submit_authorized":true}',
             self.fixture.body(submit_authorized=True),
-            self.fixture.body(coin="UNKNOWN"),
+            self.fixture.body(coin="sol-invalid"),
             b"",
         ):
             with self.subTest(body=body):
