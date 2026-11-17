@@ -187,6 +187,12 @@ CREATE TABLE IF NOT EXISTS sender_review_ci.fixture_identity_receipts (
 );
 
 
+-- Single synthetic issuer in this disposable schema: a consumed JTI
+-- must not be reusable by changing the server-side account mapping.
+-- Nonces remain account-scoped. This is not a multi-issuer runtime policy.
+CREATE UNIQUE INDEX IF NOT EXISTS fixture_jti_single_issuer_once
+    ON sender_review_ci.fixture_identity_receipts (jti);
+
 -- Exact bytes of a signed TEST fixture and REVIEW-ONLY entry intent are
 -- evidenced together. Hashes are audit evidence, NEVER a trading signature.
 -- The references bind journal scope/nonce to evidence in the same database.
