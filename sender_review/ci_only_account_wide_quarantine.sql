@@ -62,10 +62,18 @@ BEGIN
     IF EXISTS (
         SELECT 1 FROM sender_review_ci.simulated_account_quarantine_events q
         WHERE q.environment=NEW.environment AND q.account=NEW.account
+    ) OR EXISTS (
+        -- A signed fixture can commit its entry evidence BEFORE the
+        -- separate protection HOLD. Treat that incomplete handoff, or
+        -- an altered/missing scope fence, as account-wide NO-GO even if
+        -- no explicit quarantine event has been committed yet.
+        SELECT 1 FROM sender_review_ci.simulated_protection_handoff_audit a
+        WHERE a.environment=NEW.environment AND a.account=NEW.account
+          AND a.review_state <> 'PERSISTED_FIXTURE_HOLD_NO_REAL_PROTECTION'
     ) THEN
         -- Suppress candidate insertion: record_review_only() observes no
-        -- RETURNING row and returns (false, fence, duplicate-claim-held).
-        -- No exception or partial reservation is permitted.
+        -- RETURNING row and returns a generic denied result. No new
+        -- intent is recorded. An empty scope candidate row may remain.
         RETURN NULL;
     END IF;
     RETURN NEW;
@@ -147,8 +155,37 @@ SELECT environment,account,COUNT(*)::bigint AS unresolved_incident_count,
 FROM sender_review_ci.simulated_account_quarantine_events
 GROUP BY environment,account;
 
+-- Read-only aggregate shows all accounted reasons for an admission
+-- freeze, including signed handoffs interrupted before any quarantine
+-- event was inserted. No row is ever a GO or permission statement:
+-- absence of rows is also NOT an authenticated clearance.
+CREATE OR REPLACE VIEW sender_review_ci.simulated_account_admission_review
+WITH (security_invoker=true) AS
+SELECT COALESCE(q.environment,a.environment) AS environment,
+       COALESCE(q.account,a.account) AS account,
+       COALESCE(q.incident_count,0)::bigint AS explicit_incident_count,
+       COALESCE(a.incomplete_count,0)::bigint AS critical_handoff_count,
+       'ACCOUNT_ADMISSION_FROZEN_CI_REVIEW_ONLY'::text AS review_state
+FROM (
+    SELECT environment,account,count(*) AS incident_count
+    FROM sender_review_ci.simulated_account_quarantine_events
+    GROUP BY environment,account
+) AS q
+FULL JOIN (
+    SELECT environment,account,
+           count(*) FILTER (
+              WHERE review_state <>
+                    'PERSISTED_FIXTURE_HOLD_NO_REAL_PROTECTION'
+           ) AS incomplete_count
+    FROM sender_review_ci.simulated_protection_handoff_audit
+    GROUP BY environment,account
+) AS a
+ ON q.environment=a.environment AND q.account=a.account
+WHERE COALESCE(q.incident_count,0)>0 OR COALESCE(a.incomplete_count,0)>0;
+
 REVOKE ALL ON sender_review_ci.simulated_account_quarantine_events FROM PUBLIC;
 REVOKE ALL ON sender_review_ci.simulated_account_quarantine_review FROM PUBLIC;
+REVOKE ALL ON sender_review_ci.simulated_account_admission_review FROM PUBLIC;
 REVOKE EXECUTE ON FUNCTION
  sender_review_ci.reject_quarantined_review_intent() FROM PUBLIC;
 REVOKE EXECUTE ON FUNCTION
