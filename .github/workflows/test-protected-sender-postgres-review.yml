@@ -64,6 +64,8 @@ jobs:
         run: python -m unittest sender_review.test_ci_protection_reentry_holds_postgres -v
       - name: Verify signed fake HTTP request binds to permanent disposable protection HOLD
         run: python -m unittest sender_review.test_ci_signed_protection_handoff_postgres -v
+      - name: Confirm cross-bot cross-coin account quarantine after synthetic unknown outcomes
+        run: python -m unittest sender_review.test_ci_account_wide_quarantine_postgres -v
       - name: Verify no trade-authorizing SQL state or send function
         shell: bash
         run: |
