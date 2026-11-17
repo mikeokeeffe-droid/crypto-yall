@@ -86,6 +86,11 @@ class ComposedShadowWorkerTests(unittest.TestCase):
                      for p in r.deferred_entry_proposals],
                     [("open_long", "SOL")],
                 )
+                self.assertEqual(
+                    [(p["action"], p["hl_coin"])
+                     for p in r.deferred_flip_entry_proposals],
+                    [("open_long", "SOL")],
+                )
                 self.never_authority(r)
 
     def test_intraday_profit_protection_close_not_converted_to_order(self):
@@ -128,9 +133,24 @@ class ComposedShadowWorkerTests(unittest.TestCase):
         self.assertTrue(r.review_ready)
         self.assertEqual(r.close_review_proposals, ())
         self.assertEqual(r.reentry_lock_coins, ("SOL",))
-        self.assertEqual([x["action"] for x in r.deferred_entry_proposals],
+        self.assertEqual(r.deferred_entry_proposals, ())
+        self.assertEqual([x["action"] for x in r.locked_review_proposals],
                          ["close"])
         self.never_authority(r)
+
+    def test_unknown_external_position_and_disabled_protection_hold(self):
+        unknown = shadow(positions=account(("DOGE", 1, 1, 2)),
+                         signals={"SOL-USD": {"action": "buy", "osc": 0.8}})
+        self.assertEqual(unknown.state, "HOLD")
+        self.assertFalse(unknown.review_ready)
+        self.never_authority(unknown)
+        for bot in ("intraday", "aggressive"):
+            with self.subTest(bot=bot):
+                disabled = shadow(bot=bot, protection_enabled=False,
+                                  signals={"SOL-USD": {"action": "buy", "osc": 0.9}})
+                self.assertEqual(disabled.state, "HOLD")
+                self.assertFalse(disabled.review_ready)
+                self.never_authority(disabled)
 
     def test_missing_spot_fallback_and_malformed_snapshot_hold(self):
         for sample in (account(equity="5"), {}, None,
