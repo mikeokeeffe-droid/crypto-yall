@@ -49,8 +49,8 @@ FOR EACH ROW EXECUTE FUNCTION
 -- is ANY unresolved synthetic incident, including on a DIFFERENT COIN.
 -- record_review_only() takes a transaction-scoped per-account advisory lock
 -- before INSERT, so competing CI workers are serialised at this trigger.
--- The exception aborts the entire insertion transaction; neither a new
--- intent nor the temporary candidate scope_fences row may persist.
+-- A denied candidate is skipped in the same transaction; a temporary
+-- empty scope row may remain, but cannot authorise an order or new entry.
 CREATE OR REPLACE FUNCTION sender_review_ci.reject_quarantined_review_intent()
 RETURNS trigger
 LANGUAGE plpgsql SECURITY INVOKER SET search_path=pg_catalog
@@ -63,8 +63,10 @@ BEGIN
         SELECT 1 FROM sender_review_ci.simulated_account_quarantine_events q
         WHERE q.environment=NEW.environment AND q.account=NEW.account
     ) THEN
-        RAISE EXCEPTION 'CI_ONLY_ACCOUNT_QUARANTINED_NO_NEW_REVIEW_INTENT'
-          USING ERRCODE='P0001';
+        -- Suppress candidate insertion: record_review_only() observes no
+        -- RETURNING row and returns (false, fence, duplicate-claim-held).
+        -- No exception or partial reservation is permitted.
+        RETURN NULL;
     END IF;
     RETURN NEW;
 END $fn$;
