@@ -193,9 +193,11 @@ class SignedProtectionHandoffPostgresTests(unittest.TestCase):
     def test_audit_read_access_is_not_public(self):
         with connect() as db:
             self.assertFalse(db.execute(
-                "SELECT has_table_privilege('public', "
-                "'sender_review_ci.simulated_protection_handoff_audit', "
-                "'SELECT')"
+                "SELECT EXISTS (SELECT 1 FROM pg_class c "
+                "CROSS JOIN LATERAL aclexplode(COALESCE("
+                "c.relacl,acldefault('r',c.relowner))) acl "
+                "WHERE c.oid='sender_review_ci.simulated_protection_handoff_audit'"
+                "::regclass AND acl.grantee=0 AND acl.privilege_type='SELECT')"
             ).fetchone()[0])
             self.assertTrue(db.execute(
                 "SELECT reloptions FROM pg_class "
