@@ -88,6 +88,8 @@ jobs:
         run: python -m unittest sender_review.test_pure_profit_protection_legacy_parity_offline -v
       - name: Reject unsafe synthetic re-entry lock release after unknown outcomes
         run: python -m unittest sender_review.test_reentry_lock_transition_review_offline -v
+      - name: Verify fully composed signer-free three-bot shadow worker stays HOLD
+        run: python -m unittest sender_review.test_composed_shadow_worker_offline -v
       - name: Review pure signer-free worker intent fixture builder
         run: python -m unittest sender_review.test_worker_intent_fixture_builder_offline -v
       - name: Quarantine CI-only sender fixtures from all five legacy execution paths
