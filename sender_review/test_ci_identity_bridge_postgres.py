@@ -570,6 +570,38 @@ class SignedIdentityBridgePostgresTests(unittest.TestCase):
             "SELECT count(*) FROM sender_review_ci.fixture_request_evidence"
         ), [(2,)])
 
+    def test_same_issuer_jti_cannot_cross_account_mapping(self):
+        token = self.fixture.token("daily", jti="cross-account-jti-001")
+        self.assertTrue(self.submit(token=token).journal_recorded)
+        other = "0x" + "f" * 40
+        self.assertNotEqual(other, ACCOUNT)
+        def submit_other(token):
+            return inspect_and_record_signed_fixture_offline(
+                token=token, body=self.body("b"*32, coin="AVAX"),
+                policy=POLICY, fixture_keys=self.keys,
+                fixture_now_seconds=NOW, fixed_test_account=other,
+                db_password=os.environ["PGPASSWORD"],
+            )
+        for replay in (
+            token,
+            self.fixture.token("intraday", jti="cross-account-jti-001"),
+        ):
+            result = submit_other(replay)
+            self.assertEqual(result.state, "hold")
+            self.assertFalse(result.journal_recorded)
+            self.assertFalse(result.submit_authorized)
+        self.assertEqual(self.rows(
+            "SELECT account FROM sender_review_ci.fixture_identity_receipts"
+        ), [(ACCOUNT,)])
+        self.assertEqual(self.rows(
+            "SELECT count(*) FROM sender_review_ci.review_intents"
+        ), [(1,)])
+        fresh = submit_other(self.fixture.token(
+            "intraday", jti="cross-account-fresh-002"
+        ))
+        self.assertTrue(fresh.journal_recorded)
+        self.assertFalse(fresh.submit_authorized)
+
     def test_same_signed_token_different_coins_never_crosses_scope(self):
         token = self.fixture.token("daily")
         self.assertTrue(self.submit(token=token).journal_recorded)
