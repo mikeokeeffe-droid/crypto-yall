@@ -15,7 +15,7 @@ the opposite direction. A close proposal is not proof that it was filled.
 The durable single-writer coordinator must later reconcile real closes,
 position ownership, open orders, and safe reduce-only exit semantics.
 """
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 from sender_review.signer_free_account_view_offline import (
     extract_signer_free_account_view_offline,
@@ -40,6 +40,8 @@ class ShadowWorkerCycle:
     review_ready: bool = False
     close_review_proposals: tuple[dict, ...] = ()
     deferred_entry_proposals: tuple[dict, ...] = ()
+    deferred_flip_entry_proposals: tuple[dict, ...] = ()
+    locked_review_proposals: tuple[dict, ...] = ()
     other_review_proposals: tuple[dict, ...] = ()
     reentry_lock_coins: tuple[str, ...] = ()
     possible_pending_lock_marks: tuple[tuple[str, str], ...] = ()
@@ -80,6 +82,14 @@ def inspect_shadow_worker_cycle_offline(
         return ShadowWorkerCycle(
             reason="untrusted or incomplete account snapshot: " + view.reason,
             additional_spot_read_needed=view.additional_spot_read_needed,
+        )
+    if set(view.positions) - set(TICKER_TO_COIN.values()):
+        return ShadowWorkerCycle(
+            reason="unrecognized account-wide position requires separate ownership review"
+        )
+    if bot != "daily" and not protection_enabled:
+        return ShadowWorkerCycle(
+            reason="profit protection disabled; cannot treat strategy cycle as covered"
         )
     base = inspect_pure_strategy_decisions_offline(
         bot=bot, signals=signals, account_view=view,
@@ -123,7 +133,7 @@ def inspect_shadow_worker_cycle_offline(
         a["hl_coin"] for a in gate.unaffected_review_proposals
         if a["action"] == "close"
     }
-    closes, deferred, others = [], [], []
+    closes, deferred, flips, others = [], [], [], []
     for action in gate.unaffected_review_proposals:
         if action["action"] == "close":
             closes.append(action)
@@ -131,12 +141,12 @@ def inspect_shadow_worker_cycle_offline(
             # All local entries are REVIEW ONLY. Entries on a close coin
             # are explicitly deferred; other entries remain untrusted too.
             deferred.append(action)
+            if action["hl_coin"] in untrusted_closes:
+                flips.append(action)
         else:
             others.append(action)
-    also_held = {a["hl_coin"] for a in gate.blocked_actions}
-    # All proposals on a locked coin are permanently parked for review;
-    # do not mistakenly expose a locked close as a callable rescue action.
-    deferred.extend(gate.blocked_actions)
+    # Locked closes MUST NOT be mislabeled as deferred entries; no blocked
+    # mutation is a callable rescue, even if it is a protective close.
     reason = (
         "all proposals are inert; close-before-reentry, account-wide "
         "ownership, exchange ACK, risk caps, durable locks and real "
@@ -149,6 +159,8 @@ def inspect_shadow_worker_cycle_offline(
         reason=reason, review_ready=True,
         close_review_proposals=tuple(closes),
         deferred_entry_proposals=tuple(deferred),
+        deferred_flip_entry_proposals=tuple(flips),
+        locked_review_proposals=gate.blocked_actions,
         other_review_proposals=tuple(others),
         reentry_lock_coins=gate.held_coins,
         possible_pending_lock_marks=marks,
