@@ -67,11 +67,11 @@ class ProfitProtectionOfflineTests(unittest.TestCase):
         self.deny(loss)
 
     def test_intraday_trailing_and_no_trigger(self):
-        trigger = inspect(positions=account(("SOL", 1, 100, -0.5, 2)),
-                          peaks={"SOL": 2.0})
+        trigger = inspect(positions=account(("SOL", 1, 100, -1.2, 2)),
+                          peaks={"SOL": 0.9})
         self.assertEqual(trigger.proposals[0]["protection_mode"],
                          "TRAILING PROFIT PROTECTION")
-        self.assertAlmostEqual(trigger.proposals[0]["protection_giveback_pct"], 2.5)
+        self.assertAlmostEqual(trigger.proposals[0]["protection_giveback_pct"], 2.1)
         self.deny(trigger)
         inactive = inspect(positions=account(("SOL", 1, 100, 0.8, 2)),
                            peaks={"SOL": 0.9})
@@ -93,8 +93,8 @@ class ProfitProtectionOfflineTests(unittest.TestCase):
         self.assertEqual(low.proposals, ())
         self.deny(low)
         low_trigger = inspect(bot="aggressive",
-                              positions=account(("SOL", 1, 100, -0.5, 2)),
-                              peaks={"SOL": 1.6})
+                              positions=account(("SOL", 1, 100, -1.2, 2)),
+                              peaks={"SOL": 0.9})
         self.assertEqual(low_trigger.proposals[0]["protection_mode"],
                          "LOW LEVERAGE TRAILING PROFIT PROTECTION")
         self.deny(low_trigger)
