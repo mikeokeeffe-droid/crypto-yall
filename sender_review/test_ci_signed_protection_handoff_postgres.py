@@ -140,6 +140,69 @@ class SignedProtectionHandoffPostgresTests(unittest.TestCase):
         self.assertFalse(result.journal_recorded)
         self.deny_authority(result)
 
+    def test_audit_detects_missing_second_stage_and_retained_fence(self):
+        # A signed fake request recorded WITHOUT the optional second stage
+        # remains an unresolved protected-handoff review; no auto recovery.
+        from sender_review.ci_only_remote_journal_boundary import (
+            review_remote_fixture_to_disposable_journal_offline,
+        )
+        token = self.fixture.token("daily", jti="audit-missing-hold")
+        body = self.fixture.body(coin="SOL", request_nonce="d"*32)
+        result = review_remote_fixture_to_disposable_journal_offline(
+            method="POST", path="/v1/review-only/entry-intents",
+            headers=[("Authorization", "Bearer "+token),
+                     ("Content-Type", "application/json")],
+            body=body, trusted_fixture_keys=self.keys,
+            fixture_now_seconds=NOW, fixed_test_account=ACCOUNT,
+            db_password=os.environ["PGPASSWORD"],
+        )
+        self.assertTrue(result.journal_recorded)
+        audit = self.rows(
+            "SELECT protection_hold_recorded,fence_still_held,review_state "
+            "FROM sender_review_ci.simulated_protection_handoff_audit"
+        )
+        self.assertEqual(audit, [(
+            False, True, "CRITICAL_SIGNED_FIXTURE_WITHOUT_PROTECTION_HOLD"
+        )])
+        from sender_review.test_ci_journal_postgres import record
+        self.assertFalse(record(bot="aggressive", coin="SOL",
+                                nonce="e"*32)[0])
+
+    def test_audit_links_recorded_hold_and_flags_fence_tampering(self):
+        result = self.send()
+        self.assertTrue(result.simulated_protection_hold_recorded)
+        query = (
+            "SELECT bot,coin,protection_hold_recorded,fence_still_held,"
+            "review_state FROM sender_review_ci."
+            "simulated_protection_handoff_audit"
+        )
+        self.assertEqual(self.rows(query), [(
+            "daily", "SOL", True, True,
+            "PERSISTED_FIXTURE_HOLD_NO_REAL_PROTECTION"
+        )])
+        with connect() as db:
+            db.execute(
+                "UPDATE sender_review_ci.scope_fences SET active_nonce=NULL "
+                "WHERE coin='SOL'"
+            )
+        self.assertEqual(self.rows(query), [(
+            "daily", "SOL", True, False,
+            "CRITICAL_FENCE_MISSING_OR_CHANGED"
+        )])
+
+    def test_audit_read_access_is_not_public(self):
+        with connect() as db:
+            self.assertFalse(db.execute(
+                "SELECT has_table_privilege('public', "
+                "'sender_review_ci.simulated_protection_handoff_audit', "
+                "'SELECT')"
+            ).fetchone()[0])
+            self.assertTrue(db.execute(
+                "SELECT reloptions FROM pg_class "
+                "WHERE oid='sender_review_ci.simulated_protection_handoff_audit'"
+                "::regclass"
+            ).fetchone()[0] == ["security_invoker=true"])
+
     def test_after_first_commit_missing_second_stage_stays_fenced(self):
         # The signing-fixture bridge can commit first; if the new table was
         # never installed or the second transaction fails, the first fence
