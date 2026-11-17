@@ -104,6 +104,15 @@ class CollectorPolicyTests(unittest.TestCase):
         self.assertFalse(self.check(self.policy, changed).static_policy_valid)
         self.assertFalse(self.check(self.policy, b"").static_policy_valid)
 
+    def test_malformed_and_duplicate_unit_directives_fail_closed(self):
+        malformed = b"[Unit\nDescription=malformed\n"
+        duplicate = self.unit_bytes + b"\nPrivateNetwork=no\n"
+        for unit in (malformed, duplicate):
+            with self.subTest(unit=unit):
+                result = self.check(self.policy, unit)
+                self.assertEqual(result.state, "HOLD")
+                self.assertFalse(result.static_policy_valid)
+
     def test_source_only_and_no_deployment_path(self):
         source = Path(__file__).with_name(
             "ci_only_collector_policy_review.py").read_text("utf-8")

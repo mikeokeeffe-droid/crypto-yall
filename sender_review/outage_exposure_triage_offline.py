@@ -98,6 +98,7 @@ def review_outage_exposure_fixture_offline(incident) -> OutageTriageReview:
     critical = (
         (exposed and (acute_event or protection_gap))
         or incident.event == "protective_close_failed"
+        or incident.event == "unknown_ack"
         or incident.unresolved_attempt
         or (exposed and human_or_telemetry_gap)
         or (exposed and contradictory_writers)

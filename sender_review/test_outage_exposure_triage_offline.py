@@ -58,9 +58,11 @@ class OutageExposureTriageOfflineTests(unittest.TestCase):
         for event in ("unknown_ack", "protective_close_failed"):
             result = review_outage_exposure_fixture_offline(
                 incident(event=event, exposure="flat",
-                         protection="reported_healthy")
+                         protection="reported_healthy",
+                         unresolved_attempt=False)
             )
             self.assertEqual(result.severity, "CRITICAL")
+            self.assertTrue(result.emergency_rescue_required)
             self.assert_never_authorized(result)
 
     def test_reported_healthy_is_not_verified_protection(self):

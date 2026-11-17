@@ -3,7 +3,7 @@
 No systemctl, systemd-analyze, services, processes or network are executed.
 A passing result is NOT proof of host isolation or permission to deploy.
 """
-from configparser import ConfigParser
+from configparser import ConfigParser, Error as ConfigParserError
 from pathlib import Path
 import unittest
 
@@ -58,7 +58,10 @@ DISALLOWED = (
 def inspect_unit(source):
     cfg = ConfigParser(interpolation=None, strict=True, delimiters=("=",))
     cfg.optionxform = str
-    cfg.read_string(source)
+    try:
+        cfg.read_string(source)
+    except ConfigParserError as exc:
+        raise ValueError("invalid systemd unit syntax") from exc
     if set(cfg.sections()) != {"Unit", "Service"}:
         raise ValueError("unexpected unit section; no enable/install/sockets")
     for name, expected in (("Unit", EXPECTED_UNIT),
