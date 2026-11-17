@@ -44,7 +44,11 @@ class PostgreSQL18ProvisioningIntegrationTests(unittest.TestCase):
                 "-U", "postgres",
                 "-d", "sender_review_test", check=False,
             )
-            if ready.returncode == 0:
+        if ready.returncode == 0:
+                cls.docker(
+                    "exec", "--user", "0", cls.container,
+                    "chmod", "0770", "/var/run/postgresql",
+                )
                 return
             time.sleep(1)
         logs = cls.docker("logs", cls.container, check=False)
