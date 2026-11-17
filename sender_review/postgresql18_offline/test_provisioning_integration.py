@@ -71,7 +71,7 @@ class PostgreSQL18ProvisioningIntegrationTests(unittest.TestCase):
     def psql(cls, statement=None, *, file=None, check=True):
         command = [
             "exec", cls.container, "psql", "-X", "-v", "ON_ERROR_STOP=1",
-            "-h", "/tmp/pgsocket", "-U", "postgres",
+            "-h", "/var/run/postgresql", "-U", "postgres",
             "-d", "sender_review_test",
         ]
         if file is not None:
@@ -129,14 +129,14 @@ class PostgreSQL18ProvisioningIntegrationTests(unittest.TestCase):
         self.assertEqual(
             self.docker(
                 "exec", self.container, "stat", "-c", "%a:%G",
-                "/tmp/pgsocket",
+                "/var/run/postgresql",
             ).stdout.strip(),
             "770:postgres",
         )
         self.assertEqual(
             self.docker(
                 "exec", self.container, "stat", "-c", "%a:%G",
-                "/tmp/pgsocket/.s.PGSQL.5432",
+                "/var/run/postgresql/.s.PGSQL.5432",
             ).stdout.strip(),
             "770:postgres",
         )
