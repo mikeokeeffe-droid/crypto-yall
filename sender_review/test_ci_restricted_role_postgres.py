@@ -121,6 +121,47 @@ class RestrictedRoleTests(unittest.TestCase):
             finally:
                 c.execute("RESET ROLE")
 
+    def test_restricted_role_cannot_truncate_or_create_journal_objects(self):
+        # UPDATE/DELETE denial alone is insufficient: TRUNCATE bypasses
+        # row-level append-only triggers. Check effective privileges too.
+        self.assertTrue(self.call()[0])
+        with connect() as c:
+            for table in ("fixture_identity_receipts", "fixture_request_evidence",
+                          "review_intents", "review_events", "scope_fences"):
+                for privilege in ("TRUNCATE", "TRIGGER", "REFERENCES"):
+                    with self.subTest(table=table, privilege=privilege):
+                        self.assertFalse(c.execute(
+                            "SELECT has_table_privilege(%s,%s,%s)",
+                            (ROLE, "sender_review_ci."+table, privilege),
+                        ).fetchone()[0])
+            self.assertFalse(c.execute(
+                "SELECT has_schema_privilege(%s,%s,'CREATE')",
+                (ROLE, "sender_review_ci"),
+            ).fetchone()[0])
+            self.assertEqual(c.execute(
+                "SELECT rolreplication,rolbypassrls,rolinherit "
+                "FROM pg_roles WHERE rolname=%s", (ROLE,),
+            ).fetchone(), (False, False, False))
+        for statement in (
+            "TRUNCATE sender_review_ci.fixture_identity_receipts CASCADE",
+            "TRUNCATE sender_review_ci.review_intents CASCADE",
+            "CREATE TABLE sender_review_ci.forbidden_role_probe (id integer)",
+            "ALTER TABLE sender_review_ci.fixture_identity_receipts "
+            "DISABLE TRIGGER ALL",
+        ):
+            with self.subTest(statement=statement):
+                with connect() as c:
+                    c.execute("SET ROLE sender_review_ci_restricted")
+                    with self.assertRaises(psycopg.errors.InsufficientPrivilege):
+                        c.execute(statement)
+        self.assertEqual(self.rows(
+            "SELECT count(*) FROM sender_review_ci.fixture_identity_receipts"
+        ), [(1,)])
+        self.assertEqual(self.rows(
+            "SELECT count(*) FROM sender_review_ci.review_intents"
+        ), [(1,)])
+        self.assertFalse(self.call()[0])
+
     def test_fixture_review_only_and_durable_replay(self):
         first=self.call()
         self.assertEqual(first,(True,1,"persisted-fixture-review-only-HOLD"))
