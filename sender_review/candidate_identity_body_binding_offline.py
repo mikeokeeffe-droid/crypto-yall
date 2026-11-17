@@ -30,8 +30,14 @@ class CandidateIdentityBodyBinding:
     candidate_bot: str | None = None
     body_sha256: str | None = None
     candidate_jti_sha256: str | None = None
+    token_sha256: str | None = None
+    request_nonce_sha256: str | None = None
     candidate_keyset_sha256: str | None = None
     fake_identity_and_exact_body_reviewed: bool = False
+    # GitHub OIDC signs WORKLOAD claims, NOT this separate HTTP body.
+    jwt_cryptographically_signs_body: bool = False
+    bearer_replay_prevented: bool = False
+    independently_verified_request_origin: bool = False
     runtime_identity_authenticated: bool = False
     exact_body_authenticated: bool = False
     replay_consumed: bool = False
@@ -90,6 +96,11 @@ def inspect_candidate_identity_body_binding_offline(
                 or identity.fixture_bot not in ("daily", "intraday", "aggressive")
                 or type(identity.fixture_jti) is not str):
             return hold
+        # A valid signed workload fixture can be paired with MORE THAN ONE
+        # syntactically valid body. The JWT does not commit to body bytes.
+        # Both exact body and nonce hashes are observational evidence only.
+        # A trusted runtime MUST fence JTI + nonce atomically against the
+        # accepted immutable request bytes BEFORE considering execution.
         return CandidateIdentityBodyBinding(
             state="SYNTHETIC_IDENTITY_EXACT_BODY_HOLD",
             reason="mock public key and fixture identity matched exact body; "
@@ -99,6 +110,10 @@ def inspect_candidate_identity_body_binding_offline(
                 identity.fixture_jti.encode("ascii")
             ).hexdigest(),
             body_sha256=hashlib.sha256(request_body).hexdigest(),
+            token_sha256=hashlib.sha256(token.encode("ascii")).hexdigest(),
+            request_nonce_sha256=hashlib.sha256(
+                contract.request_nonce.encode("ascii")
+            ).hexdigest(),
             candidate_keyset_sha256=candidate_keys.keyset_sha256,
             fake_identity_and_exact_body_reviewed=True,
         )
