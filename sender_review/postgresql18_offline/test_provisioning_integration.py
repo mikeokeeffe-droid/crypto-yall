@@ -17,7 +17,7 @@ class PostgreSQL18ProvisioningIntegrationTests(unittest.TestCase):
     def setUpClass(cls):
         cls.container = f"sender-review-pg18-{uuid.uuid4().hex[:12]}"
         command = [
-            "docker", "run", "--detach", "--rm", "--name", cls.container,
+            "docker", "run", "--detach", "--name", cls.container,
             "--network", "none",
             "--env", "POSTGRES_HOST_AUTH_METHOD=trust",
             "--env", "POSTGRES_DB=sender_review_test",
