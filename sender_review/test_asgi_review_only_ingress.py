@@ -122,6 +122,57 @@ class ReviewOnlyAsgiTests(unittest.TestCase):
         self.assertIsNone(status)
         self.assertEqual(preflight.call_count, 0)
 
+    def test_stream_receive_exceptions_return_redacted_hold_without_preflight(self):
+        token = self.fixture.token()
+        body = self.fixture.body()
+        scope = {
+            "type": "http", "method": "POST",
+            "path": "/v1/review-only/entry-intents",
+            "raw_path": b"/v1/review-only/entry-intents",
+            "query_string": b"",
+            "headers": [
+                (b"content-type", b"application/json"),
+                (b"authorization", ("Bearer " + token).encode()),
+                (b"content-length", str(len(body)).encode()),
+            ],
+        }
+        for failure in (RuntimeError("secret-token-not-for-response"),
+                        ValueError("bad stream adapter")):
+            for on_second_chunk in (False, True):
+                with self.subTest(failure=type(failure).__name__,
+                                  on_second_chunk=on_second_chunk):
+                    result = []
+                    times = 0
+
+                    async def receive():
+                        nonlocal times
+                        times += 1
+                        if on_second_chunk and times == 1:
+                            return {
+                                "type": "http.request",
+                                "body": body[:10],
+                                "more_body": True,
+                            }
+                        raise failure
+
+                    async def send(message):
+                        result.append(message)
+
+                    with patch(
+                        "sender_review.asgi_review_only_ingress."
+                        "inspect_server_oidc_preflight_review",
+                        side_effect=AssertionError("unexpected identity preflight"),
+                    ) as preflight:
+                        asyncio.run(application(scope, receive, send))
+                    self.assertEqual(preflight.call_count, 0)
+                    self.assertEqual(len(result), 2)
+                    self.assertEqual(result[0]["status"], 503)
+                    self.assertEqual(json.loads(result[1]["body"]), {
+                        "state": "HOLD", "reason": "request stream unavailable"
+                    })
+                    self.assertNotIn(token, repr(result))
+                    self.assertNotIn("secret-token", repr(result))
+
     def test_preflight_exception_returns_redacted_503_hold(self):
         # Exercise the actual ASGI callable, not the request() helper's mock.
         # A damaged identity preflight must neither escape nor expose a JWT.
