@@ -176,6 +176,11 @@ def verify_fixture_oidc_identity_offline(
         if (type(header) is not dict or type(claims) is not dict
                 or header.get("alg") != "RS256"
                 or header.get("typ") != "JWT"
+                # Never accept key sources or JOSE processing instructions
+                # from a bearer token, even if its fixture signature verifies.
+                or any(field in header for field in (
+                    "jku", "jwk", "x5u", "x5c", "crit", "b64", "zip",
+                ))
                 or type(header.get("kid")) is not str
                 or not 1 <= len(header["kid"]) <= 128):
             return hold
