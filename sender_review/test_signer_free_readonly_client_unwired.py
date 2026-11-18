@@ -227,6 +227,53 @@ class SignerFreeReadOnlyUnwiredTests(unittest.TestCase):
                 self.assertEqual(result.state, "HOLD")
                 self.assertFalse(result.market_reference_parsed)
 
+    def test_unrequested_market_data_is_validated_as_full_document(self):
+        cases = (
+            ({"SOL": "50", "AVAX": "NaN"}, [
+                {"name": "SOL", "szDecimals": 2}]),
+            ({"SOL": "50", "AVAX": "-1"}, [
+                {"name": "SOL", "szDecimals": 2}]),
+            ({"SOL": "50", "../BAD": "1"}, [
+                {"name": "SOL", "szDecimals": 2}]),
+            ({"SOL": "50"}, [
+                {"name": "SOL", "szDecimals": 2},
+                {"name": "AVAX", "szDecimals": True}]),
+            ({"SOL": "50"}, [
+                {"name": "SOL", "szDecimals": 2},
+                {"name": "AVAX", "szDecimals": 2},
+                {"name": "AVAX", "szDecimals": 3}]),
+            ({"SOL": "50"}, [
+                {"name": "SOL", "szDecimals": 2},
+                {"name": "../BAD", "szDecimals": 2}]),
+        )
+        for mids, universe in cases:
+            with self.subTest(mids=mids, universe=universe):
+                def fake(request):
+                    return encoded(mids if request["type"] == "allMids"
+                                   else {"universe": universe})
+                result = inspect_unwired_market_reference_view(
+                    coins=("SOL",), network="testnet", test_transport=fake,
+                )
+                self.assertEqual(result.state, "HOLD")
+                self.assertFalse(result.market_reference_parsed)
+                self.assertFalse(result.order_authorized)
+        # An unrelated VALID listed asset is allowed, while its values
+        # remain untrusted and cannot authorize a requested SOL trade.
+        def valid_extra(request):
+            if request["type"] == "allMids":
+                return encoded({"SOL": "50", "AVAX": "25"})
+            return encoded({"universe": [
+                {"name": "SOL", "szDecimals": 2},
+                {"name": "AVAX", "szDecimals": 1},
+            ]})
+        parsed = inspect_unwired_market_reference_view(
+            coins=("SOL",), network="testnet", test_transport=valid_extra,
+        )
+        self.assertEqual(parsed.state, "PARSED_UNTRUSTED_MARKET_FIXTURE_HOLD")
+        self.assertEqual(parsed.mid_prices, {"SOL": "50"})
+        self.assertEqual(parsed.size_decimals, {"SOL": 2})
+        self.assertFalse(parsed.order_authorized)
+
     def test_market_reference_bad_scope_and_callback_fail_closed(self):
         requests = []
         def fake(request):
