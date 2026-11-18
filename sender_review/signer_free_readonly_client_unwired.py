@@ -285,6 +285,13 @@ def inspect_unwired_market_reference_view(
                 or type(decimals) is not int or not 0 <= decimals <= 8
             ):
                 raise ValueError("duplicate or invalid perp asset")
+            # Optional metadata flags must retain their exact JSON type.
+            # A string or number (e.g. "true" or 1) must not be
+            # interpreted as a safe, active perpetual asset. This applies
+            # to unrequested assets too: the document is one trust boundary.
+            if ("isDelisted" in asset
+                    and type(asset["isDelisted"]) is not bool):
+                raise ValueError("invalid perp delisting flag")
             all_assets.add(coin)
             if coin in requested:
                 if asset.get("isDelisted") is True:
