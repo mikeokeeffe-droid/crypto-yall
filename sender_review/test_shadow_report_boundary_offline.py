@@ -54,6 +54,11 @@ class ShadowReportBoundaryTests(unittest.TestCase):
             replace(valid, request_authorized=True),
             replace(valid, close_authorized=True),
             replace(valid, signing_enabled=True),
+            replace(valid, additional_spot_read_needed={
+                "coin": "SOL", "authorization": "do-not-export",
+            }),
+            replace(valid, additional_spot_read_needed="false"),
+            replace(valid, additional_spot_read_needed=1),
             replace(valid, exchange_origin_authenticated=True),
             replace(valid, position_ownership_verified=True),
             replace(valid, close_review_proposals=[]),
