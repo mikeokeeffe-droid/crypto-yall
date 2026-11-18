@@ -94,7 +94,7 @@ def _validate_untrusted_spot_balances(document):
         if type(row) is not dict:
             raise ValueError("invalid spot balance")
         coin = row.get("coin")
-        if (type(coin) is not str or _MARKET_OBSERVED_COIN.fullmatch(coin) is None
+        if (type(coin) is not str or _SPOT_COIN.fullmatch(coin) is None
                 or coin in seen):
             raise ValueError("invalid or duplicate spot coin")
         seen.add(coin)
@@ -279,7 +279,8 @@ def inspect_unwired_market_reference_view(
             coin = asset.get("name")
             decimals = asset.get("szDecimals")
             if (
-                type(coin) is not str or _SPOT_COIN.fullmatch(coin) is None
+                type(coin) is not str
+                or _MARKET_OBSERVED_COIN.fullmatch(coin) is None
                 or coin in all_assets
                 or type(decimals) is not int or not 0 <= decimals <= 8
             ):
