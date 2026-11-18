@@ -117,6 +117,25 @@ def _validate_untrusted_spot_balances(document):
     return document
 
 
+# PR #41's immutable /info capture contract requires decimal JSON strings
+# for accountValue and every signed szi, not JSON numbers or booleans.
+# Validate all records before the legacy-compatible float projection, even
+# for flat positions. This is fixture shape checking, never source proof.
+def _validate_untrusted_perp_wire_types(document):
+    margin = document.get("marginSummary")
+    positions = document.get("assetPositions")
+    if (type(margin) is not dict or type(positions) is not list
+            or len(positions) > 256
+            or type(margin.get("accountValue")) is not str):
+        raise ValueError("invalid perp account wire types")
+    for record in positions:
+        if (type(record) is not dict
+                or type(record.get("position")) is not dict
+                or type(record["position"].get("szi")) is not str):
+            raise ValueError("invalid perp position wire types")
+    return document
+
+
 def inspect_unwired_signer_free_account_view(
     *, account, network, test_transport=None,
 ):
@@ -147,7 +166,9 @@ def inspect_unwired_signer_free_account_view(
                 request["dex"] = ""
             return _strict_document(test_transport(request))
 
-        user_state = read("clearinghouseState")
+        user_state = _validate_untrusted_perp_wire_types(
+            read("clearinghouseState"),
+        )
         view = extract_signer_free_account_view_offline(user_state=user_state)
         if view.additional_spot_read_needed:
             spot = _validate_untrusted_spot_balances(
