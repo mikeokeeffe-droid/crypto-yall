@@ -21,6 +21,10 @@ from sender_review.signer_free_account_view_offline import (
 _ACCOUNT = re.compile(r"0x[0-9a-f]{40}\Z", re.ASCII)
 _MAX_JSON_BYTES = 131072
 _TESTNET = "testnet"
+# The only scope represented by PR #41's offline six-frame fixture.
+# NOT an approved operational or live account. Runtime account pinning
+# requires independent approval and an authenticated server-side policy.
+_FIXTURE_ACCOUNT = "0x" + "1" * 40
 
 
 @dataclass(frozen=True)
@@ -76,14 +80,16 @@ def inspect_unwired_signer_free_account_view(
     """Apply exactly two allowlisted read shapes to MOCK response bytes.
 
     The test_transport callback receives a fresh dictionary containing only
-    the fixed /info read type and the requested lower-case account. It is
+    the fixed /info read type and PR #41's synthetic test account. It is
     never obtained from environment, installed as a real Info client, or
     permitted to send orders. A caller-provided callback cannot attest a
     network source; use only offline fakes until independent host approval.
     """
     hold = UnwiredSignerFreeReadOnlyView()
     if (type(account) is not str or _ACCOUNT.fullmatch(account) is None
-            or network != _TESTNET or not callable(test_transport)):
+            or account != _FIXTURE_ACCOUNT
+            or type(network) is not str or network != _TESTNET
+            or not callable(test_transport)):
         return hold
     seen = []
     try:
