@@ -6,6 +6,7 @@ import unittest
 
 from sender_review.signer_free_readonly_client_unwired import (
     inspect_unwired_signer_free_account_view,
+    inspect_unwired_market_reference_view,
 )
 
 ACCOUNT = "0x" + "1" * 40
@@ -116,6 +117,110 @@ class SignerFreeReadOnlyUnwiredTests(unittest.TestCase):
             self.assertNotIn("secret", repr(result))
             self.assert_no_authority(result)
 
+    def test_market_mid_prices_and_precision_are_untrusted_not_trade_authority(self):
+        seen = []
+        def fake(request):
+            seen.append(request.copy())
+            if request["type"] == "allMids":
+                return encoded({"SOL": "100.25", "AVAX": "21.05"})
+            if request["type"] == "meta":
+                return encoded({"universe": [
+                    {"name": "SOL", "szDecimals": 2},
+                    {"name": "AVAX", "szDecimals": 1},
+                ]})
+            self.fail("unknown read type")
+        view = inspect_unwired_market_reference_view(
+            coins=("SOL", "AVAX"), network="testnet", test_transport=fake,
+        )
+        self.assertEqual(view.state, "PARSED_UNTRUSTED_MARKET_FIXTURE_HOLD")
+        self.assertTrue(view.market_reference_parsed)
+        self.assertEqual(view.mid_prices, {"SOL": "100.25", "AVAX": "21.05"})
+        self.assertEqual(view.size_decimals, {"SOL": 2, "AVAX": 1})
+        self.assertEqual(view.observed_read_types, ("allMids", "meta"))
+        self.assertEqual(seen, [
+            {"type": "allMids", "dex": ""},
+            {"type": "meta", "dex": ""},
+        ])
+        for name in (
+            "exchange_origin_authenticated", "market_freshness_verified",
+            "asset_constraints_verified", "prices_authorized_for_orders",
+            "order_authorized", "leverage_authorized", "signing_enabled",
+        ):
+            self.assertIs(getattr(view, name), False, name)
+
+    def test_market_reference_refuses_missing_prices_or_precision(self):
+        bad_prices = (
+            {}, {"SOL": "0"}, {"SOL": "-1"}, {"SOL": "NaN"},
+            {"SOL": "Infinity"}, {"SOL": "1e1000"},
+            {"SOL": "1000000000001"}, {"SOL": 25},
+        )
+        for mid in bad_prices:
+            with self.subTest(mid=mid):
+                result = inspect_unwired_market_reference_view(
+                    coins=("SOL",), network="testnet",
+                    test_transport=lambda request: encoded(
+                        mid if request["type"] == "allMids" else
+                        {"universe": [{"name": "SOL", "szDecimals": 2}]}
+                    ),
+                )
+                self.assertEqual(result.state, "HOLD")
+                self.assertFalse(result.market_reference_parsed)
+        for universe in (
+            [],
+            [{"name": "SOL"}],
+            [{"name": "SOL", "szDecimals": "2"}],
+            [{"name": "SOL", "szDecimals": True}],
+            [{"name": "SOL", "szDecimals": 9}],
+            [{"name": "SOL", "szDecimals": 2, "isDelisted": True}],
+            [{"name": "SOL", "szDecimals": 2},
+             {"name": "SOL", "szDecimals": 2}],
+        ):
+            with self.subTest(universe=universe):
+                result = inspect_unwired_market_reference_view(
+                    coins=("SOL",), network="testnet",
+                    test_transport=lambda request: encoded(
+                        {"SOL": "50"} if request["type"] == "allMids"
+                        else {"universe": universe}
+                    ),
+                )
+                self.assertEqual(result.state, "HOLD")
+                self.assertFalse(result.market_reference_parsed)
+
+    def test_market_reference_bad_scope_and_callback_fail_closed(self):
+        requests = []
+        def fake(request):
+            requests.append(request)
+            return encoded({"SOL": "10"})
+        for coins, network, callback in (
+            ((), "testnet", fake),
+            (("SOL", "SOL"), "testnet", fake),
+            (("sol",), "testnet", fake),
+            (("SOL",), "mainnet", fake),
+            (("SOL",), True, fake),
+            (("SOL",), "testnet", None),
+        ):
+            with self.subTest(coins=coins, network=network):
+                result = inspect_unwired_market_reference_view(
+                    coins=coins, network=network, test_transport=callback,
+                )
+                self.assertEqual(result.state, "HOLD")
+        self.assertEqual(requests, [])
+        for bad in (b"not JSON", b'{"SOL":"10","SOL":"20"}',
+                    b" " * 131073):
+            result = inspect_unwired_market_reference_view(
+                coins=("SOL",), network="testnet",
+                test_transport=lambda _: bad,
+            )
+            self.assertEqual(result.state, "HOLD")
+            self.assertFalse(result.market_reference_parsed)
+        def fail(_):
+            raise TimeoutError("do-not-leak")
+        result = inspect_unwired_market_reference_view(
+            coins=("SOL",), network="testnet", test_transport=fail,
+        )
+        self.assertEqual(result.state, "HOLD")
+        self.assertNotIn("do-not-leak", repr(result))
+
     def test_module_import_graph_excludes_network_signing_and_secrets(self):
         path = Path(__file__).with_name("signer_free_readonly_client_unwired.py")
         imports = set()
@@ -125,7 +230,7 @@ class SignerFreeReadOnlyUnwiredTests(unittest.TestCase):
             if isinstance(node, ast.ImportFrom):
                 imports.add(node.module)
         self.assertEqual(imports, {
-            "dataclasses", "json", "re",
+            "dataclasses", "decimal", "json", "re",
             "sender_review.signer_free_account_view_offline",
         })
         source = path.read_text("utf-8")
