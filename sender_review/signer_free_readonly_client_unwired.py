@@ -94,7 +94,7 @@ def _validate_untrusted_spot_balances(document):
         if type(row) is not dict:
             raise ValueError("invalid spot balance")
         coin = row.get("coin")
-        if (type(coin) is not str or _SPOT_COIN.fullmatch(coin) is None
+        if (type(coin) is not str or _MARKET_OBSERVED_COIN.fullmatch(coin) is None
                 or coin in seen):
             raise ValueError("invalid or duplicate spot coin")
         seen.add(coin)
@@ -185,6 +185,11 @@ def inspect_unwired_signer_free_account_view(
 # meta(). A future *trusted* collector needs independently enforced TLS,
 # freshness, network/dex scoping and audit, not caller-supplied test_transport.
 _MARKET_COIN = re.compile(r"[A-Z][A-Z0-9]{0,23}\Z", re.ASCII)
+# Unrequested market asset identifiers may include @-prefixed symbols and
+# namespaced perp symbols such as xyz:BTC. Never accept path-like keys.
+_MARKET_OBSERVED_COIN = re.compile(
+    r"[A-Za-z0-9@][A-Za-z0-9@._:-]{0,63}\\Z", re.ASCII,
+)
 _PRICE_STRING = re.compile(r"(?:0|[1-9][0-9]{0,14})(?:\.[0-9]{1,30})?\Z", re.ASCII)
 _MAX_MARKET_COINS = 16
 _MAX_UNIVERSE = 4096
@@ -245,7 +250,7 @@ def inspect_unwired_market_reference_view(
             raise ValueError("missing or oversized market mids")
         for observed_coin, raw in mids_doc.items():
             if (type(observed_coin) is not str
-                    or _SPOT_COIN.fullmatch(observed_coin) is None
+                    or _MARKET_OBSERVED_COIN.fullmatch(observed_coin) is None
                     or type(raw) is not str or not 0 < len(raw) <= 64
                     or raw.strip() != raw):
                 raise ValueError("invalid market quote")
