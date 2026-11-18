@@ -238,14 +238,27 @@ def inspect_unwired_market_reference_view(
             }))
 
         mids_doc = market_read("allMids")
+        # PR #41 validates the *entire* market response, not just the
+        # requested coins. Reject corrupt bystanders rather than silently
+        # accepting one valid quote from an inconsistent market document.
+        if not 0 < len(mids_doc) <= 10000:
+            raise ValueError("missing or oversized market mids")
+        for observed_coin, raw in mids_doc.items():
+            if (type(observed_coin) is not str
+                    or _SPOT_COIN.fullmatch(observed_coin) is None
+                    or type(raw) is not str or not 0 < len(raw) <= 64
+                    or raw.strip() != raw):
+                raise ValueError("invalid market quote")
+            observed_price = Decimal(raw)
+            if (not observed_price.is_finite()
+                    or not 0 < observed_price <= Decimal("1e12")):
+                raise ValueError("invalid market quote range")
+
         prices = {}
         for coin in coins:
             raw = mids_doc.get(coin)
             if type(raw) is not str or _PRICE_STRING.fullmatch(raw) is None:
-                raise ValueError("missing or invalid mid price")
-            price = Decimal(raw)
-            if not price.is_finite() or not 0 < price <= Decimal("1e12"):
-                raise ValueError("invalid mid price range")
+                raise ValueError("missing or invalid requested mid price")
             prices[coin] = raw
 
         meta = market_read("meta")
@@ -254,20 +267,23 @@ def inspect_unwired_market_reference_view(
             raise ValueError("invalid perp universe")
         sizes = {}
         requested = set(coins)
+        all_assets = set()
         for asset in universe:
             if type(asset) is not dict:
                 raise ValueError("invalid perp asset")
             coin = asset.get("name")
-            if coin not in requested:
-                continue
             decimals = asset.get("szDecimals")
             if (
-                coin in sizes
+                type(coin) is not str or _SPOT_COIN.fullmatch(coin) is None
+                or coin in all_assets
                 or type(decimals) is not int or not 0 <= decimals <= 8
-                or asset.get("isDelisted") is True
             ):
-                raise ValueError("duplicate, invalid or delisted perp asset")
-            sizes[coin] = decimals
+                raise ValueError("duplicate or invalid perp asset")
+            all_assets.add(coin)
+            if coin in requested:
+                if asset.get("isDelisted") is True:
+                    raise ValueError("requested perp asset delisted")
+                sizes[coin] = decimals
         if set(sizes) != requested:
             raise ValueError("missing perp precision metadata")
 
