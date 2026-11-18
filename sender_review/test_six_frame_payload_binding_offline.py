@@ -106,6 +106,67 @@ class SyntheticInfoPayloadBindingTests(unittest.TestCase):
         self.assertTrue(r.exact_synthetic_wiring)
         self.assertFalse(r.locally_consistent)
 
+    def test_local_history_coherence_does_not_imply_strategy_data_ready(self):
+        # The original lightweight six-frame fixture has only position sizes
+        # and no equity/entryPx/unrealizedPnl fields. It may reconcile locally
+        # but must NOT be presented as a usable strategy account snapshot.
+        result = review(sample())
+        self.assertTrue(result.locally_consistent)
+        self.assertFalse(result.strategy_shape_compatible)
+        self.assertFalse(result.additional_spot_read_needed)
+        self.assert_denied(result)
+
+    def test_matching_full_strategy_shape_remains_non_authorizing(self):
+        records = sample()
+        position = json.loads(records[0].response_body)
+        position["marginSummary"] = {"accountValue": "100"}
+        position["assetPositions"][0]["position"].update({
+            "entryPx": "120", "unrealizedPnl": "2",
+            "leverage": {"value": 2},
+        })
+        raw = json.dumps(position, separators=(",", ":")).encode("ascii")
+        frames = (
+            replace(records[0], response_body=raw),
+            *records[1:5],
+            replace(records[5], response_body=raw),
+        )
+        result = review(frames)
+        self.assertTrue(result.locally_consistent)
+        self.assertTrue(result.strategy_shape_compatible)
+        self.assertFalse(result.additional_spot_read_needed)
+        self.assert_denied(result)
+
+    def test_changed_equity_or_low_equity_spot_gap_blocks_compatibility(self):
+        records = sample()
+        full = json.loads(records[0].response_body)
+        full["marginSummary"] = {"accountValue": "100"}
+        full["assetPositions"][0]["position"].update({
+            "entryPx": "120", "unrealizedPnl": "2",
+            "leverage": {"value": 2},
+        })
+        def framed(start, end):
+            before = json.dumps(start, separators=(",", ":")).encode("ascii")
+            after = json.dumps(end, separators=(",", ":")).encode("ascii")
+            return (
+                replace(records[0], response_body=before),
+                *records[1:5],
+                replace(records[5], response_body=after),
+            )
+        changed = json.loads(json.dumps(full))
+        changed["marginSummary"]["accountValue"] = "90"
+        result = review(framed(full, changed))
+        self.assertTrue(result.locally_consistent)
+        self.assertFalse(result.strategy_shape_compatible)
+        self.assert_denied(result)
+
+        low = json.loads(json.dumps(full))
+        low["marginSummary"]["accountValue"] = "5"
+        result = review(framed(low, low))
+        self.assertTrue(result.locally_consistent)
+        self.assertTrue(result.additional_spot_read_needed)
+        self.assertFalse(result.strategy_shape_compatible)
+        self.assert_denied(result)
+
     def test_no_network_or_exchange_dependencies(self):
         import ast
         from pathlib import Path
@@ -121,6 +182,7 @@ class SyntheticInfoPayloadBindingTests(unittest.TestCase):
             "dataclasses", "hashlib", "json",
             "sender_review.hyperliquid_readonly_collection_plan_offline",
             "sender_review.coordinated_testnet_readset_review",
+            "sender_review.signer_free_account_view_offline",
         })
 
 
