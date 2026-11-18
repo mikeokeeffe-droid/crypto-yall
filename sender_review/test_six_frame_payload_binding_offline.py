@@ -178,7 +178,7 @@ class SyntheticInfoPayloadBindingTests(unittest.TestCase):
             "leverage": {"value": 2},
         })
         changed_equity = json.loads(json.dumps(base))
-        changed_equity["marginSummary"]["accountValue"] = "100.00000000000001"
+        changed_equity["marginSummary"]["accountValue"] = "100.000000000000001"
         self.assertEqual(
             float(changed_equity["marginSummary"]["accountValue"]),
             float(base["marginSummary"]["accountValue"]),
