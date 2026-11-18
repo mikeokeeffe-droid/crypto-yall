@@ -15,6 +15,11 @@ existing `testnet-collector-offline-review.service` unchanged.
   `0770`, a non-`postgres` administrator, or a non-fresh journal schema. It
   reuses `sender_review/ci_only_journal.sql` and
   `sender_review/ci_only_restricted_role.sql` verbatim.
+- The review-only owner removes the global default `PUBLIC EXECUTE` grant on
+  functions *before* creating the journal functions. A disposable PostgreSQL 18
+  integration test verifies existing and newly created functions remain
+  inaccessible to an unrelated role. This default ACL must be undone before
+  deleting the owner role during a separately approved rollback.
 - The database owner and all three bot roles are `NOLOGIN`,
   `NOSUPERUSER`, `NOCREATEDB`, `NOCREATEROLE`, `NOREPLICATION`,
   `NOBYPASSRLS`, and `NOINHERIT`. The bot roles receive no database,
@@ -120,7 +125,23 @@ and no service or other object depends on the review schema:
    DROP SCHEMA sender_review_ci CASCADE;
    ```
 
-3. Revoke any grants that an operator added outside this package, then drop
+3. Reverse the **owner's global default-function ACL change** before
+   attempting to drop that owner role. Run as the local PostgreSQL
+   administrator in the same isolated `sender_review_test` database, after
+   confirming the package is the only source of owner default-ACL changes:
+
+   ```sql
+   ALTER DEFAULT PRIVILEGES FOR ROLE sender_review_pg18_owner
+       GRANT EXECUTE ON FUNCTIONS TO PUBLIC;
+   ```
+
+   This restores PostgreSQL's built-in default for functions created **in
+   the future**; it does not grant access to the already-deleted journal
+   functions. If other default ACL modifications or role dependencies
+   remain, stop and have the reviewer identify them rather than running a
+   broad `DROP OWNED ... CASCADE` or deleting unrelated objects.
+
+4. Revoke any grants that an operator added outside this package, then drop
    only the package's roles:
 
    ```sql
@@ -132,11 +153,11 @@ and no service or other object depends on the review schema:
    DROP ROLE sender_review_pg18_owner;
    ```
 
-4. Restore the database's prior `PUBLIC` CONNECT/TEMPORARY grants only if they
+5. Restore the database's prior `PUBLIC` CONNECT/TEMPORARY grants only if they
    were present before the package was applied. Do not drop the database,
    alter socket/firewall policy, restart PostgreSQL, or change bot workflows
    as part of this rollback.
-5. Privately verify the effective database and host configuration against the
+6. Privately verify the effective database and host configuration against the
    pre-change evidence. Any mismatch is a stop condition and requires the
    independent reviewer and operator to resolve it before further activity.
 
