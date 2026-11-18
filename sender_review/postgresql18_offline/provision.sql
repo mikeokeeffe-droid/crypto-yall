@@ -71,16 +71,19 @@ REVOKE ALL ON DATABASE sender_review_test FROM
     sender_review_pg18_owner, sender_review_pg18_daily,
     sender_review_pg18_intraday, sender_review_pg18_aggressive,
     sender_review_ci_untrusted, sender_review_ci_restricted;
+-- Preserve privileges of the disconnected NOLOGIN object owner; revoking
+-- owner ACLs would contradict ownership assertions while adding no bot isolation.
+-- No owner role has database CONNECT or membership grants.
 REVOKE ALL ON SCHEMA sender_review_ci FROM PUBLIC,
-    sender_review_pg18_owner, sender_review_pg18_daily,
+    sender_review_pg18_daily,
     sender_review_pg18_intraday, sender_review_pg18_aggressive,
     sender_review_ci_untrusted, sender_review_ci_restricted;
 REVOKE ALL ON ALL TABLES IN SCHEMA sender_review_ci FROM PUBLIC,
-    sender_review_pg18_owner, sender_review_pg18_daily,
+    sender_review_pg18_daily,
     sender_review_pg18_intraday, sender_review_pg18_aggressive,
     sender_review_ci_untrusted, sender_review_ci_restricted;
 REVOKE ALL ON ALL SEQUENCES IN SCHEMA sender_review_ci FROM PUBLIC,
-    sender_review_pg18_owner, sender_review_pg18_daily,
+    sender_review_pg18_daily,
     sender_review_pg18_intraday, sender_review_pg18_aggressive,
     sender_review_ci_untrusted, sender_review_ci_restricted;
 REVOKE ALL ON ALL FUNCTIONS IN SCHEMA sender_review_ci FROM PUBLIC,
