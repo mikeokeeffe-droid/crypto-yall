@@ -111,6 +111,45 @@ class SignerFreeReadOnlyUnwiredTests(unittest.TestCase):
                 self.assertFalse(result.fixture_parsed)
                 self.assert_no_authority(result)
 
+    def test_account_wire_decimal_fields_must_be_json_strings(self):
+        cases = (
+            ("equity int", {"marginSummary": {"accountValue": 100},
+                            "assetPositions": []}),
+            ("equity float", {"marginSummary": {"accountValue": 100.5},
+                              "assetPositions": []}),
+            ("equity bool", {"marginSummary": {"accountValue": True},
+                             "assetPositions": []}),
+            ("size number", perp(positions=[{
+                "position": {
+                    "coin": "SOL", "szi": 0.25, "entryPx": "100",
+                    "unrealizedPnl": "1", "leverage": {"value": 2},
+                },
+            }])),
+            ("flat size number", perp(positions=[{
+                "position": {"coin": "SOL", "szi": 0},
+            }])),
+        )
+        for label, fixture in cases:
+            with self.subTest(label=label):
+                seen = []
+                def fake(request):
+                    seen.append(request["type"])
+                    return encoded(fixture)
+                result = inspect_unwired_signer_free_account_view(
+                    account=ACCOUNT, network="testnet", test_transport=fake,
+                )
+                self.assertEqual(seen, ["clearinghouseState"])
+                self.assertEqual(result.state, "HOLD")
+                self.assertFalse(result.fixture_parsed)
+                self.assert_no_authority(result)
+        # Properly encoded decimal strings still parse as untrusted input.
+        valid = inspect_unwired_signer_free_account_view(
+            account=ACCOUNT, network="testnet",
+            test_transport=lambda _: encoded(perp(equity="100")),
+        )
+        self.assertTrue(valid.fixture_parsed)
+        self.assert_no_authority(valid)
+
     def test_denies_bad_scope_or_missing_callback_without_read(self):
         called = []
         def transport(payload):
