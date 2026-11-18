@@ -8,6 +8,7 @@ exchange provenance, complete history, ownership or safe trading.
 from dataclasses import dataclass
 import hashlib
 import json
+from decimal import Decimal
 
 from sender_review.hyperliquid_readonly_collection_plan_offline import (
     plan_offline_six_frame_reconciliation_fixture,
@@ -163,6 +164,11 @@ def inspect_synthetic_info_payload_binding_offline(
         and after_view.fixture_parsed is True
         and before_view.positions == after_view.positions
         and before_view.equity == after_view.equity
+        # The legacy shape uses floats. Do not mistake sub-ULP changes
+        # in a decimal exchange snapshot for a stable account bookend.
+        and Decimal(str(documents[0]["marginSummary"]["accountValue"]))
+            == Decimal(str(documents[5]["marginSummary"]["accountValue"]))
+        and documents[0]["assetPositions"] == documents[5]["assetPositions"]
         and not needs_spot
     )
     return OfflinePayloadBindingReview(
