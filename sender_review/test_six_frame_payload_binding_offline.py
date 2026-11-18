@@ -167,6 +167,39 @@ class SyntheticInfoPayloadBindingTests(unittest.TestCase):
         self.assertFalse(result.strategy_shape_compatible)
         self.assert_denied(result)
 
+    def test_decimal_equity_and_raw_bookend_changes_hold(self):
+        # A float compatibility projection rounds away this tiny difference;
+        # original raw account observations must not appear stable.
+        records = sample()
+        base = json.loads(records[0].response_body)
+        base["marginSummary"] = {"accountValue": "100"}
+        base["assetPositions"][0]["position"].update({
+            "entryPx": "120", "unrealizedPnl": "2",
+            "leverage": {"value": 2},
+        })
+        changed_equity = json.loads(json.dumps(base))
+        changed_equity["marginSummary"]["accountValue"] = "100.00000000000001"
+        self.assertEqual(
+            float(changed_equity["marginSummary"]["accountValue"]),
+            float(base["marginSummary"]["accountValue"]),
+        )
+        changed_raw_position = json.loads(json.dumps(base))
+        changed_raw_position["assetPositions"][0]["position"]["unrealizedPnl"] = "2.0000000000000001"
+        self.assertEqual(float(changed_raw_position["assetPositions"][0]["position"]["unrealizedPnl"]), 2.0)
+        for changed in (changed_equity, changed_raw_position):
+            with self.subTest(changed=changed):
+                before = json.dumps(base, separators=(",", ":")).encode("ascii")
+                after = json.dumps(changed, separators=(",", ":")).encode("ascii")
+                frames = (
+                    replace(records[0], response_body=before),
+                    *records[1:5],
+                    replace(records[5], response_body=after),
+                )
+                result = review(frames)
+                self.assertTrue(result.locally_consistent)
+                self.assertFalse(result.strategy_shape_compatible)
+                self.assert_denied(result)
+
     def test_no_network_or_exchange_dependencies(self):
         import ast
         from pathlib import Path
@@ -179,7 +212,7 @@ class SyntheticInfoPayloadBindingTests(unittest.TestCase):
             elif isinstance(node, ast.ImportFrom):
                 modules.add(node.module)
         self.assertEqual(modules, {
-            "dataclasses", "hashlib", "json",
+            "dataclasses", "decimal", "hashlib", "json",
             "sender_review.hyperliquid_readonly_collection_plan_offline",
             "sender_review.coordinated_testnet_readset_review",
             "sender_review.signer_free_account_view_offline",
