@@ -15,6 +15,9 @@ from sender_review.hyperliquid_readonly_collection_plan_offline import (
 from sender_review.coordinated_testnet_readset_review import (
     inspect_coordinated_readset_offline,
 )
+from sender_review.signer_free_account_view_offline import (
+    extract_signer_free_account_view_offline,
+)
 
 _MAX_RESPONSE_BYTES = 524_288
 
@@ -38,6 +41,11 @@ class OfflinePayloadBindingReview:
     reason: str = "no authenticated origin for synthetic responses"
     exact_synthetic_wiring: bool = False
     locally_consistent: bool = False
+    # A coherent six-frame history sample can still lack the complete
+    # data shape required by the legacy strategies. This local check is
+    # NEVER trusted exchange provenance, risk clearance or trade authority.
+    strategy_shape_compatible: bool = False
+    additional_spot_read_needed: bool = False
     observed_request_sha256: tuple[str, ...] = ()
     observed_response_sha256: tuple[str, ...] = ()
     frames_reviewed: int = 0
@@ -135,11 +143,35 @@ def inspect_synthetic_info_payload_binding_offline(
         start_time_ms=start_time_ms,
         end_time_ms=end_time_ms,
     )
+    # Separate diagnostic: the six history/position frames may be locally
+    # consistent while lacking margin/equity or market fields required by
+    # the Daily/Intraday/Aggressive strategy readers. Do not elevate that
+    # weaker reconciliation verdict into a usable strategy account view.
+    before_view = extract_signer_free_account_view_offline(
+        user_state=documents[0],
+    )
+    after_view = extract_signer_free_account_view_offline(
+        user_state=documents[5],
+    )
+    needs_spot = (
+        before_view.additional_spot_read_needed
+        or after_view.additional_spot_read_needed
+    )
+    strategy_shape_compatible = (
+        result.locally_consistent
+        and before_view.fixture_parsed is True
+        and after_view.fixture_parsed is True
+        and before_view.positions == after_view.positions
+        and before_view.equity == after_view.equity
+        and not needs_spot
+    )
     return OfflinePayloadBindingReview(
         reason="six fixture bodies wired locally; " + result.reason
                + "; exchange origin and operator approval absent",
         exact_synthetic_wiring=True,
         locally_consistent=result.locally_consistent,
+        strategy_shape_compatible=strategy_shape_compatible,
+        additional_spot_read_needed=needs_spot,
         observed_request_sha256=tuple(request_digests),
         observed_response_sha256=tuple(response_digests),
         frames_reviewed=6,
