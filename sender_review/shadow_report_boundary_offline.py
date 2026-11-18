@@ -49,7 +49,8 @@ def inspect_shadow_report_boundary_offline(*, cycle):
             or cycle.exchange_origin_authenticated is not False
             or cycle.position_ownership_verified is not False
             or cycle.protective_close_verified is not False
-            or cycle.durable_fence_reserved is not False):
+            or cycle.durable_fence_reserved is not False
+            or type(cycle.additional_spot_read_needed) is not bool):
         return hold
     collections = (
         cycle.close_review_proposals, cycle.deferred_entry_proposals,
