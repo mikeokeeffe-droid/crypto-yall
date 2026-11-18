@@ -74,6 +74,49 @@ def _strict_document(raw):
     return doc
 
 
+# PR #41's disabled collector requires both total and hold for EVERY spot
+# balance and checks hold <= total. The legacy strategy shape uses only the
+# USDC total; checking only that field could hide inconsistent other balances.
+# This remains purely a caller-supplied fixture check, not authenticated data.
+_SPOT_COIN = re.compile(r"[A-Za-z0-9@._:/-]{1,64}\Z", re.ASCII)
+_MAX_SPOT_BALANCES = 512
+_SPOT_VALUE_LIMIT = Decimal("1000000000000")
+
+
+def _validate_untrusted_spot_balances(document):
+    if type(document) is not dict:
+        raise ValueError("invalid spot fixture")
+    rows = document.get("balances")
+    if type(rows) is not list or len(rows) > _MAX_SPOT_BALANCES:
+        raise ValueError("missing or oversized spot balances")
+    seen = set()
+    for row in rows:
+        if type(row) is not dict:
+            raise ValueError("invalid spot balance")
+        coin = row.get("coin")
+        if (type(coin) is not str or _SPOT_COIN.fullmatch(coin) is None
+                or coin in seen):
+            raise ValueError("invalid or duplicate spot coin")
+        seen.add(coin)
+        values = []
+        for name in ("total", "hold"):
+            raw = row.get(name)
+            if (type(raw) is not str or not 0 < len(raw) <= 64
+                    or raw.strip() != raw):
+                raise ValueError("missing or invalid spot decimal")
+            try:
+                amount = Decimal(raw)
+            except (ValueError, ArithmeticError):
+                raise ValueError("invalid spot decimal") from None
+            if (not amount.is_finite()
+                    or not 0 <= amount <= _SPOT_VALUE_LIMIT):
+                raise ValueError("invalid spot amount")
+            values.append(amount)
+        if values[1] > values[0]:
+            raise ValueError("held spot amount exceeds total")
+    return document
+
+
 def inspect_unwired_signer_free_account_view(
     *, account, network, test_transport=None,
 ):
@@ -107,7 +150,9 @@ def inspect_unwired_signer_free_account_view(
         user_state = read("clearinghouseState")
         view = extract_signer_free_account_view_offline(user_state=user_state)
         if view.additional_spot_read_needed:
-            spot = read("spotClearinghouseState")
+            spot = _validate_untrusted_spot_balances(
+                read("spotClearinghouseState"),
+            )
             view = extract_signer_free_account_view_offline(
                 user_state=user_state, spot_user_state=spot,
             )
