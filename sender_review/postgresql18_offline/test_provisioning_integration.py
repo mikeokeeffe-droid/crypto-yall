@@ -445,3 +445,41 @@ class PostgreSQL18ProvisioningIntegrationTests(unittest.TestCase):
             ).stdout.strip(),
             "0",
         )
+
+        # Exercise the documented rollback ONLY in this disposable, offline
+        # PostgreSQL 18 container. No operational host is accessed.
+        self.psql("DROP SCHEMA sender_review_ci CASCADE")
+        self.psql(
+            "ALTER DEFAULT PRIVILEGES FOR ROLE sender_review_pg18_owner "
+            "GRANT EXECUTE ON FUNCTIONS TO PUBLIC"
+        )
+        self.assertEqual(
+            self.psql(
+                "SELECT count(*) FROM pg_catalog.pg_default_acl "
+                "WHERE defaclrole = (SELECT oid FROM pg_catalog.pg_roles "
+                "WHERE rolname='sender_review_pg18_owner')"
+            ).stdout.strip(),
+            "0",
+            "owner default ACL must be restored before deleting the role",
+        )
+        for role in (*roles, public_probe):
+            self.psql(f'DROP ROLE "{role}"')
+        self.psql(
+            "GRANT CONNECT, TEMPORARY ON DATABASE sender_review_test TO PUBLIC"
+        )
+        self.assertEqual(
+            self.psql(
+                "SELECT count(*) FROM pg_catalog.pg_roles "
+                f"WHERE rolname IN ({role_csv},'{public_probe}')"
+            ).stdout.strip(),
+            "0",
+            "rollback left review-specific roles behind",
+        )
+        self.assertEqual(
+            self.psql(
+                "SELECT count(*) FROM pg_catalog.pg_namespace "
+                "WHERE nspname='sender_review_ci'"
+            ).stdout.strip(),
+            "0",
+            "rollback left the review schema behind",
+        )
