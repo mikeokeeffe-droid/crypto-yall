@@ -221,6 +221,74 @@ class SignerFreeReadOnlyUnwiredTests(unittest.TestCase):
         self.assertEqual(result.state, "HOLD")
         self.assertNotIn("do-not-leak", repr(result))
 
+    def test_pr41_collector_canonical_read_envelopes_match(self):
+        """Cross-PR #41 frozen request format compatibility, MOCK only.
+
+        Matches PR #41's six_frame_request_contract_offline at
+        13ce00001e3116c6e9cbc4c3b98feb87b3e33f08. This checks local
+        syntax, NOT whether a future /info gateway is approved or trusted.
+        """
+        account_requests = []
+        def account_transport(request):
+            account_requests.append(request.copy())
+            return encoded(perp(equity="5")) if request["type"] == "clearinghouseState" else encoded({
+                "balances": [{"coin": "USDC", "total": "22"}],
+            })
+        result = inspect_unwired_signer_free_account_view(
+            account=ACCOUNT, network="testnet",
+            test_transport=account_transport,
+        )
+        self.assertTrue(result.fixture_parsed)
+        self.assert_no_authority(result)
+        expected_clearing = {
+            "type": "clearinghouseState", "user": ACCOUNT, "dex": "",
+        }
+        expected_spot = {
+            "type": "spotClearinghouseState", "user": ACCOUNT,
+        }
+        self.assertEqual(account_requests, [expected_clearing, expected_spot])
+        # PR #41's first and sixth reconciliation frames use exactly
+        # this sorted, separator-minimized body, including the empty DEX.
+        canonical = lambda obj: json.dumps(
+            obj, sort_keys=True, separators=(",", ":"), allow_nan=False
+        ).encode("ascii")
+        self.assertEqual(canonical(account_requests[0]), canonical(expected_clearing))
+        self.assertEqual(
+            canonical(account_requests[0]),
+            b'{"dex":"","type":"clearinghouseState","user":"' +
+            ACCOUNT.encode("ascii") + b'"}',
+        )
+        # Spot fallback is a separate read, NOT part of PR #41's six-frame
+        # reconciliation. No order or close authority is implied.
+        self.assertEqual(
+            canonical(account_requests[1]),
+            b'{"type":"spotClearinghouseState","user":"' +
+            ACCOUNT.encode("ascii") + b'"}',
+        )
+
+        market_requests = []
+        def market_transport(request):
+            market_requests.append(request.copy())
+            return encoded({"SOL": "95"}) if request["type"] == "allMids" else encoded({
+                "universe": [{"name": "SOL", "szDecimals": 2}],
+            })
+        market = inspect_unwired_market_reference_view(
+            coins=("SOL",), network="testnet",
+            test_transport=market_transport,
+        )
+        self.assertEqual(market.state, "PARSED_UNTRUSTED_MARKET_FIXTURE_HOLD")
+        self.assertEqual(market_requests, [
+            {"type": "allMids", "dex": ""},
+            {"type": "meta", "dex": ""},
+        ])
+        self.assertEqual(
+            tuple(canonical(x) for x in market_requests),
+            (b'{"dex":"","type":"allMids"}',
+             b'{"dex":"","type":"meta"}'),
+        )
+        self.assertFalse(market.order_authorized)
+        self.assertFalse(market.prices_authorized_for_orders)
+
     def test_module_import_graph_excludes_network_signing_and_secrets(self):
         path = Path(__file__).with_name("signer_free_readonly_client_unwired.py")
         imports = set()
