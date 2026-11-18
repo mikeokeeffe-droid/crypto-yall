@@ -90,6 +90,40 @@ class SignedOidcFixtureTests(unittest.TestCase):
                 self.assertEqual(result.fixture_bot, bot)
                 self.assert_no_authority(result)
 
+    def test_signed_jwt_cannot_supply_its_own_key_or_processing_rules(self):
+        # Even a correctly signed *fake* RSA token may not redirect a
+        # verifier to token-provided JWK/JWKS/certificate sources.
+        # No HTTP fetch is involved and every outcome remains HOLD.
+        for injected in (
+            {"jku": "https://attacker.example/jwks"},
+            {"jwk": {"kty": "RSA", "kid": "forged"}},
+            {"x5u": "https://attacker.example/cert"},
+            {"x5c": ["forged-certificate"]},
+            {"crit": ["unknown_extension"]},
+            {"b64": False},
+            {"zip": "DEF"},
+        ):
+            with self.subTest(header=injected):
+                claims = {
+                    "iss": "https://token.actions.githubusercontent.com",
+                    "aud": AUD, "repository": REPO, "repository_id": "123456",
+                    "ref": REF, "sub": POLICY.subject,
+                    "event_name": "schedule", "workflow_ref": BOT_REFS[0][0],
+                    "jti": "unique-jti-001", "sha": "a" * 40,
+                    "run_id": "1234567", "run_attempt": "1",
+                    "nbf": NOW-40, "iat": NOW-30, "exp": NOW+180,
+                }
+                header = {"alg": "RS256", "typ": "JWT", "kid": "ci-fixture"}
+                header.update(injected)
+                message = _json(header) + "." + _json(claims)
+                sig = self.key.sign(
+                    message.encode(), padding.PKCS1v15(), hashes.SHA256()
+                )
+                token = message + "." + _b64(sig)
+                result = self.verify(token)
+                self.assertEqual(result.state, "hold")
+                self.assert_no_authority(result)
+
     def test_mutated_signature_wrong_jwks_or_unknown_key_hold(self):
         valid = self.token()
         tampered = valid[:-1] + ("A" if valid[-1] != "A" else "B")
