@@ -101,8 +101,14 @@ def extract_signer_free_account_view_offline(*, user_state, spot_user_state=None
         if type(raw_leverage) is dict:
             raw_leverage = raw_leverage.get("value", 1.0)
         # The original helper uses 'raw_leverage or 1.0'; valid zero/blank
-        # legacy observations map to 1.0, but bad/nonfinite values now HOLD.
-        if raw_leverage in (0, 0.0, "", None):
+        # legacy observations map to 1.0. Explicit JSON booleans are NOT
+        # leverage numbers: False compares equal to zero in Python and must
+        # not be silently promoted to a 1x legacy fallback.
+        if type(raw_leverage) is bool:
+            return SignerFreeAccountView(reason="boolean leverage is invalid")
+        if (raw_leverage is None
+                or (type(raw_leverage) in (int, float) and raw_leverage == 0)
+                or (type(raw_leverage) is str and raw_leverage == "")):
             raw_leverage = 1.0
         leverage = _finite_number(raw_leverage)
         if (entry_price is None or unrealized is None
