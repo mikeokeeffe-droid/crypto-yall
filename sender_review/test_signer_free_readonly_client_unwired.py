@@ -292,6 +292,41 @@ class SignerFreeReadOnlyUnwiredTests(unittest.TestCase):
         self.assertFalse(view.order_authorized)
         self.assertEqual(view.mid_prices, {"SOL": "50"})
 
+    def test_market_metadata_delisting_flag_must_be_boolean(self):
+        # A non-boolean JSON value must never be mistaken for an active
+        # asset, including when its coin is not in the requested set.
+        for coin in ("SOL", "AVAX"):
+            for value in ("true", "false", 1, 0, None, [], {}):
+                with self.subTest(coin=coin, value=value):
+                    def fake(request):
+                        if request["type"] == "allMids":
+                            return encoded({"SOL": "50", "AVAX": "25"})
+                        return encoded({"universe": [
+                            {"name": "SOL", "szDecimals": 2,
+                             **({"isDelisted": value} if coin == "SOL" else {})},
+                            {"name": "AVAX", "szDecimals": 1,
+                             **({"isDelisted": value} if coin == "AVAX" else {})},
+                        ]})
+                    result = inspect_unwired_market_reference_view(
+                        coins=("SOL",), network="testnet", test_transport=fake,
+                    )
+                    self.assertEqual(result.state, "HOLD")
+                    self.assertFalse(result.market_reference_parsed)
+                    self.assertFalse(result.order_authorized)
+        for value, expected in ((False, True), (True, False)):
+            def fake(request):
+                if request["type"] == "allMids":
+                    return encoded({"SOL": "50"})
+                return encoded({"universe": [
+                    {"name": "SOL", "szDecimals": 2, "isDelisted": value},
+                ]})
+            result = inspect_unwired_market_reference_view(
+                coins=("SOL",), network="testnet", test_transport=fake,
+            )
+            self.assertEqual(result.market_reference_parsed, expected)
+            self.assertFalse(result.order_authorized)
+            self.assertIn("HOLD", result.state)
+
     def test_market_reference_bad_scope_and_callback_fail_closed(self):
         requests = []
         def fake(request):
