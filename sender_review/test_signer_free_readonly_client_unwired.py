@@ -78,6 +78,7 @@ class SignerFreeReadOnlyUnwiredTests(unittest.TestCase):
             return encoded(perp())
         for account, network, callback in (
             (ACCOUNT.upper(), "testnet", transport),
+            ("0x" + "2" * 40, "testnet", transport),
             ("0x" + "a" * 39, "testnet", transport),
             (ACCOUNT, "mainnet", transport),
             (ACCOUNT, True, transport),
