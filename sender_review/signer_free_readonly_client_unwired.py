@@ -91,9 +91,12 @@ def inspect_unwired_signer_free_account_view(
             if read_type not in ("clearinghouseState", "spotClearinghouseState"):
                 raise ValueError("unsupported info read")
             seen.append(read_type)
-            return _strict_document(test_transport({
-                "type": read_type, "user": account,
-            }))
+            request = {"type": read_type, "user": account}
+            if read_type == "clearinghouseState":
+                # PR #41's exact /info request requires the empty perp DEX.
+                # Do not substitute another DEX or infer it from user input.
+                request["dex"] = ""
+            return _strict_document(test_transport(request))
 
         user_state = read("clearinghouseState")
         view = extract_signer_free_account_view_offline(user_state=user_state)
