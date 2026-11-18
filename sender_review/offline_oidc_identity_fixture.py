@@ -11,6 +11,7 @@ Signer here means OIDC RSA *verifier*, not a trading wallet signer. This module
 has no exchange SDK, network transport, accounts, secrets, or database code.
 """
 import base64
+import binascii
 from dataclasses import dataclass
 import json
 import re
@@ -245,5 +246,5 @@ def verify_fixture_oidc_identity_offline(
             fixture_jti=claims["jti"],
         )
     except (ValueError, TypeError, KeyError, UnicodeError,
-            InvalidSignature, OverflowError):
+            binascii.Error, InvalidSignature, OverflowError):
         return hold
