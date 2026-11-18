@@ -54,7 +54,7 @@ class SignerFreeReadOnlyUnwiredTests(unittest.TestCase):
             self.assertEqual(result.observed_read_types, ("clearinghouseState",))
             self.assert_no_authority(result)
         self.assertEqual(requests, [
-            {"type": "clearinghouseState", "user": ACCOUNT},
+            {"type": "clearinghouseState", "user": ACCOUNT, "dex": ""},
         ] * 3)
 
     def test_low_equity_spot_fallback_requires_second_read(self):
