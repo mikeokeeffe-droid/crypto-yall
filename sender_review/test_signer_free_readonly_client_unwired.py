@@ -62,7 +62,7 @@ class SignerFreeReadOnlyUnwiredTests(unittest.TestCase):
         def transport(payload):
             requests.append(payload["type"])
             return encoded(perp(equity="5")) if len(requests) == 1 else encoded({
-                "balances": [{"coin": "USDC", "total": "23.5"}],
+                "balances": [{"coin": "USDC", "total": "23.5", "hold": "0"}],
             })
         result = inspect_unwired_signer_free_account_view(
             account=ACCOUNT, network="testnet", test_transport=transport,
@@ -70,6 +70,46 @@ class SignerFreeReadOnlyUnwiredTests(unittest.TestCase):
         self.assertEqual(requests, ["clearinghouseState", "spotClearinghouseState"])
         self.assertEqual(result.equity, 23.5)
         self.assert_no_authority(result)
+
+    def test_spot_balances_match_pr41_strict_total_and_hold_contract(self):
+        good = [
+            {"coin": "USDC", "total": "23.5", "hold": "0.5"},
+            {"coin": "BTC", "total": "0.5", "hold": "0.1"},
+        ]
+        def observed(balances):
+            calls = []
+            def fake(request):
+                calls.append(request["type"])
+                return encoded(perp(equity="5")) if len(calls) == 1 else encoded(
+                    {"balances": balances})
+            return inspect_unwired_signer_free_account_view(
+                account=ACCOUNT, network="testnet", test_transport=fake,
+            ), calls
+        parsed, reads = observed(good)
+        self.assertEqual(reads, ["clearinghouseState", "spotClearinghouseState"])
+        self.assertTrue(parsed.fixture_parsed)
+        self.assertEqual(parsed.equity, 23.5)
+        self.assert_no_authority(parsed)
+        bad = (
+            [{"coin": "USDC", "total": "23.5"}],
+            [{"coin": "USDC", "total": "1", "hold": "2"}],
+            [{"coin": "USDC", "total": "NaN", "hold": "0"}],
+            [{"coin": "USDC", "total": "23.5", "hold": "-1"}],
+            [{"coin": "USDC", "total": 23.5, "hold": "0"}],
+            [{"coin": "USDC", "total": "23.5", "hold": None}],
+            [{"coin": "USDC", "total": "23.5", "hold": "0"},
+             {"coin": "USDC", "total": "22", "hold": "0"}],
+            [{"coin": "USDC", "total": "22", "hold": "0"},
+             {"coin": "BTC", "total": "0.1", "hold": "0.2"}],
+        )
+        for balances in bad:
+            with self.subTest(balances=balances):
+                result, observed_reads = observed(balances)
+                self.assertEqual(
+                    observed_reads, ["clearinghouseState", "spotClearinghouseState"])
+                self.assertEqual(result.state, "HOLD")
+                self.assertFalse(result.fixture_parsed)
+                self.assert_no_authority(result)
 
     def test_denies_bad_scope_or_missing_callback_without_read(self):
         called = []
@@ -233,7 +273,7 @@ class SignerFreeReadOnlyUnwiredTests(unittest.TestCase):
         def account_transport(request):
             account_requests.append(request.copy())
             return encoded(perp(equity="5")) if request["type"] == "clearinghouseState" else encoded({
-                "balances": [{"coin": "USDC", "total": "22"}],
+                "balances": [{"coin": "USDC", "total": "22", "hold": "0"}],
             })
         result = inspect_unwired_signer_free_account_view(
             account=ACCOUNT, network="testnet",
