@@ -308,6 +308,65 @@ class PostgreSQL18ProvisioningIntegrationTests(unittest.TestCase):
         self.assertTrue(membership_rows)
         self.assertTrue(all(result == "f" for _, _, result in membership_rows))
 
+        # A fresh unrelated role is a probe for grants inherited from PUBLIC:
+        # checking only the six named roles would miss accidental ambient grants.
+        # This role and every query below exist only in the disposable CI container.
+        public_probe = "sender_review_pg18_public_probe"
+        self.psql(
+            f"CREATE ROLE {public_probe} NOLOGIN NOSUPERUSER "
+            "NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS NOINHERIT"
+        )
+        for privilege in ("CONNECT", "CREATE", "TEMPORARY"):
+            self.assertEqual(
+                self.psql(
+                    f"SELECT has_database_privilege('{public_probe}',"
+                    f"current_database(),'{privilege}')"
+                ).stdout.strip(),
+                "f",
+                f"unexpected PUBLIC-derived database {privilege}",
+            )
+        for privilege in ("USAGE", "CREATE"):
+            self.assertEqual(
+                self.psql(
+                    f"SELECT has_schema_privilege('{public_probe}',"
+                    f"'sender_review_ci','{privilege}')"
+                ).stdout.strip(),
+                "f",
+                f"unexpected PUBLIC-derived schema {privilege}",
+            )
+        self.assertEqual(
+            self.psql(
+                "SELECT count(*) FROM pg_catalog.pg_class c "
+                "WHERE c.relnamespace='sender_review_ci'::regnamespace "
+                "AND ("
+                "(c.relkind IN ('r','p') AND ("
+                + " OR ".join(
+                    f"has_table_privilege('{public_probe}',c.oid,'{priv}')"
+                    for priv in (
+                        "SELECT", "INSERT", "UPDATE", "DELETE",
+                        "TRUNCATE", "REFERENCES", "TRIGGER",
+                    )
+                )
+                + ")) OR (c.relkind='S' AND ("
+                + " OR ".join(
+                    f"has_sequence_privilege('{public_probe}',c.oid,'{priv}')"
+                    for priv in ("USAGE", "SELECT", "UPDATE")
+                )
+                + ")))"
+            ).stdout.strip(),
+            "0",
+            "an unrelated role inherited table or sequence access",
+        )
+        self.assertEqual(
+            self.psql(
+                "SELECT count(*) FROM pg_catalog.pg_proc p "
+                "WHERE p.pronamespace='sender_review_ci'::regnamespace "
+                f"AND has_function_privilege('{public_probe}',p.oid,'EXECUTE')"
+            ).stdout.strip(),
+            "0",
+            "an unrelated role inherited journal-function EXECUTE",
+        )
+
         for role in roles[1:]:
             for statement in (
                 "SELECT * FROM sender_review_ci.review_intents",
