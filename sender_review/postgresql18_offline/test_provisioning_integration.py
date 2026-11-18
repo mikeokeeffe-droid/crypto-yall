@@ -367,6 +367,29 @@ class PostgreSQL18ProvisioningIntegrationTests(unittest.TestCase):
             "an unrelated role inherited journal-function EXECUTE",
         )
 
+        # Probe defaults for *future* owner-created SQL functions. The
+        # transaction is rolled back: no test function survives in the DB.
+        # Without ALTER DEFAULT PRIVILEGES, PostgreSQL would grant PUBLIC
+        # EXECUTE on new functions even when existing functions are fenced.
+        future_probe = self.psql(
+            "BEGIN; SET ROLE sender_review_pg18_owner; "
+            "CREATE FUNCTION sender_review_ci.future_default_acl_probe() "
+            "RETURNS boolean LANGUAGE sql AS 'SELECT true'; "
+            "RESET ROLE; "
+            "SELECT NOT has_function_privilege("
+            "'sender_review_pg18_public_probe',"
+            "'sender_review_ci.future_default_acl_probe()','EXECUTE') "
+            "AND has_function_privilege("
+            "'sender_review_pg18_owner',"
+            "'sender_review_ci.future_default_acl_probe()','EXECUTE'); "
+            "ROLLBACK;"
+        )
+        self.assertEqual(
+            future_probe.stdout.strip(),
+            "t",
+            "future owner-created function must never grant PUBLIC EXECUTE",
+        )
+
         for role in roles[1:]:
             for statement in (
                 "SELECT * FROM sender_review_ci.review_intents",
