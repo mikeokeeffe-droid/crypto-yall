@@ -81,6 +81,10 @@ class SignerFreeAccountViewOfflineTests(unittest.TestCase):
             account(equity="1e1000"),
             account(position(size="1000001")),
             account(position(leverage=[])),
+            account(position(leverage=False)),
+            account(position(leverage=True)),
+            account(position(leverage={"value": False})),
+            account(position(leverage={"value": True})),
         ]
         for sample in cases:
             with self.subTest(sample=str(sample)[:100]):
