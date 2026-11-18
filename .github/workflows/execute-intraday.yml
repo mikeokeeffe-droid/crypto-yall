@@ -158,7 +158,9 @@ jobs:
           AGGRESSIVE_GIST_ID: ${{ secrets.AGGRESSIVE_GIST_ID }}
 
       - name: Monitor Intraday protection until next strategy run
-        if: always()
+        # Skip the 55-minute loop only when entry and close-only protection
+        # are both disabled. Preserve monitoring for enabled protection.
+        if: ${{ always() && (vars.INTRADAY_KILL_SWITCH == 'ON' || vars.INTRADAY_PROTECT_WHILE_HALTED == 'ON') }}
         shell: bash
         run: |
           had_failure=0
