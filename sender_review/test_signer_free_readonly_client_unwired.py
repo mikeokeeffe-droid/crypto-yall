@@ -274,6 +274,24 @@ class SignerFreeReadOnlyUnwiredTests(unittest.TestCase):
         self.assertEqual(parsed.size_decimals, {"SOL": 2})
         self.assertFalse(parsed.order_authorized)
 
+    def test_unrequested_valid_market_symbol_forms_stay_review_only(self):
+        # Public market metadata may include synthetic tokens or namespaced
+        # perp symbols; neither should be confused with path-like data.
+        def fake(request):
+            if request["type"] == "allMids":
+                return encoded({"SOL": "50", "@12": "0.25", "xyz:BTC": "25"})
+            return encoded({"universe": [
+                {"name": "SOL", "szDecimals": 2},
+                {"name": "@12", "szDecimals": 3},
+                {"name": "xyz:BTC", "szDecimals": 4},
+            ]})
+        view = inspect_unwired_market_reference_view(
+            coins=("SOL",), network="testnet", test_transport=fake,
+        )
+        self.assertEqual(view.state, "PARSED_UNTRUSTED_MARKET_FIXTURE_HOLD")
+        self.assertFalse(view.order_authorized)
+        self.assertEqual(view.mid_prices, {"SOL": "50"})
+
     def test_market_reference_bad_scope_and_callback_fail_closed(self):
         requests = []
         def fake(request):
