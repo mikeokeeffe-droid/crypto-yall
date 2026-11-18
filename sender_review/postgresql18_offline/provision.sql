@@ -56,6 +56,11 @@ GRANT CREATE ON DATABASE sender_review_test TO sender_review_pg18_owner;
 GRANT sender_review_pg18_owner TO postgres;
 SET ROLE sender_review_pg18_owner;
 
+-- PostgreSQL grants EXECUTE on newly created functions to PUBLIC by default.
+-- Remove that default for this isolated NOLOGIN owner before any functions
+-- are created; explicitly grant only the disposable fixture wrapper below.
+ALTER DEFAULT PRIVILEGES REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC;
+
 -- Reuse the reviewed, review-only journal and restricted fixture SQL verbatim.
 \ir ../ci_only_journal.sql
 \ir ../ci_only_restricted_role.sql
