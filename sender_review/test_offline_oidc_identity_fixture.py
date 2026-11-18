@@ -124,6 +124,20 @@ class SignedOidcFixtureTests(unittest.TestCase):
                 self.assertEqual(result.state, "hold")
                 self.assert_no_authority(result)
 
+    def test_malformed_base64url_parts_fail_closed_without_exception(self):
+        valid = self.token()
+        segments = valid.split(".")
+        self.assertEqual(len(segments), 3)
+        # A single base64url character cannot be decoded into a whole
+        # number of bytes. The verifier must HOLD, not leak a decode error.
+        for index in range(3):
+            with self.subTest(segment=index):
+                invalid = segments.copy()
+                invalid[index] = "A"
+                result = self.verify(".".join(invalid))
+                self.assertEqual(result.state, "hold")
+                self.assert_no_authority(result)
+
     def test_mutated_signature_wrong_jwks_or_unknown_key_hold(self):
         valid = self.token()
         tampered = valid[:-1] + ("A" if valid[-1] != "A" else "B")
