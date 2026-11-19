@@ -1,0 +1,16 @@
+# REVIEW TEMPLATE ONLY. Enable only after explicit operator review.
+# 2-minute public API polling; not an active trade session heartbeat.
+[Unit]
+Description=Every 2 minutes check public GitHub Actions run metadata
+Documentation=https://github.com/mikeokeeffe-droid/crypto-yall/pull/42
+
+[Timer]
+OnBootSec=2min
+OnUnitInactiveSec=2min
+AccuracySec=10s
+RandomizedDelaySec=5s
+Persistent=false
+Unit=crypto-yall-status-review.service
+
+[Install]
+WantedBy=timers.target
