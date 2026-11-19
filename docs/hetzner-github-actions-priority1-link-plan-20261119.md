@@ -49,3 +49,32 @@ No Supabase integration. Do not change `main`, any existing live workflow, signi
 - [ ] Measure RTT, jitter and disconnect/recovery on distinct systems
 - [ ] Prove phone alert delivery for a failed active heartbeat
 - [ ] Confirm trades/protective stops remain independently safe on a lost link
+
+
+## 19 November follow-up — verified legacy workflow trigger configuration
+
+Direct inspection of the `main` versions of `.github/workflows/execute-trades.yml`,
+`execute-intraday.yml`, and `execute-aggressive.yml` confirms each declares
+**only** `workflow_dispatch` as its workflow trigger. The separate
+`signal-check.yml` and `manual-signal-check.yml` workflows also declare
+`workflow_dispatch` only. This does **not** establish which person, remote
+service, GitHub API client, scheduled task, or external system triggers those
+workflows. It also does **not** establish whether their old cancelled runs
+were intentional.
+
+The next read-only operator step on Hetzner is to inspect **timer unit names**
+without exposing secrets or running the bot:
+
+```bash
+systemctl list-timers --all --no-pager
+```
+
+If an existing timing service is discovered, privately assess its unit name,
+execution cadence and relationship to GitHub API workflow dispatch. Do **not**
+paste environment variables, private tokens, or full process command lines.
+The schedule may be outside Hetzner entirely. If no scheduler is found,
+record **UNKNOWN DISPATCH SOURCE**; don't invent timing, don't begin
+dispatching trading jobs and don't infer a heartbeat outage.
+
+The original three trading workflows, scheduler, live positions and secrets
+remain unchanged. Cross-host authenticated heartbeat remains **NOT VERIFIED**.
