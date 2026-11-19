@@ -23,12 +23,13 @@ class CryptoheartbeatSshTemplateTests(unittest.TestCase):
             "PermitTTY no",
             "PermitUserRC no",
             "PermitTunnel no",
-            "PermitUserEnvironment no",
         )
         for item in required:
             with self.subTest(item=item):
                 self.assertIn(item, text)
         self.assertEqual(text.count("Match User cryptoheartbeat"), 1)
+        self.assertNotIn("    PermitUserEnvironment no", text)
+        self.assertIn("GLOBAL-only directive", text)
         self.assertNotIn("HL_PRIVATE_KEY", text)
         self.assertNotIn("execute-trades", text)
         self.assertNotIn("market_open", text)
