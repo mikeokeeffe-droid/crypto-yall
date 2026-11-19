@@ -1,12 +1,15 @@
 # REVIEW TEMPLATE ONLY. Enable only after explicit operator review.
-# 2-minute public API polling; not an active trade session heartbeat.
+# Public unauthenticated API: 3 calls per pass, ~36/hour at 5-min cadence.
+# Keep under GitHub's typical 60-request/hour/IP unauthenticated budget;
+# other callers sharing this IP may still consume the quota.
+# This is NOT a high-frequency heartbeat or trade monitoring.
 [Unit]
-Description=Every 2 minutes check public GitHub Actions run metadata
+Description=Every 5 minutes check public GitHub Actions run metadata
 Documentation=https://github.com/mikeokeeffe-droid/crypto-yall/pull/42
 
 [Timer]
-OnBootSec=2min
-OnUnitInactiveSec=2min
+OnBootSec=5min
+OnUnitInactiveSec=5min
 AccuracySec=10s
 RandomizedDelaySec=5s
 Persistent=false
