@@ -1,0 +1,32 @@
+# REVIEW TEMPLATE ONLY. Not installed or enabled by this commit.
+# Run under the existing nonprivileged testadmin user, not root.
+# Public, read-only GitHub API metadata; NOT a bidirectional heartbeat.
+[Unit]
+Description=Crypto Y'all public GitHub Actions status observation (read-only)
+Documentation=https://github.com/mikeokeeffe-droid/crypto-yall/pull/42
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=%h/crypto-yall-monitor/repo
+ExecStart=/usr/bin/python3 -B -m sender_review.github_actions_readonly_observer
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=read-only
+ReadOnlyPaths=%h/crypto-yall-monitor/repo
+RestrictSUIDSGID=yes
+LockPersonality=yes
+CapabilityBoundingSet=
+AmbientCapabilities=
+UMask=0077
+TimeoutStartSec=45
+Environment=PYTHONDONTWRITEBYTECODE=1
+Environment=PYTHONUNBUFFERED=1
+# No trading keys, GitHub tokens, database or trade endpoint.
+# No network access is granted by this file; the existing host outbound
+# HTTPS policy must be reviewed independently. No inbound listener.
+
+[Install]
+WantedBy=default.target
