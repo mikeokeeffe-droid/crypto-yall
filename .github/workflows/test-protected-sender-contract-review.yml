@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - 'sender_review/**'
+      - '.github/workflows/manual-hetzner-ssh-heartbeat-review.yml'
       - '.github/workflows/execute-trades.yml'
       - '.github/workflows/execute-intraday.yml'
       - '.github/workflows/execute-aggressive.yml'
@@ -68,6 +69,8 @@ jobs:
         run: python -m unittest sender_review.test_ssh_heartbeat_stdio_review_only -v
       - name: Check pinned-host SSH heartbeat probe under offline mocks
         run: python -m unittest sender_review.test_github_to_hetzner_heartbeat_probe_review_only -v
+      - name: Check manual heartbeat workflow is isolated from trading and PR secrets
+        run: python -m unittest sender_review.test_manual_hetzner_heartbeat_workflow_review -v
       - name: Validate review-only SSH heartbeat restrictions (no SSH changes)
         run: python -m unittest sender_review.test_cryptoheartbeat_ssh_template -v
       - name: Validate inert heartbeat restricted login shell (no host changes)
