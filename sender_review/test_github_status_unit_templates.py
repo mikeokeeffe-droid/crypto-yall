@@ -9,7 +9,8 @@ _TIMER = _ROOT / "crypto-yall-status-review.timer.example"
 
 
 def parsed(path):
-    cfg = ConfigParser(interpolation=None)
+    cfg = ConfigParser(interpolation=None, strict=False)
+    # systemd permits repeated directives, including Environment=.
     with path.open(encoding="utf-8") as handle:
         cfg.read_file(handle)
     return cfg
