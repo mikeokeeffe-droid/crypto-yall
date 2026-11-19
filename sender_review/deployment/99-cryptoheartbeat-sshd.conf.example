@@ -34,4 +34,6 @@ Match User cryptoheartbeat
     PermitTTY no
     PermitUserRC no
     PermitTunnel no
-    PermitUserEnvironment no
+# PermitUserEnvironment is a GLOBAL-only directive on this OpenSSH build.
+# The existing global sshd configuration already sets permituserenvironment no.
+# Do not modify global sshd settings as part of this heartbeat review.
