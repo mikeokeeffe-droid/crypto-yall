@@ -18,8 +18,8 @@ ProtectHome=read-only
 ReadOnlyPaths=%h/crypto-yall-monitor/repo
 RestrictSUIDSGID=yes
 LockPersonality=yes
-CapabilityBoundingSet=
-AmbientCapabilities=
+# User-level systemd cannot change the kernel capability bounding set.
+# NoNewPrivileges=yes remains mandatory; monitor has no trade credentials.
 UMask=0077
 TimeoutStartSec=45
 Environment=PYTHONDONTWRITEBYTECODE=1
