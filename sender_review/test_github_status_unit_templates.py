@@ -47,13 +47,13 @@ class ReviewOnlyStatusUnitTemplateTests(unittest.TestCase):
                 continue
             self.assertNotIn(forbidden, src)
 
-    def test_timer_every_two_minutes_and_not_persistent(self):
+    def test_timer_every_five_minutes_and_not_persistent(self):
         timer = parsed(_TIMER)
         self.assertEqual(
             timer["Timer"]["Unit"], "crypto-yall-status-review.service"
         )
-        self.assertEqual(timer["Timer"]["OnUnitInactiveSec"], "2min")
-        self.assertEqual(timer["Timer"]["OnBootSec"], "2min")
+        self.assertEqual(timer["Timer"]["OnUnitInactiveSec"], "5min")
+        self.assertEqual(timer["Timer"]["OnBootSec"], "5min")
         self.assertEqual(timer["Timer"]["Persistent"], "false")
         self.assertEqual(timer["Install"]["WantedBy"], "timers.target")
 
