@@ -28,5 +28,4 @@ Environment=PYTHONUNBUFFERED=1
 # No network access is granted by this file; the existing host outbound
 # HTTPS policy must be reviewed independently. No inbound listener.
 
-[Install]
-WantedBy=default.target
+# Timer activates this one-shot service. Never enable the service directly.
