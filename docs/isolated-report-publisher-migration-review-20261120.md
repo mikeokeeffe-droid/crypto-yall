@@ -21,6 +21,35 @@ trading executor, or Hetzner host is changed by this note.
   **7 Nov 2026**. This proves that file is stale, not that any trading bot has
   or has not been running since.
 
+## Read-only GitHub operation and visibility check (20 Nov 2026)
+
+- The repository metadata returns `private: false` / `visibility: public`.
+  The existing `reports/latest.json` and dated reports are therefore not
+  an acceptable destination for new unredacted private trading records.
+  **Do not post copies of sensitive report bodies or Gist contents in CI logs,
+  PR comments, public artifacts or a new branch.** Review existing public
+  report exposure and decide whether removal or access changes are needed,
+  under separate explicit operator approval.
+- GitHub Actions read-only list `GET /actions/runs?branch=main&per_page=100`
+  showed its most recent `main` workflow run as **Execute Intraday,
+  7 Nov 2026 00:07 UTC, cancelled**. The preceding Intraday runs on 6 Nov
+  were successful. The repository's last report has a matching 7 Nov
+  generation timestamp. The reviewed original bot workflow definitions
+  are `workflow_dispatch`-only, with no GitHub `schedule` trigger.
+  **Do not conclude bots have stopped trading**: an external dispatcher or
+  server may exist outside this GitHub run history; current Gist and exchange
+  account evidence was neither accessible nor requested.
+- A safe operator check, before any new scheduler or bot dispatch, is:
+  identify the authoritative prior dispatcher, confirm its health and
+  intended trigger ownership without making changes, verify the absence
+  of unexpected overlapping jobs, and separately verify any open
+  Hyperliquid positions/protective exit coverage through an authorised
+  read-only route. Do not restart a live bot or run a manual workflow merely
+  to produce a fresh report.
+- Source-only offline contract + Code Safety + disposable PostgreSQL
+  checks all passed at commit `9403e1e4fb8b3c82920d8dd68cc09139104281ef`.
+  This confirms **offline regression behavior**, not actual report delivery.
+
 ## Proposed migration sequence (not authorised to run)
 
 1. Preserve the running bots and their protection loops untouched. Design a
