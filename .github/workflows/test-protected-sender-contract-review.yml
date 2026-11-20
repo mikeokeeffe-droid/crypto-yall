@@ -97,6 +97,8 @@ jobs:
         run: |
           python -m unittest sender_review.test_three_bot_cutover_matrix -v
           python -m sender_review.three_bot_cutover_matrix
+      - name: Detect legacy report direct-push and mid-job reset risks (offline)
+        run: python -m unittest sender_review.test_legacy_report_publisher_audit_offline -v
       - name: Pin exact original strategy and protection file bytes (offline)
         run: python -m unittest sender_review.test_legacy_exact_source_pin_offline -v
       - name: Verify synthetic pre-submit leverage and notional checks always HOLD
