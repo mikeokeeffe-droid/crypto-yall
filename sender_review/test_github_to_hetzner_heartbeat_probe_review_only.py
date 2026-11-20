@@ -1,6 +1,9 @@
 """Offline tests for GitHub → Hetzner SSH probe; no network or secrets."""
 import base64
 import json
+import os
+import stat
+from pathlib import Path
 import struct
 import subprocess
 import unittest
@@ -64,6 +67,14 @@ class GitHubToHetznerProbeReviewTests(unittest.TestCase):
             self.assertIn("BatchMode=yes", args)
             self.assertIn("-T", args)
             self.assertNotIn("StrictHostKeyChecking=no", args)
+            self.assertIn("ProxyCommand=none", args)
+            self.assertIn("ProxyJump=none", args)
+            self.assertIn("RequestTTY=no", args)
+            key_path = Path(args[args.index("-i") + 1])
+            self.assertEqual(stat.S_IMODE(key_path.stat().st_mode), 0o600)
+            host_opt = next(x for x in args if x.startswith("UserKnownHostsFile="))
+            host_path = Path(host_opt.partition("=")[2])
+            self.assertEqual(stat.S_IMODE(host_path.stat().st_mode), 0o600)
             reply = json.dumps({"v": 1, "kind": "heartbeat_ack",
                                 "nonce": NONCE, "server_nonce": "b"*32,
                                 "received": NOW, "authority": "none"}).encode("ascii")
@@ -72,6 +83,19 @@ class GitHubToHetznerProbeReviewTests(unittest.TestCase):
                               host_public_key=HOSTKEY, ssh_run=fake_run,
                               now=NOW, nonce=NONCE))
         self.assertEqual(len(inspected), 1)
+
+    def test_review_workflow_requires_separate_environment_secrets(self):
+        """No original repo-secret names and no unprotected heartbeat job."""
+        wf = Path('.github/workflows/manual-hetzner-ssh-heartbeat-review.yml').read_text()
+        self.assertIn('environment: hetzner-heartbeat-review', wf)
+        self.assertIn("github.ref == 'refs/heads/main'", wf)
+        self.assertIn("inputs.confirm == 'RUN_READONLY_HEARTBEAT'", wf)
+        self.assertIn('secrets.HETZNER_HEARTBEAT_REVIEW_ENV_PRIVATE_KEY', wf)
+        self.assertIn('secrets.HETZNER_HEARTBEAT_REVIEW_ENV_HOST_KEY_ED25519', wf)
+        self.assertNotIn('secrets.HETZNER_HEARTBEAT_SSH_KEY', wf)
+        self.assertNotIn('secrets.HETZNER_HEARTBEAT_HOST_KEY_ED25519', wf)
+        self.assertNotIn('on: push', wf)
+        self.assertNotIn('on: schedule', wf)
 
     def test_nonzero_exit_never_echoes_stderr(self):
         def failed_run(args, **kw):
