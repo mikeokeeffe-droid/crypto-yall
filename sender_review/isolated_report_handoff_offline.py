@@ -64,6 +64,54 @@ def _tracking_started(report):
     return started, updated
 
 
+def _retains_closed_history(old_rows, new_rows):
+    """Check that older closed records survive ordinary append/200-row trim.
+
+    A 200-row cap permits dropping the oldest rows. A no-overlap transition
+    stays HOLD rather than guessing that 200+ new rows arrived at once.
+    Record equality is a SYNTHETIC continuity check, not proof of provenance.
+    """
+    if (type(old_rows) is not list or type(new_rows) is not list
+            or len(old_rows) > 200 or len(new_rows) > 200
+            or any(type(row) is not dict for row in old_rows + new_rows)):
+        return False
+    if not old_rows:
+        return True
+    overlap = next(
+        (n for n in range(min(len(old_rows), len(new_rows)), 0, -1)
+         if old_rows[-n:] == new_rows[:n]),
+        0,
+    )
+    return overlap > 0 and (overlap == len(old_rows) or len(new_rows) == 200)
+
+
+def _check_shadow_cohorts(old_shadow, new_shadow):
+    expected = {"intraday", "aggressive"}
+    for filtered in (False, True):
+        if filtered:
+            old_part = old_shadow.get("dual_short_confirmed_filter")
+            new_part = new_shadow.get("dual_short_confirmed_filter")
+        else:
+            old_part, new_part = old_shadow, new_shadow
+        if type(old_part) is not dict or type(new_part) is not dict:
+            return False
+        old_bots = old_part.get("bots")
+        new_bots = new_part.get("bots")
+        if (type(old_bots) is not dict or type(new_bots) is not dict
+                or set(old_bots) != expected or set(new_bots) != expected):
+            return False
+        for bot in expected:
+            prior = old_bots[bot]
+            candidate = new_bots[bot]
+            if type(prior) is not dict or type(candidate) is not dict:
+                return False
+            if not _retains_closed_history(
+                prior.get("closed_trades"), candidate.get("closed_trades")
+            ):
+                return False
+    return True
+
+
 def review_private_report_handoff_offline(
     *, previous: bytes, candidate: bytes, now: dt.datetime,
 ) -> PrivateReportHandoffReview:
@@ -97,8 +145,11 @@ def review_private_report_handoff_offline(
                 or set(old_shadow["dual_short_confirmed_filter"].get("bots", {}))
                 != set(new_shadow["dual_short_confirmed_filter"].get("bots", {}))):
             return hold
-        # Historical counts and records need durable private-store roundtrip
-        # verification before publication. This check is NOT sufficient.
+        if not _check_shadow_cohorts(old_shadow, new_shadow):
+            return hold
+        # The sequence comparison catches obvious loss or rewrite of prior
+        # paper records. It is NOT authenticated storage, history provenance,
+        # an atomic compare-and-swap, or a reason to publish private reports.
         return PrivateReportHandoffReview(
             verdict="CONTINUITY_METADATA_ONLY_HOLD",
             reason="snapshot timestamps and shadow cohort identities match; private storage unverified",
