@@ -89,6 +89,34 @@ Separately inspect authorised read-only Hyperliquid account positions/orders.
 Do not run a workflow dispatch, restart a timer, modify credentials, connect
 to a server, or assume flat/no-risk state on the basis of these records.
 
+## Three-bot final dispatch timeline (20 Nov 2026 read-only GitHub audit)
+
+The Actions history confirms **staggered historical stoppage**, not a simultaneous
+migration of the three bots:
+
+| Original workflow | Last recorded `main` dispatch, UTC | Outcome | Recorded job evidence |
+| --- | --- | --- | --- |
+| Daily `Execute Trades` | **24 Oct 2026 00:15:33 UTC** | success | [run 40044074650](https://github.com/mikeokeeffe-droid/crypto-yall/actions/runs/40044074650); its execute and report-publish steps were both marked success |
+| Aggressive `Execute Aggressive` | **24 Oct 2026 13:02:14 UTC** | cancelled | [run 40096422121](https://github.com/mikeokeeffe-droid/crypto-yall/actions/runs/40096422121); available job metadata contains no individual step conclusions |
+| Intraday `Execute Intraday` | **7 Nov 2026 00:07:12 UTC** | cancelled | [run 42316237705](https://github.com/mikeokeeffe-droid/crypto-yall/actions/runs/42316237705); available job metadata contains no individual step conclusions |
+
+This is derived from the paged `main` Actions run listing (pages 1–10)
+and individual job metadata. Earlier recurring times were consistent with
+Daily at :15 once daily, Aggressive at :02/:32 half-hourly, and
+Intraday at :07 hourly. They were launched as `workflow_dispatch`,
+but the original calling scheduler, reason for cancellation, and any
+separately operating trading instance **cannot be inferred** from
+`actor.login` alone.
+
+**Operational safety implication:** The historical GitHub bot jobs
+and their inline protection loops cannot establish **current** protection
+or open-position status. Do not infer a flat account. Do not resume a
+single worker while any earlier instance could still sign orders or while
+an old position may need protective exits. Ask the operator of the
+unmanaged former scheduler for narrow redacted evidence and obtain an
+authorised independent read-only exchange position/order assessment before
+considering any restart, cutover or recovery.
+
 ## Proposed migration sequence (not authorised to run)
 
 1. Preserve the running bots and their protection loops untouched. Design a
