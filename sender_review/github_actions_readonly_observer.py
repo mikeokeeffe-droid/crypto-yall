@@ -114,6 +114,66 @@ def observe_all(*, fetch=None, now=None):
     return tuple(output)
 
 
+# These are conservative alert windows based on recorded historical GitHub
+# dispatch cadence, NOT verified operator-approved schedules or service SLAs.
+# Missing dispatches do not establish whether any trading server is running.
+_HISTORICAL_GAP_MINUTES = {
+    "daily": 2160,       # observed once per day; 36-hour alert
+    "intraday": 180,     # observed once per hour; 3-hour alert
+    "aggressive": 120,   # observed twice per hour; 2-hour alert
+}
+
+
+@dataclass(frozen=True)
+class DispatchHistoryReview:
+    bot: str
+    verdict: str = "UNVERIFIED"
+    age_minutes: int | None = None
+    schedule_authoritatively_verified: bool = False
+    live_bot_running_verified: bool = False
+    open_position_protection_verified: bool = False
+    restart_authorized: bool = False
+    note: str = (
+        "GitHub run history only; external dispatcher and account state unknown"
+    )
+
+
+def assess_dispatch_history_offline(observation):
+    """Only classify recorded GitHub dispatch history; no network or authority."""
+    if type(observation) is not RunObservation:
+        return DispatchHistoryReview(bot="unknown")
+    bot = observation.bot
+    result = DispatchHistoryReview(bot=bot)
+    max_age = _HISTORICAL_GAP_MINUTES.get(bot)
+    if max_age is None:
+        return result
+    if observation.state == "NO_RUNS":
+        return DispatchHistoryReview(bot=bot, verdict="NO_GITHUB_RUNS")
+    if (observation.state == "UNVERIFIED"
+            or type(observation.age_minutes) is not int
+            or observation.age_minutes < 0):
+        return result
+    if observation.state == "COMPLETED" and observation.conclusion != "success":
+        return DispatchHistoryReview(
+            bot=bot, verdict="LAST_GITHUB_RUN_NOT_SUCCESSFUL",
+            age_minutes=observation.age_minutes,
+        )
+    if observation.state != "COMPLETED":
+        return DispatchHistoryReview(
+            bot=bot, verdict="GITHUB_JOB_NOT_COMPLETED",
+            age_minutes=observation.age_minutes,
+        )
+    if observation.age_minutes > max_age:
+        return DispatchHistoryReview(
+            bot=bot, verdict="HISTORICAL_DISPATCH_GAP",
+            age_minutes=observation.age_minutes,
+        )
+    return DispatchHistoryReview(
+        bot=bot, verdict="RECENT_GITHUB_RUN_ONLY",
+        age_minutes=observation.age_minutes,
+    )
+
+
 def main():
     observations = observe_all()
     for item in observations:
@@ -123,8 +183,13 @@ def main():
             f"last_update={item.last_run or 'N/A'} "
             f"age_minutes={item.age_minutes if item.age_minutes is not None else 'N/A'}"
         )
-    print("READ-ONLY RUN STATUS. NOT A SERVER HEARTBEAT. NO TRADING AUTHORITY.")
-    return 1 if any(o.state == "UNVERIFIED" for o in observations) else 0
+    reviews = tuple(assess_dispatch_history_offline(o) for o in observations)
+    for reviewed in reviews:
+        print(f"{reviewed.bot}: github_dispatch_evidence={reviewed.verdict}")
+    print("GITHUB HISTORY ONLY. NO SERVER HEARTBEAT, POSITION OR TRADE AUTHORITY.")
+    return 1 if any(
+        reviewed.verdict != "RECENT_GITHUB_RUN_ONLY" for reviewed in reviews
+    ) else 0
 
 
 if __name__ == "__main__":
