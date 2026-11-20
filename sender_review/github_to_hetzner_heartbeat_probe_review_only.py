@@ -89,10 +89,13 @@ def probe(*, private_key, host_public_key, ssh_run=subprocess.run, now=None, non
     with tempfile.TemporaryDirectory(prefix="heartbeat-review-") as temp:
         key_file = Path(temp) / "identity"
         host_file = Path(temp) / "known_hosts"
-        key_file.write_text(private_key.rstrip("\n") + "\n", encoding="ascii")
-        host_file.write_text(known_hosts, encoding="ascii")
-        key_file.chmod(0o600)
-        host_file.chmod(0o600)
+        # Avoid creating private material with default permissions before chmod.
+        # The new names exist only inside a fresh, private temporary directory.
+        for path, contents in ((key_file, private_key.rstrip("\n") + "\n"),
+                               (host_file, known_hosts)):
+            fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+            with os.fdopen(fd, "w", encoding="ascii") as target:
+                target.write(contents)
         args = [
             "ssh", "-T", "-p", "22",
             "-i", str(key_file),
@@ -107,6 +110,9 @@ def probe(*, private_key, host_public_key, ssh_run=subprocess.run, now=None, non
             "-o", "ClearAllForwardings=yes",
             "-o", "ForwardAgent=no",
             "-o", "ControlMaster=no",
+            "-o", "ProxyCommand=none",
+            "-o", "ProxyJump=none",
+            "-o", "RequestTTY=no",
             "-o", "ConnectTimeout=8",
             "-o", "ConnectionAttempts=1",
             "-o", "LogLevel=ERROR",
