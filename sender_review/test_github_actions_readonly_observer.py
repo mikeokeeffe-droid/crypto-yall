@@ -6,6 +6,7 @@ from unittest.mock import patch
 
 from sender_review.github_actions_readonly_observer import (
     _ROOT, _WORKFLOWS, _public_fetch, interpret_workflow_response, observe_all,
+    assess_dispatch_history_offline, RunObservation,
 )
 
 NOW = dt.datetime(2026, 11, 19, 12, 0, tzinfo=dt.timezone.utc)
@@ -72,6 +73,64 @@ class GithubActionsReadonlyObserverTests(unittest.TestCase):
         ):
             with self.subTest(bad=bad), self.assertRaises(ValueError):
                 interpret_workflow_response("daily", bad, now=NOW)
+
+    def test_stale_completed_bot_run_is_history_gap_not_healthy(self):
+        for bot, old_date in (
+            ("daily", "2026-10-24T00:15:33Z"),
+            ("intraday", "2026-11-07T00:16:22Z"),
+            ("aggressive", "2026-10-24T13:02:14Z"),
+        ):
+            with self.subTest(bot=bot):
+                seen = interpret_workflow_response(
+                    bot, payload(updated_at=old_date), now=NOW
+                )
+                reviewed = assess_dispatch_history_offline(seen)
+                self.assertEqual(reviewed.verdict, "HISTORICAL_DISPATCH_GAP")
+                self.assertFalse(reviewed.live_bot_running_verified)
+                self.assertFalse(reviewed.open_position_protection_verified)
+                self.assertFalse(reviewed.restart_authorized)
+                self.assertFalse(reviewed.schedule_authoritatively_verified)
+
+    def test_cancelled_or_failed_run_never_looks_healthy(self):
+        for conclusion in ("cancelled", "failure", "timed_out"):
+            with self.subTest(conclusion=conclusion):
+                observation = interpret_workflow_response(
+                    "intraday", payload(conclusion=conclusion), now=NOW
+                )
+                reviewed = assess_dispatch_history_offline(observation)
+                self.assertEqual(
+                    reviewed.verdict, "LAST_GITHUB_RUN_NOT_SUCCESSFUL"
+                )
+                self.assertFalse(reviewed.restart_authorized)
+        queued = interpret_workflow_response(
+            "daily", payload(status="queued", conclusion=None), now=NOW
+        )
+        self.assertEqual(
+            assess_dispatch_history_offline(queued).verdict,
+            "GITHUB_JOB_NOT_COMPLETED",
+        )
+
+    def test_recent_success_is_not_server_or_exchange_attestation(self):
+        for bot in ("daily", "intraday", "aggressive"):
+            recent = interpret_workflow_response(bot, payload(), now=NOW)
+            reviewed = assess_dispatch_history_offline(recent)
+            self.assertEqual(reviewed.verdict, "RECENT_GITHUB_RUN_ONLY")
+            self.assertFalse(reviewed.live_bot_running_verified)
+            self.assertFalse(reviewed.open_position_protection_verified)
+            self.assertFalse(reviewed.restart_authorized)
+        self.assertEqual(
+            assess_dispatch_history_offline(
+                RunObservation(bot="daily", state="NO_RUNS")
+            ).verdict, "NO_GITHUB_RUNS"
+        )
+        self.assertEqual(
+            assess_dispatch_history_offline(
+                RunObservation(bot="intraday", state="UNVERIFIED")
+            ).verdict, "UNVERIFIED"
+        )
+        self.assertEqual(
+            assess_dispatch_history_offline(object()).verdict, "UNVERIFIED"
+        )
 
     def test_public_fetch_only_allows_fixed_readonly_workflow_urls(self):
         for bad in (
