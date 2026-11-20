@@ -53,8 +53,16 @@ class GitHubToHetznerProbeReviewTests(unittest.TestCase):
     def test_known_hosts_must_be_fixed_ed25519_key(self):
         self.assertEqual(pinned_host_key_line(HOSTKEY),
                          HOST + " ssh-ed25519 " + ssh_blob() + "\n")
+        bad_trailing = base64.b64encode(base64.b64decode(ssh_blob()) + b"extra").decode("ascii")
+        bad_short_key = base64.b64encode(
+            struct.pack(">I", 11) + b"ssh-ed25519" +
+            struct.pack(">I", 31) + b"\0"*31).decode("ascii")
+        bad_fake_marker = base64.b64encode(b"abc ssh-ed25519" + b"x"*40).decode("ascii")
         for invalid in ("", "ssh-rsa " + ssh_blob(),
-                        "2.29.170.69 " + HOSTKEY, "ssh-ed25519 garbage", "localhost"):
+                        "2.29.170.69 " + HOSTKEY, "ssh-ed25519 garbage", "localhost",
+                        "ssh-ed25519 " + bad_trailing,
+                        "ssh-ed25519 " + bad_short_key,
+                        "ssh-ed25519 " + bad_fake_marker):
             with self.subTest(value=invalid), self.assertRaises(HeartbeatProbeError):
                 pinned_host_key_line(invalid)
 
@@ -103,6 +111,10 @@ class GitHubToHetznerProbeReviewTests(unittest.TestCase):
         self.assertIn("inputs.confirm == 'RUN_READONLY_HEARTBEAT'", wf)
         self.assertIn('secrets.HETZNER_HEARTBEAT_REVIEW_ENV_PRIVATE_KEY', wf)
         self.assertIn('secrets.HETZNER_HEARTBEAT_REVIEW_ENV_HOST_KEY_ED25519', wf)
+        self.assertIn(
+            'HETZNER_HEARTBEAT_SSH_KEY: ${{ secrets.HETZNER_HEARTBEAT_REVIEW_ENV_PRIVATE_KEY }}', wf)
+        self.assertIn(
+            'HETZNER_HEARTBEAT_HOST_KEY_ED25519: ${{ secrets.HETZNER_HEARTBEAT_REVIEW_ENV_HOST_KEY_ED25519 }}', wf)
         self.assertNotIn('secrets.HETZNER_HEARTBEAT_SSH_KEY', wf)
         self.assertNotIn('secrets.HETZNER_HEARTBEAT_HOST_KEY_ED25519', wf)
         self.assertNotIn('on: push', wf)
