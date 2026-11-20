@@ -18,12 +18,12 @@ This change applies **only** to PR #43 and its one-shot no-trading GitHub SSH he
 - Code and passing CI **cannot prove** GitHub environment protection rules were configured correctly. A workflow-level `if: github.ref == 'refs/heads/main'` is not a permissions barrier.
 - Confirm on-host `cryptoheartbeat` has **no sudo**, privileged groups (including `docker`), writeable startup scripts, trading credentials, or read access to exchange/account secrets. Review the forced command, account shell, root ownership, authorized key count, SSH effective settings, firewall and server access logs; use redacted, read-only evidence.
 - Confirm independent authentication/approval protection for repository changes and the default branch (branch protection/rulesets where available).
-- The Python subprocess currently uses `capture_output=True`: ACK validation rejects more than 500 bytes **after capture**, but memory read is not strictly bounded before capture. Reviewer should assess whether it merits redesign before merge. Its subprocess timeout is 20 seconds; the job timeout is 2 minutes.
+- The SSH subprocess now uses a bounded read: stdout is capped to 501 bytes for overflow detection and stderr is discarded. A deadline and forced process termination apply; the probe timeout is 20 seconds and the job timeout is 2 minutes. Independent review should verify the read/cleanup logic.
 - GitHub-hosted runner IP ranges can change frequently. **Do not blindly restrict port 22 to a narrow IP list**: this could lock out the operator and break connectivity. Any firewall changes require an independently reviewed plan and recovery-console access.
 - A passing mocked CI check is **not** a successful real GitHub-to-Hetzner connection, nor proof of absence of trading authority. No real workflow has been dispatched.
 
 ## What tests prove
 
-Offline unit tests cover the SSH probe, host-key parsing, nonce/freshness ACK, hostile responses, options to disable forwarding/proxying, initial `0600` file creation and the workflow's required environment reference and distinct secret names. All external SSH attempts are mocked in CI.
+Offline unit tests cover the SSH probe, host-key parsing, nonce/freshness ACK, hostile responses, options to disable forwarding/proxying, initial `0600` file creation, bounded local subprocess output, timeout/overflow behavior and the workflow's required environment reference and distinct secret names. All external SSH attempts are mocked in CI.
 
 **Status:** REVIEW ONLY; not merged, deployed or authorized to run.
