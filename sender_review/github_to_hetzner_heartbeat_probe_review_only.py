@@ -8,6 +8,7 @@ import base64
 import json
 import os
 import re
+import selectors
 import secrets
 import subprocess
 import tempfile
@@ -76,7 +77,52 @@ def pinned_host_key_line(raw):
     return HOST + " ssh-ed25519 " + fields[1] + "\n"
 
 
-def probe(*, private_key, host_public_key, ssh_run=subprocess.run, now=None, nonce=None):
+def _run_ssh_bounded(args, *, input, capture_output, timeout, check, env=None):
+    """Bound SSH stdout to 500 bytes; discard stderr; kill on timeout or excess.
+
+    Avoid subprocess.run(capture_output=True), which buffers untrusted output
+    without a cap. This function has no network side effects in offline tests.
+    """
+    if not capture_output or check or type(input) is not bytes or len(input) > 384:
+        raise HeartbeatProbeError("invalid bounded SSH invocation")
+    process = subprocess.Popen(
+        args, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+        stderr=subprocess.DEVNULL, env=env,
+    )
+    deadline = time.monotonic() + timeout
+    try:
+        try:
+            process.stdin.write(input)
+            process.stdin.close()
+        except BrokenPipeError:
+            # An SSH setup failure may exit before reading stdin.
+            process.stdin.close()
+        output = bytearray()
+        with selectors.DefaultSelector() as selection:
+            selection.register(process.stdout, selectors.EVENT_READ)
+            while True:
+                remaining = deadline - time.monotonic()
+                if remaining <= 0 or not selection.select(remaining):
+                    raise subprocess.TimeoutExpired(args, timeout)
+                chunk = os.read(process.stdout.fileno(), 501 - len(output))
+                if not chunk:
+                    break
+                output.extend(chunk)
+                if len(output) > 500:
+                    raise HeartbeatProbeError("SSH ACK exceeded maximum length")
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise subprocess.TimeoutExpired(args, timeout)
+        code = process.wait(timeout=remaining)
+        return subprocess.CompletedProcess(args, code, stdout=bytes(output), stderr=b"")
+    finally:
+        if process.poll() is None:
+            process.kill()
+        process.wait()
+        process.stdout.close()
+
+
+def probe(*, private_key, host_public_key, ssh_run=_run_ssh_bounded, now=None, nonce=None):
     if not isinstance(private_key, str) or not (
         private_key.startswith("-----BEGIN OPENSSH PRIVATE KEY-----")
         and private_key.strip().endswith("-----END OPENSSH PRIVATE KEY-----")):
@@ -97,11 +143,14 @@ def probe(*, private_key, host_public_key, ssh_run=subprocess.run, now=None, non
             with os.fdopen(fd, "w", encoding="ascii") as target:
                 target.write(contents)
         args = [
-            "ssh", "-T", "-p", "22",
+            "ssh", "-T", "-F", "/dev/null", "-p", "22",
             "-i", str(key_file),
             "-o", "BatchMode=yes",
             "-o", "IdentitiesOnly=yes",
             "-o", "PreferredAuthentications=publickey",
+            "-o", "HostKeyAlgorithms=ssh-ed25519",
+            "-o", "IdentityAgent=none",
+            "-o", "UpdateHostKeys=no",
             "-o", "PasswordAuthentication=no",
             "-o", "KbdInteractiveAuthentication=no",
             "-o", "StrictHostKeyChecking=yes",
@@ -120,7 +169,8 @@ def probe(*, private_key, host_public_key, ssh_run=subprocess.run, now=None, non
         ]
         try:
             result = ssh_run(args, input=frame, capture_output=True, timeout=20,
-                             check=False)
+                             check=False, env={"PATH": "/usr/bin:/bin", "LANG": "C",
+                                               "HOME": temp})
         except (OSError, subprocess.TimeoutExpired) as exc:
             raise HeartbeatProbeError("SSH handshake or heartbeat timed out") from exc
     if result.returncode != 0:
