@@ -13,6 +13,23 @@ This change applies **only** to PR #43 and its one-shot no-trading GitHub SSH he
 5. An independent security reviewer must review the actual PR diff and remaining server isolation questions. Claude's automated review can find problems but is not an independent human approval.
 6. Only after the above, obtain **separate explicit approvals** for merging and for a one-shot manual workflow dispatch on `main`. The manual confirm phrase is `RUN_READONLY_HEARTBEAT`. Do not dispatch on unreviewed code.
 
+## Existing report publisher dependency on `main` (read-only audit)
+
+**Verified at current `main` (20 November 2026)**: `.github/workflows/execute-trades.yml`, `execute-intraday.yml`, and `execute-aggressive.yml` each use `workflow_dispatch` and `permissions: contents: write`. Each has a `Publish daily bot report` step that:
+- executes `git fetch origin main` and `git reset --hard origin/main`,
+- writes `reports/latest.json` and `reports/<UTC date>.json` using `daily_bot_report.py`,
+- commits and directly pushes `HEAD:main` (up to three tries),
+- uses `if: always()` and `continue-on-error: true`.
+
+**Observed historical effect**: latest `main` commit `82b14b92` on 7 November 2026 was authored by `github-actions[bot]`, added `reports/2026-11-07.json`, and modified `reports/latest.json`. This confirms the repository has used that direct-push pattern. It does **not** establish whether external workflow dispatches or trading have run since that date.
+
+**Safety implications and migration preconditions:**
+- Enforcing `main` PR-only/required-check protection **without redesigning this publisher** is likely to block report writes; do not add a blanket GitHub Actions bypass because it could defeat code protection.
+- The `git reset --hard origin/main` in the report step occurs **before** Intraday/Aggressive protection-monitoring steps (also `if: always()`). A main-branch change could therefore alter code files in the current job's workspace before protection monitoring, independently of the report publish outcome. Avoid any live cutover or change before a separate risk review of this exact ordering.
+- A failed report publish is nonfatal by design, so green workflow status is **not** proof that fresh reports were saved; review the publish step result and report's `generated_at` freshness.
+- Proposed *separate*, future reviewed change: keep each live job on a pinned commit for all protective steps, produce reports as isolated artifacts or a narrowly authorised reporting workflow, then remove direct code-branch writes before enforcing `main` protection. Validate reporting alerts, durability, and rollback offline first.
+- This observation is **not** permission to alter the original three executor workflows, disable reporting, grant bypass identities, or activate any SSH/trading capability.
+
 ## Observed GitHub branch protection gap (20 November 2026; read-only API evidence)
 
 - `GET /repos/mikeokeeffe-droid/crypto-yall/branches/main` returned **`protected: false`**, and the embedded branch protection reported **`enabled: false`**, with required status checks off.
