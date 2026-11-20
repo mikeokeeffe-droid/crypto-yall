@@ -1,4 +1,8 @@
 # REVIEW-ONLY: manually dispatched after independent security review.
+# PRECONDITION: explicitly configure the environment below with main-only
+# deployment branch policy, independent required reviewer, and secrets stored
+# ONLY at environment scope. Do not create matching repository-level secrets.
+# Never merge or dispatch until environment protections have been inspected.
 # This workflow is NOT available for workflow_dispatch until reviewed and
 # present on the repository default branch. NEVER run on unreviewed PR code.
 # No trading workflow, exchange client or signing credentials are used.
@@ -24,17 +28,20 @@ jobs:
     # No pull_request, push, schedule or callable workflow trigger.
     # Restrict deployment to reviewed default-branch code only.
     if: github.ref == 'refs/heads/main' && inputs.confirm == 'RUN_READONLY_HEARTBEAT'
+    # The branch if-guard alone is NOT a secret boundary. Environment rules
+    # must be configured by the repository administrator before promotion.
+    environment: hetzner-heartbeat-review
     runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:
       - name: Check out only reviewed default-branch code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           persist-credentials: false
       - name: Verify isolated probe contract without network
         run: python3 -m unittest sender_review.test_github_to_hetzner_heartbeat_probe_review_only -v
       - name: One-shot verified SSH heartbeat (never trade)
         env:
-          HETZNER_HEARTBEAT_SSH_KEY: ${{ secrets.HETZNER_HEARTBEAT_SSH_KEY }}
-          HETZNER_HEARTBEAT_HOST_KEY_ED25519: ${{ secrets.HETZNER_HEARTBEAT_HOST_KEY_ED25519 }}
+          HETZNER_HEARTBEAT_SSH_KEY: ${{ secrets.HETZNER_HEARTBEAT_REVIEW_ENV_PRIVATE_KEY }}
+          HETZNER_HEARTBEAT_HOST_KEY_ED25519: ${{ secrets.HETZNER_HEARTBEAT_REVIEW_ENV_HOST_KEY_ED25519 }}
         run: python3 -m sender_review.github_to_hetzner_heartbeat_probe_review_only
