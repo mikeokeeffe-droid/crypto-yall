@@ -188,6 +188,10 @@ def main():
         # Fixed, sanitized messages only. Never echo either secret.
         print("SSH HEARTBEAT UNVERIFIED:", str(exc))
         return 1
+    except Exception:
+        # Fail closed without leaking accidental exceptions or key-derived details.
+        print("SSH HEARTBEAT UNVERIFIED: internal SSH probe error")
+        return 1
     print("SSH HEARTBEAT ACK VERIFIED (review-only; trading authority NONE)")
     return 0
 
