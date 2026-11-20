@@ -94,6 +94,55 @@ class PrivateReportHandoffTests(unittest.TestCase):
         after["short_opportunity_check"]["updated_at"] = PREV.isoformat()
         self.assertEqual(self.review(after=after).verdict, "HOLD")
 
+    def test_unexplained_closed_trade_loss_or_rewrite_is_held(self):
+        for cohort in ("bots", "dual_short_confirmed_filter"):
+            with self.subTest(cohort=cohort):
+                before = fixture(PREV)
+                after = fixture(NOW)
+                prior = (before["short_opportunity_check"][cohort]
+                         if cohort == "bots" else
+                         before["short_opportunity_check"][cohort])
+                following = (after["short_opportunity_check"][cohort]
+                             if cohort == "bots" else
+                             after["short_opportunity_check"][cohort])
+                prior["bots"]["intraday"]["closed_trades"] = [{"id": 1}]
+                self.assertEqual(self.review(before=before, after=after).verdict, "HOLD")
+                following["bots"]["intraday"]["closed_trades"] = [{"id": 1}]
+                self.assertEqual(
+                    self.review(before=before, after=after).verdict,
+                    "CONTINUITY_METADATA_ONLY_HOLD",
+                )
+                following["bots"]["intraday"]["closed_trades"] = [{"id": 2}]
+                self.assertEqual(self.review(before=before, after=after).verdict, "HOLD")
+                following["bots"]["intraday"]["closed_trades"] = [{"id": 1}, {"id": 2}]
+                self.assertEqual(
+                    self.review(before=before, after=after).verdict,
+                    "CONTINUITY_METADATA_ONLY_HOLD",
+                )
+
+    def test_200_row_retention_needs_overlapping_tail(self):
+        before = fixture(PREV)
+        after = fixture(NOW)
+        prior = before["short_opportunity_check"]["bots"]["aggressive"]
+        following = after["short_opportunity_check"]["bots"]["aggressive"]
+        prior["closed_trades"] = [{"id": i} for i in range(200)]
+        following["closed_trades"] = [{"id": i} for i in range(1, 201)]
+        result = self.review(before=before, after=after)
+        self.assertEqual(result.verdict, "CONTINUITY_METADATA_ONLY_HOLD")
+        self.assert_never_authorized(result)
+        following["closed_trades"] = [{"id": i} for i in range(200, 400)]
+        self.assertEqual(self.review(before=before, after=after).verdict, "HOLD")
+        following["closed_trades"] = [{"id": i} for i in range(1, 199)]
+        self.assertEqual(self.review(before=before, after=after).verdict, "HOLD")
+        following["closed_trades"] = [{"id": i} for i in range(201)]
+        self.assertEqual(self.review(before=before, after=after).verdict, "HOLD")
+
+    def test_non_dictionary_closed_trades_cannot_pass_handoff(self):
+        for bad in (None, {}, "not a list", [1], [{"id": i} for i in range(201)]):
+            after = fixture(NOW)
+            after["short_opportunity_check"]["bots"]["intraday"]["closed_trades"] = bad
+            self.assertEqual(self.review(after=after).verdict, "HOLD")
+
     def test_malformed_overlarge_and_secret_payloads_are_never_returned(self):
         for previous, candidate in (
             (b"{}", encode(fixture(NOW))),
