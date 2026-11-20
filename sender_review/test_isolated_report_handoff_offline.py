@@ -99,12 +99,12 @@ class PrivateReportHandoffTests(unittest.TestCase):
             with self.subTest(cohort=cohort):
                 before = fixture(PREV)
                 after = fixture(NOW)
-                prior = (before["short_opportunity_check"][cohort]
+                prior = (before["short_opportunity_check"]
                          if cohort == "bots" else
-                         before["short_opportunity_check"][cohort])
-                following = (after["short_opportunity_check"][cohort]
+                         before["short_opportunity_check"]["dual_short_confirmed_filter"])
+                following = (after["short_opportunity_check"]
                              if cohort == "bots" else
-                             after["short_opportunity_check"][cohort])
+                             after["short_opportunity_check"]["dual_short_confirmed_filter"])
                 prior["bots"]["intraday"]["closed_trades"] = [{"id": 1}]
                 self.assertEqual(self.review(before=before, after=after).verdict, "HOLD")
                 following["bots"]["intraday"]["closed_trades"] = [{"id": 1}]
