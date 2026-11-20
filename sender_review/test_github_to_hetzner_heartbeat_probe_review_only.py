@@ -98,7 +98,8 @@ class GitHubToHetznerProbeReviewTests(unittest.TestCase):
     def test_review_workflow_requires_separate_environment_secrets(self):
         """No original repo-secret names and no unprotected heartbeat job."""
         wf = Path('.github/workflows/manual-hetzner-ssh-heartbeat-review.yml').read_text()
-        self.assertRegex(wf, r'(?m)^    environment: hetzner-heartbeat-review\s*        self.assertIn("github.ref == 'refs/heads/main'", wf)
+        self.assertRegex(wf, r'(?m)^    environment: hetzner-heartbeat-review\s*$')
+        self.assertIn("github.ref == 'refs/heads/main'", wf)
         self.assertIn("inputs.confirm == 'RUN_READONLY_HEARTBEAT'", wf)
         self.assertIn('secrets.HETZNER_HEARTBEAT_REVIEW_ENV_PRIVATE_KEY', wf)
         self.assertIn('secrets.HETZNER_HEARTBEAT_REVIEW_ENV_HOST_KEY_ED25519', wf)
