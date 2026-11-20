@@ -3,6 +3,7 @@ import base64
 import json
 import os
 import stat
+import sys
 from pathlib import Path
 import struct
 import subprocess
@@ -10,7 +11,7 @@ import unittest
 from unittest.mock import patch
 
 from sender_review.github_to_hetzner_heartbeat_probe_review_only import (
-    HOST, HeartbeatProbeError, challenge, pinned_host_key_line, probe, verify_ack,
+    HOST, HeartbeatProbeError, _run_ssh_bounded, challenge, pinned_host_key_line, probe, verify_ack,
 )
 
 NOW = 1800000000
@@ -70,6 +71,11 @@ class GitHubToHetznerProbeReviewTests(unittest.TestCase):
             self.assertIn("ProxyCommand=none", args)
             self.assertIn("ProxyJump=none", args)
             self.assertIn("RequestTTY=no", args)
+            self.assertIn('HostKeyAlgorithms=ssh-ed25519', args)
+            self.assertIn('IdentityAgent=none', args)
+            self.assertIn('UpdateHostKeys=no', args)
+            self.assertIn('-F', args)
+            self.assertEqual(args[args.index('-F')+1], '/dev/null')
             key_path = Path(args[args.index("-i") + 1])
             self.assertEqual(stat.S_IMODE(key_path.stat().st_mode), 0o600)
             host_opt = next(x for x in args if x.startswith("UserKnownHostsFile="))
@@ -96,6 +102,29 @@ class GitHubToHetznerProbeReviewTests(unittest.TestCase):
         self.assertNotIn('secrets.HETZNER_HEARTBEAT_HOST_KEY_ED25519', wf)
         self.assertNotIn('on: push', wf)
         self.assertNotIn('on: schedule', wf)
+
+    def test_bounded_local_process_captures_small_ack(self):
+        # Local python process only, never an SSH/network connection.
+        p = [sys.executable, '-c',
+             'import sys; sys.stdin.buffer.read(); sys.stdout.buffer.write(b"OK")']
+        r = _run_ssh_bounded(p, input=b"hello", capture_output=True, timeout=3,
+                             check=False)
+        self.assertEqual(r.returncode, 0)
+        self.assertEqual(r.stdout, b"OK")
+
+    def test_bounded_local_process_rejects_overflow(self):
+        p = [sys.executable, '-c',
+             'import sys; sys.stdin.buffer.read(); sys.stdout.buffer.write(b"x"*501); sys.stdout.flush()']
+        with self.assertRaisesRegex(HeartbeatProbeError, "maximum length"):
+            _run_ssh_bounded(p, input=b"hello", capture_output=True, timeout=3,
+                             check=False)
+
+    def test_bounded_local_process_times_out(self):
+        p = [sys.executable, '-c',
+             'import time,sys; sys.stdin.buffer.read(); time.sleep(3)']
+        with self.assertRaises(subprocess.TimeoutExpired):
+            _run_ssh_bounded(p, input=b"hello", capture_output=True, timeout=0.3,
+                             check=False)
 
     def test_nonzero_exit_never_echoes_stderr(self):
         def failed_run(args, **kw):
