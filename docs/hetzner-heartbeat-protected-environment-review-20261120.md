@@ -13,6 +13,26 @@ This change applies **only** to PR #43 and its one-shot no-trading GitHub SSH he
 5. An independent security reviewer must review the actual PR diff and remaining server isolation questions. Claude's automated review can find problems but is not an independent human approval.
 6. Only after the above, obtain **separate explicit approvals** for merging and for a one-shot manual workflow dispatch on `main`. The manual confirm phrase is `RUN_READONLY_HEARTBEAT`. Do not dispatch on unreviewed code.
 
+## Evidence gate after offline CI (20 November 2026)
+
+Latest review-only head `bb68ad7e8803710417aeb2075ee0740904a7bb9f`: **both the offline heartbeat review and Code Safety Check passed**. The added tests cover rejection of replayed ACKs on a fresh challenge, removal of ephemeral key files after a failed probe, and local child-process reaping after timeout/overflow. This is **NOT a real SSH connectivity check** and confers no trading authority.
+
+Two **HIGH** external items remain **UNVERIFIED**, not passed:
+
+1. **GitHub environment enforcement** (repository administrator inspection required, no SSH/trade action):
+   - Check `Settings → Environments → hetzner-heartbeat-review`: independent required reviewer and no self-approval, environment deployment branches limited to `main`, no unintended bypass path
+   - Check that only **environment-scoped** secrets under the two `HETZNER_HEARTBEAT_REVIEW_ENV_*` names will be used; do not disclose values or duplicate secrets into repository scope
+   - Record the date and a redacted pass/fail observation for each item. **Never** attach secret values, private keys, or raw environment exports
+2. **Hetzner heartbeat identity** (authorised operator's read-only observations required; do not log in or change settings as part of CI):
+   - Confirm `cryptoheartbeat` has a restricted forced command / no general-purpose interactive shell and its public key is the **only expected heartbeat key**
+   - Verify no sudo, Docker or privileged groups, exchange/trading credentials, writable forced-command scripts or privileged file/ACL access
+   - Compare the trusted server's ED25519 public host-key **SHA256 fingerprint** with the exact candidate environment public host key by a separately trusted method; `ssh-keyscan` on the same network path is not independent proof
+   - Record only scrubbed findings and hashes, never private keys, raw account credentials, or complete `authorized_keys` values
+
+**Review provenance:** Copilot provided a written static assessment in the PR comments, with no critical findings but these two high unverified controls. A separate formal Copilot review reported insufficient review quota. Neither result counts as independent human review. The owner has indicated that a human reviewer is unavailable; do not silently mark that required gate passed or reduce the safety policy by inference.
+
+**Decision:** NO-GO for merge, manual workflow dispatch, real SSH, testnet trading or live trading. These require separately explicit approval and a documented decision on any unmet independent-review requirement.
+
 ## Known open security items
 
 - Code and passing CI **cannot prove** GitHub environment protection rules were configured correctly. A workflow-level `if: github.ref == 'refs/heads/main'` is not a permissions barrier.
