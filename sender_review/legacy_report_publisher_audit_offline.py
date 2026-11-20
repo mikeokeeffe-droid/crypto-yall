@@ -44,7 +44,7 @@ class ReportPublisherAudit:
 
 def inspect_legacy_report_publishers_offline(root: Path = ROOT) -> ReportPublisherAudit:
     """Identify source-level risks without performing any workflow actions."""
-    if type(root) is not Path:
+    if not isinstance(root, Path):
         return ReportPublisherAudit()
     findings = []
     for filename in WORKFLOWS:
