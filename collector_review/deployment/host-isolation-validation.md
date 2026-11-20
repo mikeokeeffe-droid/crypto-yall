@@ -8,7 +8,7 @@ the Daily, Intraday or Aggressive trading executors, live signing credentials,
 or their databases. No collector transport is enabled by this plan.
 
 The source in PR #41 has a disabled network transport. Its existing unit
-template runs an **offline host probe plus unit tests only**. The template
+template runs an **offline host probe, in-unit IP socket-denial probe, and unit tests only**. The template
 cannot be installed by GitHub CI and has no [Install] section.
 
 ## Gate A: independently identify a host and reject unsafe placement
@@ -33,8 +33,13 @@ or if a network or credential exception is requested.
 
 Confirm the systemd unit text is the reviewed
 \`collector_review/deployment/testnet-collector-offline-review.service.example\`.
-Check that it has exactly the intended two ExecStart commands (host probe
-then offline tests), *no* network-enabled collector entrypoint, and:
+Check that it has exactly the intended three ExecStart commands, in this order:
+
+1. `python3 -B -m collector_review.host_isolation_probe` (host isolation probe).
+2. `python3 -B -m collector_review.ip_socket_denial_probe` (no-connect IPv4/IPv6 socket-denial check).
+3. `python3 -B -m unittest` (offline test suite).
+
+Require *no* network-enabled collector entrypoint, and:
 
 - \`DynamicUser=yes\`, \`NoNewPrivileges=yes\`, empty ambient/bounding caps.
 - \`PrivateNetwork=yes\`, \`RestrictAddressFamilies=AF_UNIX\`,
@@ -61,7 +66,8 @@ drop-ins, the service user/group, writable mount points and executable path.
 
 The first ExecStart must execute
 \`python3 -B -m collector_review.host_isolation_probe\` *inside the same
-unit sandbox* as the offline tests. Expected successful evidence is a real
+unit sandbox* as the second-step no-connect socket-denial probe and third-step
+offline tests. Expected successful evidence is a real
 process in the intended cgroup with non-root UID/GID, no effective/bounding
 capabilities, \`NoNewPrivs=1\`, seccomp filter, and a network namespace
 different from host PID 1. Any \`collector_host_probe=hold\`, missing log,
