@@ -50,6 +50,26 @@ class GitHubToHetznerProbeReviewTests(unittest.TestCase):
         with self.assertRaises(HeartbeatProbeError):
             verify_ack(b'{"v":1,"v":1}', nonce=NONCE, now=NOW)
 
+    def test_rejects_untrusted_ack_frames_and_length_boundary(self):
+        good = {"v": 1, "kind": "heartbeat_ack", "nonce": NONCE,
+                "server_nonce": "b"*32, "received": NOW, "authority": "none"}
+        valid = json.dumps(good).encode("ascii")
+        self.assertTrue(verify_ack(valid, nonce=NONCE, now=NOW))
+        malformed = (
+            b"", b"null", b"[]", b"false", b"{}", b"not-json",
+            b"\\xff", b"\\x00" + valid, valid + b"\\x00",
+            b"x" * 501,
+            json.dumps({**good, "authority": "trade"}).encode("ascii"),
+            json.dumps({**good, "received": True}).encode("ascii"),
+            json.dumps({**good, "received": NOW + 16}).encode("ascii"),
+        )
+        for frame in malformed:
+            with self.subTest(frame=frame[:32]), self.assertRaises(HeartbeatProbeError):
+                verify_ack(frame, nonce=NONCE, now=NOW)
+        self.assertTrue(verify_ack(
+            json.dumps({**good, "received": NOW + 15}).encode("ascii"),
+            nonce=NONCE, now=NOW))
+
     def test_known_hosts_must_be_fixed_ed25519_key(self):
         self.assertEqual(pinned_host_key_line(HOSTKEY),
                          HOST + " ssh-ed25519 " + ssh_blob() + "\n")
