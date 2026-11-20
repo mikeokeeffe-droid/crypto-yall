@@ -149,6 +149,24 @@ considering any restart, cutover or recovery.
    Never introduce a broad GitHub Actions bypass that enables arbitrary
    code writes. Keep open-position protection independent and effective.
 
+## Synthetic paper-short history retention gate (review-only, 20 Nov)
+
+- `isolated_report_handoff_offline.py` now compares both independent
+  shadow cohorts (Intraday and Aggressive, plus the dual-short-confirmed
+  cohort) and rejects absent, rewritten, reordered or silently dropped
+  older `closed_trades` records. The source reporter caps each cohort to
+  the latest **200** closed trades, so the review allows the oldest rows
+  to roll off **only** when the newer 200-row list shares an ordered tail
+  with the old list. An entire 200-record rollover without overlap is
+  treated as unverified, not automatically accepted.
+- This is **synthetic continuity detection**, not cryptographic history
+  provenance. It does not validate changes to `open_positions`, durable
+  storage, actual fill attribution, private-store concurrency or publishing
+  atomicity. Those gates remain unresolved and any report remains
+  **HOLD for publication**. No live report or Gist was read or modified.
+- The validation cannot authorize a public commit, a new bot dispatch,
+  a server operation, or a trading action, even when the fixture passes.
+
 ## Current status
 
 Synthetic report snapshot checks and current-workflow hazard detection
