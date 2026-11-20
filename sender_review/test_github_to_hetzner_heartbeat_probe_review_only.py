@@ -123,6 +123,56 @@ class GitHubToHetznerProbeReviewTests(unittest.TestCase):
                               now=NOW, nonce=NONCE))
         self.assertEqual(len(inspected), 1)
 
+    def test_ack_from_previous_challenge_cannot_answer_new_nonce(self):
+        original_ack = json.dumps({
+            "v": 1, "kind": "heartbeat_ack", "nonce": NONCE,
+            "server_nonce": "b" * 32, "received": NOW, "authority": "none",
+        }).encode("ascii")
+        self.assertTrue(verify_ack(original_ack, nonce=NONCE, now=NOW))
+        with self.assertRaises(HeartbeatProbeError):
+            verify_ack(original_ack, nonce="c" * 32, now=NOW)
+
+    def test_temporary_private_key_is_removed_after_probe_failure(self):
+        observed_paths = []
+        def failed_run(args, **kwargs):
+            key_path = Path(args[args.index("-i") + 1])
+            known_hosts_opt = next(
+                arg for arg in args if arg.startswith("UserKnownHostsFile="))
+            host_path = Path(known_hosts_opt.partition("=")[2])
+            observed_paths.extend([key_path, host_path, Path(kwargs["env"]["HOME"])])
+            self.assertTrue(key_path.exists())
+            self.assertTrue(host_path.exists())
+            return subprocess.CompletedProcess(args, 255, stdout=b"", stderr=b"redacted")
+        with self.assertRaises(HeartbeatProbeError):
+            probe(private_key=DUMMY_PRIVATE_KEY, host_public_key=HOSTKEY,
+                  ssh_run=failed_run, now=NOW, nonce=NONCE)
+        self.assertEqual(len(observed_paths), 3)
+        for path in observed_paths:
+            self.assertFalse(path.exists(), "temporary key or directory was not removed")
+
+    def test_subprocess_is_reaped_on_timeout_and_overflow(self):
+        original_popen = subprocess.Popen
+        for script, limit, expected in (
+            ('import sys,time; sys.stdin.buffer.read(); time.sleep(5)', 0.2,
+             subprocess.TimeoutExpired),
+            ('import sys; sys.stdin.buffer.read(); sys.stdout.buffer.write(b"x"*501); sys.stdout.flush()', 2,
+             HeartbeatProbeError),
+        ):
+            with self.subTest(script=script):
+                spawned = []
+                def recording_popen(*args, **kwargs):
+                    child = original_popen(*args, **kwargs)
+                    spawned.append(child)
+                    return child
+                with patch("sender_review.github_to_hetzner_heartbeat_probe_review_only.subprocess.Popen",
+                           side_effect=recording_popen):
+                    with self.assertRaises(expected):
+                        _run_ssh_bounded([sys.executable, "-c", script], input=b"ping",
+                                         capture_output=True, timeout=limit, check=False)
+                self.assertEqual(len(spawned), 1)
+                self.assertIsNotNone(spawned[0].poll(), "child was not reaped")
+                self.assertIsNotNone(spawned[0].returncode)
+
     def test_review_workflow_requires_separate_environment_secrets(self):
         """No original repo-secret names and no unprotected heartbeat job."""
         wf = Path('.github/workflows/manual-hetzner-ssh-heartbeat-review.yml').read_text()
