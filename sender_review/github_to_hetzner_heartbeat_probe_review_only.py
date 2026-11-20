@@ -72,7 +72,14 @@ def pinned_host_key_line(raw):
         blob = base64.b64decode(fields[1], validate=True)
     except (ValueError, base64.binascii.Error) as exc:
         raise HeartbeatProbeError("invalid trusted host key") from exc
-    if len(blob) < 40 or b"ssh-ed25519" not in blob[:20]:
+    # OpenSSH ED25519 public-key blob is two length-prefixed strings:
+    # the exact algorithm name and an exact 32-byte public key.
+    key_type = b"ssh-ed25519"
+    n = len(key_type)
+    if (len(blob) != 4 + n + 4 + 32
+            or int.from_bytes(blob[:4], "big") != n
+            or blob[4:4 + n] != key_type
+            or int.from_bytes(blob[4 + n:8 + n], "big") != 32):
         raise HeartbeatProbeError("malformed host key")
     return HOST + " ssh-ed25519 " + fields[1] + "\n"
 
