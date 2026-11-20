@@ -98,7 +98,108 @@ class GitHubToHetznerProbeReviewTests(unittest.TestCase):
     def test_review_workflow_requires_separate_environment_secrets(self):
         """No original repo-secret names and no unprotected heartbeat job."""
         wf = Path('.github/workflows/manual-hetzner-ssh-heartbeat-review.yml').read_text()
-        self.assertRegex(wf, r'(?m)^    environment: hetzner-heartbeat-review\s*
+        self.assertRegex(wf, r'(?m)^    environment: hetzner-heartbeat-review\s*        self.assertIn("github.ref == 'refs/heads/main'", wf)
+        self.assertIn("inputs.confirm == 'RUN_READONLY_HEARTBEAT'", wf)
+        self.assertIn('secrets.HETZNER_HEARTBEAT_REVIEW_ENV_PRIVATE_KEY', wf)
+        self.assertIn('secrets.HETZNER_HEARTBEAT_REVIEW_ENV_HOST_KEY_ED25519', wf)
+        self.assertNotIn('secrets.HETZNER_HEARTBEAT_SSH_KEY', wf)
+        self.assertNotIn('secrets.HETZNER_HEARTBEAT_HOST_KEY_ED25519', wf)
+        self.assertNotIn('on: push', wf)
+        self.assertNotIn('on: schedule', wf)
+
+    def test_bounded_local_process_captures_small_ack(self):
+        # Local python process only, never an SSH/network connection.
+        p = [sys.executable, '-c',
+             'import sys; sys.stdin.buffer.read(); sys.stdout.buffer.write(b"OK")']
+        r = _run_ssh_bounded(p, input=b"hello", capture_output=True, timeout=3,
+                             check=False)
+        self.assertEqual(r.returncode, 0)
+        self.assertEqual(r.stdout, b"OK")
+
+    def test_bounded_local_process_rejects_overflow(self):
+        p = [sys.executable, '-c',
+             'import sys; sys.stdin.buffer.read(); sys.stdout.buffer.write(b"x"*501); sys.stdout.flush()']
+        with self.assertRaisesRegex(HeartbeatProbeError, "maximum length"):
+            _run_ssh_bounded(p, input=b"hello", capture_output=True, timeout=3,
+                             check=False)
+
+    def test_bounded_local_process_times_out(self):
+        p = [sys.executable, '-c',
+             'import time,sys; sys.stdin.buffer.read(); time.sleep(3)']
+        with self.assertRaises(subprocess.TimeoutExpired):
+            _run_ssh_bounded(p, input=b"hello", capture_output=True, timeout=0.3,
+                             check=False)
+
+    def test_nonzero_exit_never_echoes_stderr(self):
+        def failed_run(args, **kw):
+            return subprocess.CompletedProcess(args, 255, stdout=b"",
+                                               stderr=b"DO_NOT_LOG_SECRET")
+        with self.assertRaisesRegex(HeartbeatProbeError,
+                                    "SSH probe failed"):
+            probe(private_key=DUMMY_PRIVATE_KEY, host_public_key=HOSTKEY,
+                  ssh_run=failed_run, now=NOW, nonce=NONCE)
+
+    def test_no_network_when_input_missing(self):
+        with patch("sender_review.github_to_hetzner_heartbeat_probe_review_only.subprocess.Popen",
+                   side_effect=AssertionError("network not allowed")):
+            with self.assertRaises(HeartbeatProbeError):
+                probe(private_key="", host_public_key=HOSTKEY)
+
+
+if __name__ == "__main__":
+    unittest.main()
+)
+        self.assertIn("github.ref == 'refs/heads/main'", wf)
+        self.assertIn("inputs.confirm == 'RUN_READONLY_HEARTBEAT'", wf)
+        self.assertIn('secrets.HETZNER_HEARTBEAT_REVIEW_ENV_PRIVATE_KEY', wf)
+        self.assertIn('secrets.HETZNER_HEARTBEAT_REVIEW_ENV_HOST_KEY_ED25519', wf)
+        self.assertNotIn('secrets.HETZNER_HEARTBEAT_SSH_KEY', wf)
+        self.assertNotIn('secrets.HETZNER_HEARTBEAT_HOST_KEY_ED25519', wf)
+        self.assertNotIn('on: push', wf)
+        self.assertNotIn('on: schedule', wf)
+
+    def test_bounded_local_process_captures_small_ack(self):
+        # Local python process only, never an SSH/network connection.
+        p = [sys.executable, '-c',
+             'import sys; sys.stdin.buffer.read(); sys.stdout.buffer.write(b"OK")']
+        r = _run_ssh_bounded(p, input=b"hello", capture_output=True, timeout=3,
+                             check=False)
+        self.assertEqual(r.returncode, 0)
+        self.assertEqual(r.stdout, b"OK")
+
+    def test_bounded_local_process_rejects_overflow(self):
+        p = [sys.executable, '-c',
+             'import sys; sys.stdin.buffer.read(); sys.stdout.buffer.write(b"x"*501); sys.stdout.flush()']
+        with self.assertRaisesRegex(HeartbeatProbeError, "maximum length"):
+            _run_ssh_bounded(p, input=b"hello", capture_output=True, timeout=3,
+                             check=False)
+
+    def test_bounded_local_process_times_out(self):
+        p = [sys.executable, '-c',
+             'import time,sys; sys.stdin.buffer.read(); time.sleep(3)']
+        with self.assertRaises(subprocess.TimeoutExpired):
+            _run_ssh_bounded(p, input=b"hello", capture_output=True, timeout=0.3,
+                             check=False)
+
+    def test_nonzero_exit_never_echoes_stderr(self):
+        def failed_run(args, **kw):
+            return subprocess.CompletedProcess(args, 255, stdout=b"",
+                                               stderr=b"DO_NOT_LOG_SECRET")
+        with self.assertRaisesRegex(HeartbeatProbeError,
+                                    "SSH probe failed"):
+            probe(private_key=DUMMY_PRIVATE_KEY, host_public_key=HOSTKEY,
+                  ssh_run=failed_run, now=NOW, nonce=NONCE)
+
+    def test_no_network_when_input_missing(self):
+        with patch("sender_review.github_to_hetzner_heartbeat_probe_review_only.subprocess.run",
+                   side_effect=AssertionError("network not allowed")):
+            with self.assertRaises(HeartbeatProbeError):
+                probe(private_key="", host_public_key=HOSTKEY)
+
+
+if __name__ == "__main__":
+    unittest.main()
+)
         self.assertIn("github.ref == 'refs/heads/main'", wf)
         self.assertIn("inputs.confirm == 'RUN_READONLY_HEARTBEAT'", wf)
         self.assertIn('secrets.HETZNER_HEARTBEAT_REVIEW_ENV_PRIVATE_KEY', wf)
