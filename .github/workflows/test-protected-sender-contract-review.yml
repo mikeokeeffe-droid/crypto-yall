@@ -97,6 +97,8 @@ jobs:
         run: |
           python -m unittest sender_review.test_three_bot_cutover_matrix -v
           python -m sender_review.three_bot_cutover_matrix
+      - name: Review private report continuity without publication or trade access (offline)
+        run: python -m unittest sender_review.test_isolated_report_handoff_offline -v
       - name: Validate report snapshot freshness and completeness (offline)
         run: python -m unittest sender_review.test_report_snapshot_health_offline -v
       - name: Detect legacy report direct-push and mid-job reset risks (offline)
