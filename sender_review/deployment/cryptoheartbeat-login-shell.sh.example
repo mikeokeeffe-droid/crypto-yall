@@ -1,0 +1,14 @@
+#!/bin/sh
+# REVIEW ONLY: dedicated login shell for cryptoheartbeat.
+# Do not install or select as login shell until the root-owned executable,
+# Match User forced-command restrictions, authorized key, SSH host-key pin,
+# account authentication behavior and rollback are independently verified.
+#
+# sshd normally launches a ForceCommand via the account shell with -c;
+# /usr/sbin/nologin cannot run it. This shell ignores ALL client arguments
+# (including -c and SSH_ORIGINAL_COMMAND) and will run only the exact
+# heartbeat stdin responder. It has NO command dispatch or trade functions.
+#
+# Do NOT source a profile, evaluate user input, or refer to $@ / $*.
+# Do NOT install a symlink to a writable checkout.
+exec /usr/bin/env -i PATH=/usr/bin:/bin LANG=C /usr/bin/python3 -I /usr/local/libexec/crypto-yall/ssh_heartbeat_stdio_review_only.py
