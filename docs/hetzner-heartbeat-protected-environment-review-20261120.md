@@ -13,6 +13,14 @@ This change applies **only** to PR #43 and its one-shot no-trading GitHub SSH he
 5. An independent security reviewer must review the actual PR diff and remaining server isolation questions. Claude's automated review can find problems but is not an independent human approval.
 6. Only after the above, obtain **separate explicit approvals** for merging and for a one-shot manual workflow dispatch on `main`. The manual confirm phrase is `RUN_READONLY_HEARTBEAT`. Do not dispatch on unreviewed code.
 
+## Observed GitHub branch protection gap (20 November 2026; read-only API evidence)
+
+- `GET /repos/mikeokeeffe-droid/crypto-yall/branches/main` returned **`protected: false`**, and the embedded branch protection reported **`enabled: false`**, with required status checks off.
+- `GET /repos/mikeokeeffe-droid/crypto-yall/rulesets` returned the empty list `[]`: no repository rulesets were visible.
+- The dedicated branch-protection endpoint returned **403 Resource not accessible by integration**. Do not imply its detailed configuration was inspected or that an environment's approvals/secrets can be read via the current connector.
+- **HIGH / not a code-test failure:** Required PR review, CI status checks, and restricted direct pushes to `main` cannot currently be treated as enforced controls. This is separate from the still-unverified `hetzner-heartbeat-review` environment.
+- **Precondition before PR #43 merge or manual dispatch:** Have an authorized repository administrator inspect and establish appropriate `main` review / required-check / direct-push controls and the protected environment settings; then perform a fresh read-only verification. Account for any existing GitHub Actions bot report-writing workflow on `main` so protection changes do **not** accidentally interrupt existing operations. Do not change branch settings, secret scope, or live workflows without separate authorization.
+
 ## Evidence gate after offline CI (20 November 2026)
 
 Latest review-only head `bb68ad7e8803710417aeb2075ee0740904a7bb9f`: **both the offline heartbeat review and Code Safety Check passed**. The added tests cover rejection of replayed ACKs on a fresh challenge, removal of ephemeral key files after a failed probe, and local child-process reaping after timeout/overflow. This is **NOT a real SSH connectivity check** and confers no trading authority.
