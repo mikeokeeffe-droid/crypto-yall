@@ -50,6 +50,45 @@ trading executor, or Hetzner host is changed by this note.
   checks all passed at commit `9403e1e4fb8b3c82920d8dd68cc09139104281ef`.
   This confirms **offline regression behavior**, not actual report delivery.
 
+## Historical dispatch provenance and protection evidence (read-only; 20 Nov 2026)
+
+- The original `Execute Intraday` GitHub Actions runs on **6 Nov 2026**
+  were `workflow_dispatch` events occurring at approximately **HH:07 UTC**
+  for each of the 24 hours queried. Their `actor.login` and
+  `triggering_actor.login` fields were both `mikeokeeffe-droid`.
+  This is consistent with an hourly external API dispatcher using that
+  account's token, **but does not identify the server, process, cron entry,
+  GitHub App, or human action that originated the requests**.
+- The last verified successful run
+  [42309672826](https://github.com/mikeokeeffe-droid/crypto-yall/actions/runs/42309672826)
+  started **6 Nov 2026 23:07:10 UTC**. Its GitHub job step conclusions
+  were `success` for execution, report publish, and the timed
+  `Monitor Intraday protection until next strategy run` step.
+  A successful Actions step says only that this historical job completed,
+  **not** that any open positions are now protected or that exchange orders
+  did or did not fill.
+- The next and latest recorded Intraday run
+  [42316237705](https://github.com/mikeokeeffe-droid/crypto-yall/actions/runs/42316237705)
+  started **7 Nov 2026 00:07:12 UTC** and concluded **cancelled**, with
+  GitHub update time 00:16:22 UTC. Cancellation reason, identity of the
+  cancelling operator, exchange positions, and protective process health
+  are **not established** by the available metadata.
+- Read-only GitHub Actions query for `main` with
+  `created=2026-11-19..2026-11-20` returned **0 runs**. This does not
+  speak to actions on another host, nor to bots triggered outside GitHub.
+- The older operational scheduler/host has **not been inspected**, and
+  this project cannot verify its systemd timers, crontabs, running process
+  health, secrets, monitoring or exchange ownership from GitHub metadata.
+
+**Required supervised next observation, without mutation:** contact the
+operator responsible for the older dispatcher to obtain redacted evidence of
+what triggered `execute-intraday.yml` at :07, whether it was intentionally
+stopped on 7 Nov, the state of Daily and Aggressive triggers, and which
+independent mechanism (if any) monitors or can rescue existing positions.
+Separately inspect authorised read-only Hyperliquid account positions/orders.
+Do not run a workflow dispatch, restart a timer, modify credentials, connect
+to a server, or assume flat/no-risk state on the basis of these records.
+
 ## Proposed migration sequence (not authorised to run)
 
 1. Preserve the running bots and their protection loops untouched. Design a
