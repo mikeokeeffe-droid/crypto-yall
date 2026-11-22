@@ -11,6 +11,7 @@ from sender_review.ci_only_identity_bridge import (
 )
 from sender_review.test_ci_journal_postgres import (
     ACCOUNT, CI_MARKER, SQL, connect, record,
+    corrupt_scope_fence_for_view_test,
 )
 from sender_review.test_offline_oidc_identity_fixture import (
     SignedOidcFixtureTests, POLICY, NOW,
@@ -167,12 +168,13 @@ class AccountWideQuarantinePostgresTests(unittest.TestCase):
 
     def test_corrupted_signed_scope_fence_blocks_other_coins(self):
         self.signed()
-        with connect() as db:
-            db.execute(
-                "UPDATE sender_review_ci.scope_fences "
-                "SET active_nonce=NULL WHERE account=%s AND coin='SOL'",
-                (ACCOUNT,),
-            )
+        # A privileged disposable test fixture simulates corruption;
+        # ordinary updates must be rejected by the database guard.
+        corrupt_scope_fence_for_view_test(
+            "UPDATE sender_review_ci.scope_fences "
+            "SET active_nonce=NULL WHERE account=%s AND coin='SOL'",
+            (ACCOUNT,),
+        )
         self.assertEqual(self.rows(
             "SELECT review_state FROM "
             "sender_review_ci.simulated_protection_handoff_audit"
