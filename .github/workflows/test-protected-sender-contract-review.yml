@@ -136,6 +136,8 @@ jobs:
         run: python -m unittest sender_review.test_protective_recovery_simulator_offline -v
       - name: Verify offline P3 recovery triage never authorizes actions
         run: python -m unittest sender_review.test_recovery_triage_decision_table_offline -v
+      - name: Verify synthetic three-bot shared account netting always HOLD
+        run: python -m unittest sender_review.test_shared_account_reconciliation_offline -v
       - name: Verify synthetic account-wide ownership and fill reconciliation stays HOLD
         run: python -m unittest sender_review.test_account_wide_reconciliation_fixture_offline -v
       - name: Verify offline exchange read-set provenance handoff and pagination HOLD
