@@ -129,6 +129,64 @@ class SenderJournalPostgresTests(unittest.TestCase):
             "select 1 from sender_review_ci.review_events"
         )), 1)
 
+    def test_one_bot_per_coin_holds_across_distinct_nonces(self):
+        # This is a synthetic reservation, NOT proof that a real exchange
+        # position is flat or that these protections are deployed live.
+        first = record("daily", "SOL", "a" * 32)
+        self.assertTrue(first[0])
+        self.assertEqual(first[2], "persisted-review-only-HOLD")
+        # Both other bots must lose even with unique, fresh request nonces.
+        for bot, nonce in (("intraday", "b" * 32),
+                           ("aggressive", "c" * 32)):
+            with self.subTest(losing_bot=bot):
+                attempt = record(bot, "SOL", nonce)
+                self.assertFalse(attempt[0])
+                self.assertEqual(attempt[2], "active-scope-held")
+        # Other coins remain available to distinct bots and nonces.
+        self.assertTrue(record("intraday", "AVAX", "d" * 32)[0])
+        self.assertTrue(record("aggressive", "LINK", "e" * 32)[0])
+        self.assertEqual(
+            self.query(
+                "SELECT coin,bot,state FROM sender_review_ci.review_intents "
+                "ORDER BY coin"
+            ),
+            [("AVAX", "intraday", "review_only"),
+             ("LINK", "aggressive", "review_only"),
+             ("SOL", "daily", "review_only")],
+        )
+        self.assertEqual(
+            self.query(
+                "SELECT coin,fence,active_nonce "
+                "FROM sender_review_ci.scope_fences ORDER BY coin"
+            ),
+            [("AVAX", 1, "d" * 32),
+             ("LINK", 1, "e" * 32),
+             ("SOL", 1, "a" * 32)],
+        )
+
+    def test_unknown_ack_keeps_coin_blocked_for_every_other_bot(self):
+        self.assertTrue(record("aggressive", "SOL", "a" * 32)[0])
+        with connect() as conn:
+            self.assertTrue(conn.execute(
+                "SELECT sender_review_ci.hold_uncertain(%s,%s,%s,%s)",
+                (ACCOUNT, "SOL", "a" * 32, 1),
+            ).fetchone()[0])
+        # Separate connections and fresh nonces cannot take over SOL.
+        for bot, nonce in (("daily", "b" * 32),
+                           ("intraday", "c" * 32)):
+            with self.subTest(losing_bot=bot):
+                attempt = record(bot, "SOL", nonce)
+                self.assertFalse(attempt[0])
+                self.assertEqual(attempt[2], "active-scope-held")
+        # Do not turn an uncertain SOL outcome into an account-wide lock:
+        # a different coin with a new nonce can be reviewed independently.
+        self.assertTrue(record("daily", "AVAX", "d" * 32)[0])
+        self.assertEqual(self.query(
+            "SELECT coin,bot,state FROM sender_review_ci.review_intents "
+            "ORDER BY coin"
+        ), [("AVAX", "daily", "review_only"),
+            ("SOL", "aggressive", "hold_unknown")])
+
     def test_same_nonce_cannot_replay_across_coins_or_bots(self):
         self.assertTrue(record()[0])
         self.assertFalse(record("intraday", "AVAX", "a" * 32)[0])
