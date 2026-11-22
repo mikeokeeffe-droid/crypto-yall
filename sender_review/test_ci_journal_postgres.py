@@ -47,7 +47,9 @@ def corrupt_scope_fence_for_view_test(statement, params=()):
     an already-corrupted database; it is never a production recovery path.
     """
     if not (
-        os.environ.get(CI_MARKER) == "1"
+        type(statement) is str
+        and ";" not in statement  # Never accept stacked SQL commands.
+        and os.environ.get(CI_MARKER) == "1"
         and os.environ.get("PGDATABASE") == "sender_review_test"
         and os.environ.get("PGHOST") == "127.0.0.1"
         and statement.lstrip().upper().startswith(
@@ -56,17 +58,27 @@ def corrupt_scope_fence_for_view_test(statement, params=()):
     ):
         raise RuntimeError("disposable scope-fence corruption fixture only")
     with connect() as conn:
-        # DDL and the injected UPDATE are one transaction, so any failure
-        # rolls back the disabled trigger and can never leave it disabled.
+        # DDL and the injected UPDATE are one transaction. A failed UPDATE
+        # rolls back the DISABLE too. Preserve the existing trigger mode so
+        # a future ENABLE ALWAYS guard is not silently downgraded.
         with conn.transaction():
+            row = conn.execute(
+                "SELECT tgenabled FROM pg_catalog.pg_trigger "
+                "WHERE tgrelid='sender_review_ci.scope_fences'::regclass "
+                "AND tgname='scope_fence_hold_guard' AND NOT tgisinternal"
+            ).fetchone()
+            if row is None or row[0] not in ("O", "A"):
+                raise RuntimeError("scope fence guard absent or disabled")
             conn.execute(
                 "ALTER TABLE sender_review_ci.scope_fences "
                 "DISABLE TRIGGER scope_fence_hold_guard"
             )
             conn.execute(statement, params)
+            restore_mode = ("ENABLE ALWAYS TRIGGER" if row[0] == "A"
+                            else "ENABLE TRIGGER")
             conn.execute(
                 "ALTER TABLE sender_review_ci.scope_fences "
-                "ENABLE TRIGGER scope_fence_hold_guard"
+                + restore_mode + " scope_fence_hold_guard"
             )
 
 
@@ -613,6 +625,128 @@ print(json.dumps({"claims": results, "repeated_hold": repeat_hold}))
             "SELECT state FROM sender_review_ci.review_intents"
         ), [("hold_unknown",)])
 
+    def test_review_only_intent_cannot_mutate_or_hide_changes_during_hold(self):
+        # Guard must reject edits even BEFORE the state becomes uncertain,
+        # and must reject a valid direction coupled with any other mutation.
+        self.assertTrue(record()[0])
+        before = self.query(
+            "SELECT bot,coin,rounded_size,request_nonce,fence,state "
+            "FROM sender_review_ci.review_intents"
+        )
+        for statement in (
+            "UPDATE sender_review_ci.review_intents "
+            "SET bot='intraday' WHERE coin='SOL'",
+            "UPDATE sender_review_ci.review_intents "
+            "SET state='hold_unknown',bot='intraday' WHERE coin='SOL'",
+            "UPDATE sender_review_ci.review_intents "
+            "SET state='hold_unknown',rounded_size=0.20 WHERE coin='SOL'",
+            "UPDATE sender_review_ci.review_intents "
+            "SET state='hold_unknown',coin='AVAX' WHERE coin='SOL'",
+            "UPDATE sender_review_ci.review_intents "
+            "SET state='hold_unknown',fence=fence+1 WHERE coin='SOL'",
+        ):
+            with self.subTest(statement=statement):
+                with connect() as db:
+                    with self.assertRaises(psycopg.errors.RaiseException):
+                        db.execute(statement)
+                self.assertEqual(self.query(
+                    "SELECT bot,coin,rounded_size,request_nonce,fence,state "
+                    "FROM sender_review_ci.review_intents"
+                ), before)
+        # The narrow, legitimate HOLD-only state change still works.
+        with connect() as db:
+            self.assertTrue(db.execute(
+                "SELECT sender_review_ci.hold_uncertain(%s,%s,%s,%s)",
+                (ACCOUNT, "SOL", "a" * 32, 1),
+            ).fetchone()[0])
+        self.assertEqual(self.query(
+            "SELECT state FROM sender_review_ci.review_intents"
+        ), [("hold_unknown",)])
+
+    def test_unclaimed_scope_guard_rejects_missing_wrong_and_held_intents(self):
+        # Direct INSERTs are intentionally possible in disposable CI; use
+        # them to isolate the scope UPDATE guard's negative conditions.
+        nonce = "a" * 32
+        with connect() as db:
+            db.execute(
+                "INSERT INTO sender_review_ci.scope_fences "
+                "(environment,account,dex,coin) "
+                "VALUES ('testnet',%s,'','SOL')", (ACCOUNT,)
+            )
+        update = (
+            "UPDATE sender_review_ci.scope_fences "
+            "SET fence=%s,active_nonce=%s WHERE coin='SOL'"
+        )
+        with connect() as db:
+            with self.assertRaises(psycopg.errors.RaiseException):
+                db.execute(update, (1, nonce))  # No matching intent.
+        with connect() as db:
+            db.execute(
+                "INSERT INTO sender_review_ci.review_intents "
+                "(environment,account,dex,coin,bot,action,side,"
+                "request_nonce,cloid,rounded_size,requested_leverage,fence) "
+                "VALUES ('testnet',%s,'','SOL','daily','open_long',"
+                "'long',%s,%s,0.16,2,1)",
+                (ACCOUNT, nonce, "0x" + "b" * 32),
+            )
+            with self.assertRaises(psycopg.errors.RaiseException):
+                db.execute(update, (2, nonce))  # Skips a fence.
+            db.execute(
+                "UPDATE sender_review_ci.review_intents "
+                "SET state='hold_unknown' WHERE coin='SOL'"
+            )
+            with self.assertRaises(psycopg.errors.RaiseException):
+                db.execute(update, (1, nonce))  # Matching intent is held.
+        self.assertEqual(self.query(
+            "SELECT fence,active_nonce FROM sender_review_ci.scope_fences"
+        ), [(0, None)])
+        self.assertEqual(self.query(
+            "SELECT state FROM sender_review_ci.review_intents"
+        ), [("hold_unknown",)])
+
+    def test_corruption_fixture_rejects_stacked_sql_and_restores_guard_mode(self):
+        self.assertTrue(record()[0])
+        mode_sql = (
+            "SELECT tgenabled FROM pg_catalog.pg_trigger "
+            "WHERE tgrelid='sender_review_ci.scope_fences'::regclass "
+            "AND tgname='scope_fence_hold_guard' AND NOT tgisinternal"
+        )
+        original = self.query(mode_sql)
+        self.assertEqual(len(original), 1)
+        self.assertIn(original[0][0], ("O", "A"))
+        with self.assertRaises(RuntimeError):
+            corrupt_scope_fence_for_view_test(
+                "UPDATE sender_review_ci.scope_fences SET active_nonce=NULL "
+                "WHERE coin='SOL'; SELECT 1"
+            )
+        self.assertEqual(self.query(mode_sql), original)
+        # A SQL error inside the transaction must roll back DISABLE TRIGGER.
+        with self.assertRaises(psycopg.errors.UndefinedColumn):
+            corrupt_scope_fence_for_view_test(
+                "UPDATE sender_review_ci.scope_fences "
+                "SET nonexistent_fixture_column=1 WHERE coin='SOL'"
+            )
+        self.assertEqual(self.query(mode_sql), original)
+        corrupt_scope_fence_for_view_test(
+            "UPDATE sender_review_ci.scope_fences "
+            "SET active_nonce=NULL WHERE coin='SOL'"
+        )
+        self.assertEqual(self.query(mode_sql), original)
+        corrupt_scope_fence_for_view_test(
+            "UPDATE sender_review_ci.scope_fences "
+            "SET active_nonce=%s WHERE coin='SOL'", ("a" * 32,)
+        )
+        self.assertEqual(self.query(mode_sql), original)
+        with connect() as db:
+            with self.assertRaises(psycopg.errors.RaiseException):
+                db.execute(
+                    "UPDATE sender_review_ci.scope_fences "
+                    "SET active_nonce=NULL WHERE coin='SOL'"
+                )
+        self.assertEqual(self.query(
+            "SELECT fence,active_nonce FROM sender_review_ci.scope_fences"
+        ), [(1, "a" * 32)])
+
     def test_direct_sql_cannot_reopen_or_rewrite_unknown_held_intent(self):
         self.assertTrue(record()[0])
         with connect() as conn:
@@ -693,10 +827,20 @@ print(json.dumps({"claims": results, "repeated_hold": repeat_hold}))
              "reject_fixture_evidence_mutation",
              "guard_review_intent_transition", "guard_scope_fence"},
         )
-        states = self.query(
-            "select distinct state from sender_review_ci.review_intents"
+        # Inspect the actual CHECK definition, not an empty table (which
+        # setUp truncates and would trivially satisfy any state assertion).
+        constraints = self.query(
+            "SELECT pg_catalog.pg_get_constraintdef(c.oid) "
+            "FROM pg_catalog.pg_constraint AS c "
+            "WHERE c.conrelid='sender_review_ci.review_intents'::regclass "
+            "AND c.contype='c'"
         )
-        self.assertEqual(states, [])
+        self.assertTrue(any(
+            "state" in row[0]
+            and "review_only" in row[0]
+            and "hold_unknown" in row[0]
+            for row in constraints
+        ), "journal state CHECK must allow only conservative states")
 
 
 if __name__ == "__main__":
