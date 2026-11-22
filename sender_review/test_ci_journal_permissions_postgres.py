@@ -117,6 +117,7 @@ class JournalUntrustedRolePermissionsTests(unittest.TestCase):
                 "WHERE n.nspname='sender_review_ci' ORDER BY proname"
             ).fetchall()
         self.assertEqual(functions, [
+            ("guard_review_intent_transition",), ("guard_scope_fence",),
             ("hold_uncertain",), ("record_review_only",),
             ("reject_fixture_evidence_mutation",),
         ])
