@@ -38,24 +38,43 @@ class PostgreSQL18ProvisioningIntegrationTests(unittest.TestCase):
                 f"could not start disposable PostgreSQL 18: {result.stderr}"
             )
         deadline = time.monotonic() + 90
+        last_error = "no successful SQL connection"
         while time.monotonic() < deadline:
             ready = cls.docker(
                 "exec", cls.container, "pg_isready", "-h", "/var/run/postgresql",
-                "-U", "postgres",
-                "-d", "sender_review_test", check=False,
+                "-U", "postgres", "-d", "sender_review_test", check=False,
             )
             if ready.returncode == 0:
-                cls.docker(
+                # pg_isready alone can succeed before the exact runner's
+                # socket and psql session are usable. Exercise real SQL.
+                permission = cls.docker(
                     "exec", "--user", "0", cls.container,
-                    "chmod", "00770", "/var/run/postgresql",
+                    "chmod", "00770", "/var/run/postgresql", check=False,
                 )
-                return
+                if permission.returncode == 0:
+                    probe = cls.psql("SELECT 1", check=False)
+                    if probe.returncode == 0 and probe.stdout.strip() == "1":
+                        return
+                    last_error = (
+                        f"psql SQL probe rc={probe.returncode}; "
+                        f"stderr={probe.stderr.strip()}"
+                    )
+                else:
+                    last_error = (
+                        f"socket chmod rc={permission.returncode}; "
+                        f"stderr={permission.stderr.strip()}"
+                    )
+            else:
+                last_error = (
+                    f"pg_isready rc={ready.returncode}; "
+                    f"stderr={ready.stderr.strip()}"
+                )
             time.sleep(1)
         logs = cls.docker("logs", cls.container, check=False)
         cls.docker("rm", "--force", cls.container, check=False)
         raise RuntimeError(
-            "disposable PostgreSQL 18 did not become ready: "
-            f"{logs.stdout}{logs.stderr}"
+            "disposable PostgreSQL 18 did not become SQL-ready: "
+            f"{last_error}; container logs={logs.stdout}{logs.stderr}"
         )
 
     @classmethod
@@ -84,7 +103,19 @@ class PostgreSQL18ProvisioningIntegrationTests(unittest.TestCase):
             command.extend(["--no-align", "--tuples-only", "--quiet",
                             "-F", "|",
                             "-c", statement])
-        return cls.docker(*command, check=check)
+        result = cls.docker(*command, check=False)
+        if check and result.returncode:
+            # Report the command failure, not just subprocess exit status 2.
+            # This isolated container uses no live credentials or endpoints.
+            server = cls.docker("logs", "--tail", "40", cls.container,
+                                check=False)
+            raise RuntimeError(
+                f"Disposable PG18 psql failed (rc={result.returncode}); "
+                f"stdout={result.stdout.strip()!r}; "
+                f"stderr={result.stderr.strip()!r}; "
+                f"container_logs={server.stdout[-6000:]!r}"
+            )
+        return result
 
     @classmethod
     def rows(cls, statement):
