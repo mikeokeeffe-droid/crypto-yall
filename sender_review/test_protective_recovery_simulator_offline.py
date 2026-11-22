@@ -66,7 +66,7 @@ class ProtectiveRecoveryOfflineTests(unittest.TestCase):
     def test_unknown_ack_blocks_all_resends_and_release(self):
         result=assess()
         self.assertEqual(result.reason,"unknown-ack-permanent-hold")
-        self.assertEqual(result.simulated_remaining,"0.16")
+        self.assertIsNone(result.simulated_remaining)
         self.assertTrue(result.fixture_matched)
         self.assert_hold(result)
 
@@ -78,6 +78,7 @@ class ProtectiveRecoveryOfflineTests(unittest.TestCase):
                     remaining_size=remaining))
                 self.assertEqual(result.reason,"partial-fill-needs-independent-reconciliation")
                 self.assertEqual(result.simulated_remaining,remaining)
+                self.assertIn("claimed-unverified", result.diagnostic)
                 self.assert_hold(result)
         for bad in (
             order(status="partial",cumulative_fill="0",remaining_size="0.16"),
@@ -101,6 +102,10 @@ class ProtectiveRecoveryOfflineTests(unittest.TestCase):
                 result=assess(order=fixture)
                 self.assertEqual(result.reason,expected)
                 self.assertTrue(result.fixture_matched)
+                if fixture.status in ("open", "not_sent"):
+                    self.assertIsNone(result.simulated_remaining)
+                else:
+                    self.assertIn("claimed-unverified", result.diagnostic)
                 self.assert_hold(result)
 
     def test_stale_positions_and_wrong_ownership_never_authorize_close(self):
@@ -197,6 +202,10 @@ class ProtectiveRecoveryOfflineTests(unittest.TestCase):
                     )
                     self.assertEqual(result.reason, reason)
                     self.assertTrue(result.fixture_matched)
+                    if status in ("unknown_ack", "not_sent", "open"):
+                        self.assertIsNone(result.simulated_remaining)
+                    else:
+                        self.assertIn("claimed-unverified", result.diagnostic)
                     self.assert_hold(result)
 
     def test_p3_claimed_authority_in_request_cannot_enable_recovery(self):
@@ -262,6 +271,20 @@ class ProtectiveRecoveryOfflineTests(unittest.TestCase):
                 result = assess(order=fixture)
                 self.assertFalse(result.fixture_matched)
                 self.assert_hold(result)
+
+    def test_uncertain_orders_never_report_retry_sized_quantities(self):
+        # Any fabricated accounting supplied alongside an uncertain outcome
+        # remains non-executable and cannot be echoed as a suggested size.
+        for status in ("unknown_ack", "not_sent", "open"):
+            for filled, remaining in (("0", "0.16"), ("0.05", "0.11")):
+                with self.subTest(status=status, filled=filled):
+                    result = assess(order=order(
+                        status=status, cumulative_fill=filled,
+                        remaining_size=remaining,
+                    ))
+                    self.assertTrue(result.fixture_matched)
+                    self.assertIsNone(result.simulated_remaining)
+                    self.assert_hold(result)
 
     def test_module_has_no_network_db_signer_imports(self):
         source=Path(__file__).with_name(
