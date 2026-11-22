@@ -39,6 +39,37 @@ def record(bot="daily", coin="SOL", nonce="a" * 32,
         ).fetchone()
 
 
+def corrupt_scope_fence_for_view_test(statement, params=()):
+    """Inject damage only as the disposable CI database superuser.
+
+    Ordinary SQL must fail the fence trigger. This narrow, explicit bypass
+    exists solely to test whether separate read-only audit views detect
+    an already-corrupted database; it is never a production recovery path.
+    """
+    if not (
+        os.environ.get(CI_MARKER) == "1"
+        and os.environ.get("PGDATABASE") == "sender_review_test"
+        and os.environ.get("PGHOST") == "127.0.0.1"
+        and statement.lstrip().upper().startswith(
+            "UPDATE SENDER_REVIEW_CI.SCOPE_FENCES "
+        )
+    ):
+        raise RuntimeError("disposable scope-fence corruption fixture only")
+    with connect() as conn:
+        # DDL and the injected UPDATE are one transaction, so any failure
+        # rolls back the disabled trigger and can never leave it disabled.
+        with conn.transaction():
+            conn.execute(
+                "ALTER TABLE sender_review_ci.scope_fences "
+                "DISABLE TRIGGER scope_fence_hold_guard"
+            )
+            conn.execute(statement, params)
+            conn.execute(
+                "ALTER TABLE sender_review_ci.scope_fences "
+                "ENABLE TRIGGER scope_fence_hold_guard"
+            )
+
+
 @unittest.skipUnless(
     os.environ.get(CI_MARKER) == "1"
     and os.environ.get("PGDATABASE") == "sender_review_test"
@@ -582,6 +613,75 @@ print(json.dumps({"claims": results, "repeated_hold": repeat_hold}))
             "SELECT state FROM sender_review_ci.review_intents"
         ), [("hold_unknown",)])
 
+    def test_direct_sql_cannot_reopen_or_rewrite_unknown_held_intent(self):
+        self.assertTrue(record()[0])
+        with connect() as conn:
+            self.assertTrue(conn.execute(
+                "SELECT sender_review_ci.hold_uncertain(%s,%s,%s,%s)",
+                (ACCOUNT, "SOL", "a" * 32, 1),
+            ).fetchone()[0])
+        snapshot = self.query(
+            "SELECT bot,state,request_nonce,fence FROM "
+            "sender_review_ci.review_intents"
+        )
+        events = self.query(
+            "SELECT kind FROM sender_review_ci.review_events "
+            "ORDER BY event_id"
+        )
+        statements = (
+            "UPDATE sender_review_ci.review_intents "
+            "SET state='review_only' WHERE coin='SOL'",
+            "UPDATE sender_review_ci.review_intents "
+            "SET bot='intraday' WHERE coin='SOL'",
+            "UPDATE sender_review_ci.review_intents "
+            "SET fence=fence+1 WHERE coin='SOL'",
+            "DELETE FROM sender_review_ci.review_intents WHERE coin='SOL'",
+        )
+        for statement in statements:
+            with self.subTest(statement=statement):
+                with connect() as conn:
+                    with self.assertRaises(psycopg.errors.RaiseException):
+                        conn.execute(statement)
+                self.assertEqual(self.query(
+                    "SELECT bot,state,request_nonce,fence FROM "
+                    "sender_review_ci.review_intents"
+                ), snapshot)
+                self.assertEqual(self.query(
+                    "SELECT kind FROM sender_review_ci.review_events "
+                    "ORDER BY event_id"
+                ), events)
+        self.assertEqual(snapshot, [("daily", "hold_unknown", "a" * 32, 1)])
+
+    def test_direct_sql_cannot_release_or_reassign_active_fence(self):
+        self.assertTrue(record()[0])
+        before = self.query(
+            "SELECT environment,account,dex,coin,fence,active_nonce "
+            "FROM sender_review_ci.scope_fences"
+        )
+        statements = (
+            "UPDATE sender_review_ci.scope_fences "
+            "SET active_nonce=NULL WHERE coin='SOL'",
+            "UPDATE sender_review_ci.scope_fences "
+            "SET active_nonce='bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb' "
+            "WHERE coin='SOL'",
+            "UPDATE sender_review_ci.scope_fences "
+            "SET fence=fence+1 WHERE coin='SOL'",
+            "UPDATE sender_review_ci.scope_fences "
+            "SET coin='AVAX' WHERE coin='SOL'",
+            "DELETE FROM sender_review_ci.scope_fences WHERE coin='SOL'",
+        )
+        for statement in statements:
+            with self.subTest(statement=statement):
+                with connect() as conn:
+                    with self.assertRaises(psycopg.errors.RaiseException):
+                        conn.execute(statement)
+                self.assertEqual(self.query(
+                    "SELECT environment,account,dex,coin,fence,active_nonce "
+                    "FROM sender_review_ci.scope_fences"
+                ), before)
+        self.assertFalse(record("aggressive", "SOL", "b" * 32)[0])
+        self.assertEqual(before[0][-2:], (1, "a" * 32))
+
     def test_no_release_send_or_trade_function_exists(self):
         routines = self.query(
             "select proname from pg_proc p join pg_namespace n "
@@ -589,7 +689,9 @@ print(json.dumps({"claims": results, "repeated_hold": repeat_hold}))
         )
         self.assertEqual(
             {item[0] for item in routines},
-            {"record_review_only", "hold_uncertain", "reject_fixture_evidence_mutation"},
+            {"record_review_only", "hold_uncertain",
+             "reject_fixture_evidence_mutation",
+             "guard_review_intent_transition", "guard_scope_fence"},
         )
         states = self.query(
             "select distinct state from sender_review_ci.review_intents"
