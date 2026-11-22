@@ -37,43 +37,70 @@ class PostgreSQL18ProvisioningIntegrationTests(unittest.TestCase):
             raise RuntimeError(
                 f"could not start disposable PostgreSQL 18: {result.stderr}"
             )
+        # The official PostgreSQL image uses a temporary postmaster during
+        # first-time initdb. A single pg_isready/SELECT 1 can hit that server,
+        # then the next SQL call fails when Docker stops it. Wait for the
+        # explicit init-complete boundary AND a stable final postmaster.
         deadline = time.monotonic() + 90
-        last_error = "no successful SQL connection"
+        last_error = "database initialization has not completed"
+        init_done = "PostgreSQL init process complete; ready for start up."
         while time.monotonic() < deadline:
+            logs = cls.docker("logs", cls.container, check=False)
+            if init_done not in logs.stdout:
+                last_error = "waiting for PostgreSQL image init-complete marker"
+                time.sleep(1)
+                continue
             ready = cls.docker(
                 "exec", cls.container, "pg_isready", "-h", "/var/run/postgresql",
                 "-U", "postgres", "-d", "sender_review_test", check=False,
             )
-            if ready.returncode == 0:
-                # pg_isready alone can succeed before the exact runner's
-                # socket and psql session are usable. Exercise real SQL.
-                permission = cls.docker(
-                    "exec", "--user", "0", cls.container,
-                    "chmod", "00770", "/var/run/postgresql", check=False,
-                )
-                if permission.returncode == 0:
-                    probe = cls.psql("SELECT 1", check=False)
-                    if probe.returncode == 0 and probe.stdout.strip() == "1":
-                        return
-                    last_error = (
-                        f"psql SQL probe rc={probe.returncode}; "
-                        f"stderr={probe.stderr.strip()}"
-                    )
-                else:
-                    last_error = (
-                        f"socket chmod rc={permission.returncode}; "
-                        f"stderr={permission.stderr.strip()}"
-                    )
-            else:
+            if ready.returncode != 0:
                 last_error = (
-                    f"pg_isready rc={ready.returncode}; "
+                    f"final pg_isready rc={ready.returncode}; "
                     f"stderr={ready.stderr.strip()}"
                 )
+                time.sleep(1)
+                continue
+            permission = cls.docker(
+                "exec", "--user", "0", cls.container,
+                "chmod", "00770", "/var/run/postgresql", check=False,
+            )
+            if permission.returncode != 0:
+                last_error = (
+                    f"socket chmod rc={permission.returncode}; "
+                    f"stderr={permission.stderr.strip()}"
+                )
+                time.sleep(1)
+                continue
+            probe_sql = (
+                "SELECT pg_catalog.pg_postmaster_start_time()::text"
+            )
+            first = cls.psql(probe_sql, check=False)
+            if first.returncode != 0 or not first.stdout.strip():
+                last_error = (
+                    f"first SQL probe rc={first.returncode}; "
+                    f"stderr={first.stderr.strip()}"
+                )
+                time.sleep(1)
+                continue
+            # Require the same server start-time across distinct SQL sessions,
+            # a few seconds apart, after the temporary server has shut down.
+            time.sleep(3)
+            second = cls.psql(probe_sql, check=False)
+            if (second.returncode == 0
+                    and second.stdout.strip() == first.stdout.strip()):
+                return
+            last_error = (
+                f"postmaster changed or disappeared between probes: "
+                f"first={first.stdout.strip()!r}, "
+                f"second={second.stdout.strip()!r}; "
+                f"second stderr={second.stderr.strip()}"
+            )
             time.sleep(1)
         logs = cls.docker("logs", cls.container, check=False)
         cls.docker("rm", "--force", cls.container, check=False)
         raise RuntimeError(
-            "disposable PostgreSQL 18 did not become SQL-ready: "
+            "disposable PostgreSQL 18 did not become final-server-ready: "
             f"{last_error}; container logs={logs.stdout}{logs.stderr}"
         )
 
