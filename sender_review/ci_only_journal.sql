@@ -171,6 +171,82 @@ END
 $$;
 
 
+-- P1: the CI journal must enforce permanent HOLD at the table boundary,
+-- not merely through conservative helper functions. Only the narrow
+-- review_only -> hold_unknown transition is allowed for an existing intent.
+-- All other updates and ordinary DELETEs are rejected, including by the
+-- disposable table owner. No approved/retry/release state exists.
+CREATE OR REPLACE FUNCTION sender_review_ci.guard_review_intent_transition()
+RETURNS trigger
+LANGUAGE plpgsql SECURITY INVOKER SET search_path = pg_catalog
+AS $$
+BEGIN
+    IF TG_OP = 'DELETE' THEN
+        RAISE EXCEPTION 'CI journal intents cannot be deleted';
+    END IF;
+    IF OLD.state = 'review_only'
+       AND NEW.state = 'hold_unknown'
+       AND (pg_catalog.to_jsonb(NEW) - 'state') =
+           (pg_catalog.to_jsonb(OLD) - 'state') THEN
+        RETURN NEW;
+    END IF;
+    RAISE EXCEPTION 'CI journal intent update denied: permanent HOLD';
+END
+$$;
+
+DROP TRIGGER IF EXISTS review_intents_hold_guard
+  ON sender_review_ci.review_intents;
+CREATE TRIGGER review_intents_hold_guard
+BEFORE UPDATE OR DELETE ON sender_review_ci.review_intents
+FOR EACH ROW EXECUTE FUNCTION
+    sender_review_ci.guard_review_intent_transition();
+
+-- A scope may be claimed exactly once by its matching journal intent.
+-- The initial NULL nonce and fence may advance to an active reservation;
+-- once active the nonce, fence and scope cannot be changed or deleted.
+-- This makes ordinary SQL incapable of unholding a recorded/unknown order.
+CREATE OR REPLACE FUNCTION sender_review_ci.guard_scope_fence()
+RETURNS trigger
+LANGUAGE plpgsql SECURITY INVOKER SET search_path = pg_catalog
+AS $$
+BEGIN
+    IF TG_OP = 'DELETE' THEN
+        RAISE EXCEPTION 'CI active scope fences cannot be deleted';
+    END IF;
+    IF OLD.active_nonce IS NULL
+       AND NEW.active_nonce IS NOT NULL
+       AND NEW.fence = OLD.fence + 1
+       AND NEW.environment = OLD.environment
+       AND NEW.account = OLD.account
+       AND NEW.dex = OLD.dex
+       AND NEW.coin = OLD.coin
+       AND EXISTS (
+           SELECT 1 FROM sender_review_ci.review_intents AS i
+            WHERE i.environment=NEW.environment
+              AND i.account=NEW.account
+              AND i.dex=NEW.dex AND i.coin=NEW.coin
+              AND i.request_nonce=NEW.active_nonce
+              AND i.fence=NEW.fence
+              AND i.state='review_only'
+       ) THEN
+        RETURN NEW;
+    END IF;
+    RAISE EXCEPTION 'CI scope fence update denied: permanent HOLD';
+END
+$$;
+
+DROP TRIGGER IF EXISTS scope_fence_hold_guard
+  ON sender_review_ci.scope_fences;
+CREATE TRIGGER scope_fence_hold_guard
+BEFORE UPDATE OR DELETE ON sender_review_ci.scope_fences
+FOR EACH ROW EXECUTE FUNCTION
+    sender_review_ci.guard_scope_fence();
+
+-- These ordinary-row triggers do not prevent TRUNCATE, superuser-trigger
+-- disabling or schema-owner DDL. CI resets use TRUNCATE intentionally.
+-- They are defense-in-depth for a disposable offline simulation, never
+-- an immutable production ledger, real exchange ownership or signer safety.
+
 -- Signed OIDC test fixture JTI consumption is durable across CI process
 -- restarts. These rows are NOT server authentication or trading permission.
 CREATE TABLE IF NOT EXISTS sender_review_ci.fixture_identity_receipts (
