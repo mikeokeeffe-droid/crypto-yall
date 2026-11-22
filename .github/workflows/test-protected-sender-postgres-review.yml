@@ -136,3 +136,40 @@ jobs:
           python-version: '3.12'
       - name: Execute guarded PostgreSQL 18 provisioning SQL in disposable container
         run: python -m unittest sender_review.postgresql18_offline.test_provisioning_integration -v
+
+  pg18-startup-stress-20:
+    if: github.event_name == 'pull_request' && github.event.pull_request.number == 42
+    name: pg18-startup-stress-20
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Run 20 fresh offline PostgreSQL 18 cold starts without retries
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p pg18-stress-logs
+          for attempt in $(seq 1 20); do
+            printf -v log 'pg18-stress-logs/attempt-%02d.log' "$attempt"
+            echo "Starting PG18 cold start $attempt/20"
+            if python -m unittest sender_review.postgresql18_offline.test_provisioning_integration -v >"$log" 2>&1; then
+              echo "PASS $attempt/20" | tee -a pg18-stress-logs/summary.txt
+            else
+              echo "FAIL $attempt/20 (no retry)" | tee -a pg18-stress-logs/summary.txt
+              cat "$log"
+              exit 1
+            fi
+          done
+          echo "20/20 PASS without retries" | tee -a pg18-stress-logs/summary.txt
+      - name: Upload all PG18 attempt logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pg18-stress-logs
+          path: pg18-stress-logs/
+          retention-days: 30
