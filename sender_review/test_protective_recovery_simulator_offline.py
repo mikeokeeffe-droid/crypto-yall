@@ -167,6 +167,102 @@ class ProtectiveRecoveryOfflineTests(unittest.TestCase):
             self.assertEqual(result.reason,"unknown-ack-permanent-hold")
             self.assert_hold(result)
 
+    def test_p3_all_order_lifecycle_outcomes_remain_untrusted(self):
+        # Covers the proposed decision table, NOT real exchange truth.
+        # Even a self-consistent fill or cancel remains a synthetic HOLD.
+        outcomes = (
+            ("not_sent", "0", "0.16",
+             "not-sent-is-not-proof-of-safe-retry"),
+            ("unknown_ack", "0", "0.16",
+             "unknown-ack-permanent-hold"),
+            ("open", "0", "0.16",
+             "open-order-already-outstanding"),
+            ("partial", "0.05", "0.11",
+             "partial-fill-needs-independent-reconciliation"),
+            ("canceled", "0.05", "0.11",
+             "fixture-canceled-still-no-release"),
+            ("filled", "0.16", "0",
+             "fixture-filled-still-no-release"),
+        )
+        for bot in ("daily", "intraday", "aggressive"):
+            for status, filled, remaining, reason in outcomes:
+                with self.subTest(bot=bot, status=status):
+                    result = assess(
+                        fixture_bot=bot,
+                        position=position(bot=bot),
+                        order=order(
+                            status=status, cumulative_fill=filled,
+                            remaining_size=remaining,
+                        ),
+                    )
+                    self.assertEqual(result.reason, reason)
+                    self.assertTrue(result.fixture_matched)
+                    self.assert_hold(result)
+
+    def test_p3_claimed_authority_in_request_cannot_enable_recovery(self):
+        # Caller-provided 'verified' flags must not become trust inputs.
+        for field in (
+            "identity_authenticated", "exchange_snapshot_verified",
+            "position_ownership_verified", "nonce_reserved",
+            "retry_authorized", "close_authorized",
+            "fence_released", "signing_enabled",
+        ):
+            with self.subTest(field=field):
+                result = assess(body=close(**{field: True}))
+                self.assertFalse(result.fixture_matched)
+                self.assert_hold(result)
+        # Even an internally consistent fabricated snapshot does not grant
+        # authentication, a real fill proof, or an operator-approved release.
+        result = assess()
+        self.assertTrue(result.fixture_matched)
+        self.assertFalse(result.exchange_snapshot_verified)
+        self.assertFalse(result.position_ownership_verified)
+        self.assert_hold(result)
+
+    def test_p3_conflicting_account_bot_order_and_fence_never_reconcile(self):
+        # Cross-bot / cross-scope evidence may not be stitched together to
+        # infer that an order completed, a fence is free, or a close is safe.
+        scenarios = (
+            dict(position=position(bot="aggressive")),
+            dict(position=position(account="0x" + "2" * 40)),
+            dict(position=position(fence=5)),
+            dict(position=position(active_nonce="e" * 32)),
+            dict(position=position(position_age_seconds=12)),
+            dict(order=order(nonce="e" * 32)),
+            dict(order=order(account="0x" + "2" * 40)),
+            dict(order=order(coin="AVAX")),
+            dict(order=order(fence=5)),
+            dict(order=order(cloid="0x" + "x" * 32)),
+            dict(body=close(side="short")),
+            dict(order=None),
+            dict(seen_nonces=frozenset({NONCE})),
+        )
+        for changes in scenarios:
+            with self.subTest(changes=changes):
+                result = assess(**changes)
+                self.assertFalse(result.fixture_matched)
+                self.assert_hold(result)
+
+    def test_p3_contradictory_or_nonfinite_remainders_never_authorize(self):
+        # Unknown, canceled and filled fixtures are not exchange proofs.
+        for fixture in (
+            order(status="unknown_ack", cumulative_fill="0.12",
+                  remaining_size="0.12"),
+            order(status="partial", cumulative_fill="0.16",
+                  remaining_size="0"),
+            order(status="filled", cumulative_fill="0.15",
+                  remaining_size="0.01"),
+            order(status="canceled", cumulative_fill="0.20",
+                  remaining_size="0"),
+            order(status="open", cumulative_fill="NaN"),
+            order(status="open", remaining_size="-0.01"),
+            order(status="not_sent", cumulative_fill="Infinity"),
+        ):
+            with self.subTest(fixture=fixture):
+                result = assess(order=fixture)
+                self.assertFalse(result.fixture_matched)
+                self.assert_hold(result)
+
     def test_module_has_no_network_db_signer_imports(self):
         source=Path(__file__).with_name(
             "protective_recovery_simulator_offline.py").read_text("utf-8")
