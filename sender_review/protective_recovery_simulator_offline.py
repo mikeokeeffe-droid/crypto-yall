@@ -49,6 +49,8 @@ class RecoveryReview:
     state: str = "HOLD"
     reason: str = "insufficient trusted evidence"
     diagnostic: str = "no execution permitted"
+    # Untrusted fixture arithmetic, never safe as a retry/close size.
+    # For unknown/open/not-sent order outcomes it must remain None.
     simulated_remaining: str | None = None
     fixture_matched: bool = False
     runtime_identity_authenticated: bool = False
@@ -161,25 +163,28 @@ def review_close_and_recovery_offline(
         return RecoveryReview(reason="contradictory-fill-accounting")
     if order.status == "unknown_ack":
         return RecoveryReview(reason="unknown-ack-permanent-hold",
-                              simulated_remaining=str(remaining), fixture_matched=True)
+                              fixture_matched=True)
     if order.status == "not_sent":
         return RecoveryReview(reason="not-sent-is-not-proof-of-safe-retry",
-                              simulated_remaining=str(remaining), fixture_matched=True)
+                              fixture_matched=True)
     if order.status == "partial":
         if filled <= 0 or remaining <= 0:
             return RecoveryReview(reason="contradictory-partial-status")
         return RecoveryReview(reason="partial-fill-needs-independent-reconciliation",
+                              diagnostic="claimed-unverified-fixture-remainder; no execution permitted",
                               simulated_remaining=str(remaining), fixture_matched=True)
     if order.status == "filled":
         if filled != submitted or remaining != 0:
             return RecoveryReview(reason="contradictory-filled-status")
         return RecoveryReview(reason="fixture-filled-still-no-release",
+                              diagnostic="claimed-unverified-fixture-remainder; no execution permitted",
                               simulated_remaining="0", fixture_matched=True)
     if order.status == "canceled":
         # A canceled remainder may coexist with a prior partial fill.
         return RecoveryReview(reason="fixture-canceled-still-no-release",
+                              diagnostic="claimed-unverified-fixture-remainder; no execution permitted",
                               simulated_remaining=str(remaining), fixture_matched=True)
     if order.status == "open":
         return RecoveryReview(reason="open-order-already-outstanding",
-                              simulated_remaining=str(remaining), fixture_matched=True)
+                              fixture_matched=True)
     return RecoveryReview(reason="unrecognized-order-status")
