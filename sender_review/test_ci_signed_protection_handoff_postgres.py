@@ -9,6 +9,7 @@ from sender_review.ci_only_signed_protection_handoff import (
 )
 from sender_review.test_ci_journal_postgres import (
     ACCOUNT, CI_MARKER, SQL, connect,
+    corrupt_scope_fence_for_view_test,
 )
 from sender_review.test_remote_request_boundary_offline import (
     NOW, OfflineRemoteRequestBoundaryTests,
@@ -180,11 +181,10 @@ class SignedProtectionHandoffPostgresTests(unittest.TestCase):
             "daily", "SOL", True, True,
             "PERSISTED_FIXTURE_HOLD_NO_REAL_PROTECTION"
         )])
-        with connect() as db:
-            db.execute(
-                "UPDATE sender_review_ci.scope_fences SET active_nonce=NULL "
-                "WHERE coin='SOL'"
-            )
+        corrupt_scope_fence_for_view_test(
+            "UPDATE sender_review_ci.scope_fences SET active_nonce=NULL "
+            "WHERE coin='SOL'"
+        )
         self.assertEqual(self.rows(query), [(
             "daily", "SOL", True, False,
             "CRITICAL_FENCE_MISSING_OR_CHANGED"
