@@ -13,11 +13,16 @@ permissions:
 
 jobs:
   disposable-pg-journal:
+    name: disposable-pg-journal-pg${{ matrix.postgres_major }}
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 12
+    strategy:
+      fail-fast: false
+      matrix:
+        postgres_major: ['16', '18']
     services:
       postgres:
-        image: postgres:16
+        image: postgres:${{ matrix.postgres_major }}
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: disposable-only-ci-password
@@ -33,6 +38,7 @@ jobs:
       SENDER_REVIEW_DISPOSABLE_CI: '1'
       PGHOST: 127.0.0.1
       PGDATABASE: sender_review_test
+      PG_EXPECTED_MAJOR: ${{ matrix.postgres_major }}
       PGPASSWORD: disposable-only-ci-password
       PYTHONDONTWRITEBYTECODE: '1'
     steps:
@@ -42,6 +48,45 @@ jobs:
           python-version: '3.12'
       - name: Install disposable PostgreSQL client
         run: python -m pip install 'psycopg[binary]>=3.2,<4' 'cryptography>=42,<47'
+      # Docker's health check is not proof that SQL works with the exact
+      # CI role/DB, or that this job started the intended PostgreSQL major.
+      - name: Verify SQL connection and matrix PostgreSQL major
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import os
+          import sys
+          import time
+          import psycopg
+
+          expected = int(os.environ["PG_EXPECTED_MAJOR"])
+          last_error = "no successful database connection"
+          for attempt in range(1, 21):
+              try:
+                  with psycopg.connect(
+                      host="127.0.0.1", port=5432,
+                      dbname="sender_review_test", user="postgres",
+                      password=os.environ["PGPASSWORD"],
+                      connect_timeout=3,
+                  ) as db:
+                      version, database, username = db.execute(
+                          "SELECT current_setting('server_version_num')::integer, "
+                          "current_database(), current_user"
+                      ).fetchone()
+                  actual = version // 10000
+                  if actual != expected or database != "sender_review_test" or username != "postgres":
+                      sys.exit(f"PostgreSQL fixture mismatch: expected major {expected}, "
+                               f"found major {actual}, database={database}, role={username}")
+                  print(f"Disposable PostgreSQL {actual}: SQL connection and identity verified")
+                  break
+              except (psycopg.Error, OSError) as exc:
+                  last_error = f"{type(exc).__name__}: {exc}"
+                  print(f"Attempt {attempt}/20: disposable PostgreSQL not ready", flush=True)
+                  time.sleep(1)
+          else:
+              sys.exit(f"PostgreSQL SQL readiness failed: {last_error}")
+          PY
       - name: Concurrent review-only journal and unknown-ack recovery
         run: python -m unittest sender_review.test_ci_journal_postgres -v
       - name: Verify signed fixture identity, durable replay and fail-closed journal bridge
