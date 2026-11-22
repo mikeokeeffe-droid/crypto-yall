@@ -69,6 +69,31 @@ close size or evidence that the account is flat.
   during HOLD. These are requirements for a separately reviewed future
   system, not reasons to relax this simulator's HOLD result.
 
+## Standalone three-bot netting arithmetic (offline only)
+
+The independent synthetic checker in
+`sender_review/shared_account_reconciliation_offline.py` and its tests
+`sender_review/test_shared_account_reconciliation_offline.py` describe
+a **non-authorizing arithmetic exercise**, not a solution to shared-account
+ownership. They require one synthetic allocation for each of Daily,
+Intraday and Aggressive and compare signed before/after positions and
+claimed per-bot fills against the claimed net account position.
+Missing, duplicated or cross-account fills, inconsistent arithmetic and
+offsetting long/short claims are categorized as **HOLD**.
+Even perfectly matching figures remain HOLD and cannot authorize any
+retry, protective close, lock release, sender or resumption.
+
+**Not proven:** fill-history completeness; authenticated exchange
+observations; freshness and sequencing; reliable historical position
+attribution when bots share one netted exchange position; account-wide
+nonce reservations; fill/CLOID linkage to the durable journal; or safe
+account recovery. The inputs, IDs, account sizes and bot allocations
+are caller-provided synthetic fixtures, not trusted exchange evidence.
+A true live reconciliation path requires a separate authenticated
+read-only adapter, complete timestamped and paginated fills, immutable
+provenance, and a reviewed operator process. This standalone arithmetic
+must never be connected to a signer or live trading state.
+
 ## Required before any testnet transport or trading
 
 The real sender must independently authenticate GitHub workload identity,
