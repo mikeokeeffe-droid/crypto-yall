@@ -13,6 +13,7 @@ from sender_review.ci_only_identity_bridge import (
 )
 from sender_review.test_ci_journal_postgres import (
     ACCOUNT, CI_MARKER, SQL, connect,
+    corrupt_scope_fence_for_view_test,
 )
 from sender_review.test_offline_oidc_identity_fixture import (
     NOW, POLICY, SignedOidcFixtureTests,
@@ -282,20 +283,18 @@ os._exit(0)
         self.assertEqual(self.query(query), [
             (True, "CRITICAL_OUTCOME_UNCONFIRMED")
         ])
-        with connect() as db:
-            db.execute(
-                "UPDATE sender_review_ci.scope_fences "
-                "SET active_nonce=NULL WHERE coin='SOL'"
-            )
+        corrupt_scope_fence_for_view_test(
+            "UPDATE sender_review_ci.scope_fences "
+            "SET active_nonce=NULL WHERE coin='SOL'"
+        )
         self.assertEqual(self.query(query), [
             (False, "CRITICAL_FENCE_MISSING_OR_CHANGED")
         ])
         # Restore ONLY within this disposable test for later assertions.
-        with connect() as db:
-            db.execute(
-                "UPDATE sender_review_ci.scope_fences "
-                "SET active_nonce=%s WHERE coin='SOL'", ("a" * 32,)
-            )
+        corrupt_scope_fence_for_view_test(
+            "UPDATE sender_review_ci.scope_fences "
+            "SET active_nonce=%s WHERE coin='SOL'", ("a" * 32,)
+        )
         self.assertTrue(self.hold()[0])
         self.assertEqual(self.query(query), [
             (True, "CRITICAL_UNKNOWN_OUTCOME")
