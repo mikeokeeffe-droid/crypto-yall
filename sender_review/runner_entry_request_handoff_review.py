@@ -20,6 +20,7 @@ from sender_review.worker_intent_fixture_builder_offline import (
 )
 from sender_review.legacy_order_capture_preview import LegacyOrderCapturePreview
 from sender_review.request_contract import inspect_sender_entry_request_offline
+from sender_review.testnet_only_scope_offline import inspect_testnet_only_scope_offline
 
 _JWT_SHAPE = re.compile(
     r"[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\Z", re.ASCII
@@ -148,3 +149,32 @@ def prepare_captured_legacy_entry_handoff_review_only(
     if envelope.body != capture.proposed_body:
         return denied
     return envelope
+
+def prepare_testnet_only_runner_entry_handoff_review_only(
+    *, proposed_network, proposed_api_url=None, candidate_runner_jwt,
+    fixture_bot, action, coin, side, request_nonce, rounded_size,
+    requested_leverage,
+):
+    """Fail-closed Testnet review scope around the existing no-send handoff.
+
+    No environment flag or URL can select Mainnet. This only checks caller-
+    supplied test metadata; it is NOT a server-side environment restriction,
+    authenticated identity, trusted endpoint, or permission to send an order.
+    The real protected sender is not wired to this interface.
+    """
+    scope = inspect_testnet_only_scope_offline(
+        proposed_network=proposed_network,
+        proposed_api_url=proposed_api_url,
+    )
+    if scope.state != "REVIEW_ONLY_HOLD" or not scope.candidate_parsed:
+        return RunnerEntryHandoffReview()
+    return prepare_runner_entry_handoff_review_only(
+        candidate_runner_jwt=candidate_runner_jwt,
+        fixture_bot=fixture_bot,
+        action=action,
+        coin=coin,
+        side=side,
+        request_nonce=request_nonce,
+        rounded_size=rounded_size,
+        requested_leverage=requested_leverage,
+    )
