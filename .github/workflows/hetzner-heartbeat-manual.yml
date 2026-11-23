@@ -1,0 +1,36 @@
+name: Hetzner SSH heartbeat (manual, no trading)
+
+# One-shot, manually initiated liveness check ONLY; no cron, push or PR trigger.
+# This workflow deliberately remains separate from all live trading workflows.
+# The tested client is pinned to PR #42 commit cfc41fe285f9195baa0f4f421252e3438ef28052.
+# This is NOT a trading sender, server deployment, SSH configuration change,
+# monitoring daemon, or approval for any Testnet or Mainnet order.
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_heartbeat_only:
+        description: 'Type yes for one heartbeat-only SSH request (no trade)'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  heartbeat-only:
+    if: github.ref == 'refs/heads/main' && inputs.confirm_heartbeat_only == 'yes'
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Check out exact tested heartbeat client revision
+        uses: actions/checkout@v4
+        with:
+          ref: cfc41fe285f9195baa0f4f421252e3438ef28052
+          persist-credentials: false
+      - name: One bounded SSH heartbeat, never an order
+        env:
+          HETZNER_HEARTBEAT_SSH_KEY: ${{ secrets.HETZNER_HEARTBEAT_SSH_KEY }}
+          HETZNER_HEARTBEAT_HOST_KEY_ED25519: ${{ secrets.HETZNER_HEARTBEAT_HOST_KEY_ED25519 }}
+          HEARTBEAT_MANUAL_CONFIRM: ${{ inputs.confirm_heartbeat_only }}
+        run: |
+          python3 -B -m sender_review.ssh_heartbeat_client_manual
