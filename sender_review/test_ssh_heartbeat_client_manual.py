@@ -56,6 +56,21 @@ class ManualHeartbeatClientTests(TestCase):
                 with self.assertRaises(client.HeartbeatHold):
                     client.main()
 
+    def test_failure_categories_are_fixed_and_redacted(self):
+        cases = (
+            (b"Host key verification failed.", "SSH_HOST_KEY_REJECTED"),
+            (b"Load key /tmp/private: invalid format", "SSH_PRIVATE_KEY_UNUSABLE"),
+            (b"Permission denied (publickey).", "SSH_AUTHENTICATION_REJECTED"),
+            (b"ssh: connect to host x: Connection refused", "SSH_CONNECTION_REFUSED"),
+            (b"ssh: connect to host x: Connection timed out", "SSH_NETWORK_UNAVAILABLE"),
+            (b"private-information-that-must-not-appear", "SSH_FAILED_UNCLASSIFIED"),
+        )
+        for raw, expected in cases:
+            with self.subTest(expected=expected):
+                result = client._ssh_failure_category(raw)
+                self.assertEqual(result, expected)
+                self.assertNotIn("private-information", result)
+
     def test_rejects_unusable_private_key_without_creating_file(self):
         with self.assertRaises(client.HeartbeatHold):
             client._write_private_key(None, "not a key")
