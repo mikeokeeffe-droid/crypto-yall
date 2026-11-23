@@ -40,6 +40,8 @@ jobs:
         run: python -m unittest collector_review.test_offline_capture_audit -v
       - name: Verify redacted read-only host evidence command cannot authorize testnet
         run: python -m unittest collector_review.test_readonly_host_evidence -v
+      - name: Verify deterministic offline source-byte inventory and fail-closed drift checks
+        run: python -m unittest collector_review.test_offline_source_inventory -v
       - name: Offline-only runtime identity and credential boundary tests
         run: python -m unittest collector_review.test_runtime_identity_review -v
       - name: Static offline systemd isolation review (no deployment)
