@@ -266,5 +266,68 @@ class ReviewOnlyAsgiTests(unittest.TestCase):
             self.assertEqual(status, 400)
 
 
+    def test_server_review_scope_rejects_mainnet_and_endpoint_drift(self):
+        # A legitimate-looking request cannot override a broken/mutated
+        # review-only server policy. It stays unavailable before preflight.
+        for bot in ("daily", "intraday", "aggressive"):
+            body = self.fixture.body()
+            headers = [
+                (b"authorization", ("Bearer " + self.fixture.token(bot)).encode()),
+                (b"content-type", b"application/json"),
+                (b"content-length", str(len(body)).encode()),
+            ]
+            for network in ("mainnet", "MAINNET", "", "false", None):
+                with self.subTest(bot=bot, network=network):
+                    with patch(
+                        "sender_review.asgi_review_only_ingress."
+                        "_SERVER_REVIEW_NETWORK", network,
+                    ):
+                        status, response, preflight = self.request(
+                            body=body, headers=headers,
+                        )
+                    self.assertEqual(status, 503)
+                    self.assertEqual(
+                        response["reason"],
+                        "review-only Testnet policy unavailable",
+                    )
+                    self.assertEqual(preflight.call_count, 0)
+            for endpoint in ("https://api.hyperliquid.xyz", "", None):
+                with self.subTest(bot=bot, endpoint=endpoint):
+                    with patch(
+                        "sender_review.asgi_review_only_ingress."
+                        "_SERVER_REVIEW_API_URL", endpoint,
+                    ):
+                        status, response, preflight = self.request(
+                            body=body, headers=headers,
+                        )
+                    self.assertEqual(status, 503)
+                    self.assertEqual(
+                        response["reason"],
+                        "review-only Testnet policy unavailable",
+                    )
+                    self.assertEqual(preflight.call_count, 0)
+
+    def test_even_valid_testnet_scope_is_no_send_and_untrusted(self):
+        # The fixed Testnet string is only a review proposal, not
+        # operational source authentication or sender authorization.
+        for bot in ("daily", "intraday", "aggressive"):
+            with self.subTest(bot=bot):
+                token = self.fixture.token(bot)
+                body = self.fixture.body()
+                status, response, preflight = self.request(
+                    headers=[
+                        (b"authorization", ("Bearer " + token).encode()),
+                        (b"content-type", b"application/json"),
+                        (b"content-length", str(len(body)).encode()),
+                    ],
+                    body=body,
+                )
+                self.assertEqual(status, 503)
+                self.assertEqual(
+                    response["reason"], "no authenticated sender deployed",
+                )
+                self.assertEqual(preflight.call_count, 1)
+
+
 if __name__ == "__main__":
     unittest.main()
