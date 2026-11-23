@@ -36,6 +36,8 @@ jobs:
           python-version: '3.12'
       - name: Check strict no-trade sender request contract
         run: python -m unittest sender_review.test_request_contract -v
+      - name: Reject Mainnet selection in review-only Testnet scope and audit legacy fallback
+        run: python -m unittest sender_review.test_testnet_only_scope_offline -v
       - name: Install isolated RSA verifier test dependency
         run: python -m pip install 'cryptography>=42,<47'
       - name: Check offline signed GitHub Actions workload identity fixtures
