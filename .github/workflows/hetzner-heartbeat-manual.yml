@@ -2,7 +2,7 @@ name: Hetzner SSH heartbeat (manual, no trading)
 
 # One-shot, manually initiated liveness check ONLY; no cron, push or PR trigger.
 # This workflow deliberately remains separate from all live trading workflows.
-# The tested client is pinned to PR #42 commit cfc41fe285f9195baa0f4f421252e3438ef28052.
+# The diagnostic client is pinned to passed PR #42 commit 8c1aceae55a5a937c1175a5e4fb3b588b1597a19.
 # This is NOT a trading sender, server deployment, SSH configuration change,
 # monitoring daemon, or approval for any Testnet or Mainnet order.
 on:
@@ -25,7 +25,7 @@ jobs:
       - name: Check out exact tested heartbeat client revision
         uses: actions/checkout@v4
         with:
-          ref: cfc41fe285f9195baa0f4f421252e3438ef28052
+          ref: 8c1aceae55a5a937c1175a5e4fb3b588b1597a19
           persist-credentials: false
       - name: One bounded SSH heartbeat, never an order
         env:
