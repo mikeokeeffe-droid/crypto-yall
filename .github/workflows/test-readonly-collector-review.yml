@@ -60,3 +60,18 @@ jobs:
           cp collector_review/deployment/testnet-collector-offline-review.service.example "$tmpdir/testnet-collector-offline-review.service"
           systemd-analyze verify "$tmpdir/testnet-collector-offline-review.service"
 
+      - name: Produce source-byte inventory from this GitHub Actions checkout (no host access)
+        shell: bash
+        run: |
+          set -euo pipefail
+          PYTHONDONTWRITEBYTECODE=1 python -m collector_review.deployment.offline_source_inventory --emit "$RUNNER_TEMP/pr41-collector-source-inventory.json"
+          git rev-parse HEAD > "$RUNNER_TEMP/pr41-checked-out-commit.txt"
+      - name: Save offline source inventory for later supervised host comparison
+        uses: actions/upload-artifact@v4
+        with:
+          name: pr41-offline-source-inventory
+          path: |
+            ${{ runner.temp }}/pr41-collector-source-inventory.json
+            ${{ runner.temp }}/pr41-checked-out-commit.txt
+          if-no-files-found: error
+          retention-days: 14
