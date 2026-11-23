@@ -111,21 +111,52 @@ def _write_private_key(path, value):
         handle.write(value.rstrip("\n") + "\n")
 
 
+def _ssh_failure_category(stderr):
+    """Classify SSH failure without emitting attacker-controlled stderr.
+
+    Never log raw SSH diagnostics, private key content, or peer responses.
+    """
+    if type(stderr) is not bytes:
+        return "SSH_FAILED_UNCLASSIFIED"
+    if (b"Host key verification failed" in stderr
+            or b"REMOTE HOST IDENTIFICATION HAS CHANGED" in stderr):
+        return "SSH_HOST_KEY_REJECTED"
+    if (b"Load key" in stderr or b"sign_and_send_pubkey" in stderr
+            or b"invalid format" in stderr):
+        return "SSH_PRIVATE_KEY_UNUSABLE"
+    if b"Permission denied" in stderr:
+        return "SSH_AUTHENTICATION_REJECTED"
+    if b"Connection refused" in stderr:
+        return "SSH_CONNECTION_REFUSED"
+    if (b"timed out" in stderr or b"Network is unreachable" in stderr
+            or b"No route to host" in stderr):
+        return "SSH_NETWORK_UNAVAILABLE"
+    return "SSH_FAILED_UNCLASSIFIED"
+
+
 def main():
     # Defense in depth; workflow is also gated by dispatch input and main ref.
     if (os.environ.get("GITHUB_ACTIONS") != "true"
         or os.environ.get("GITHUB_REF") != "refs/heads/main"
         or os.environ.get("HEARTBEAT_MANUAL_CONFIRM") != "yes"):
-        raise HeartbeatHold("manual main-branch dispatch required")
+        raise HeartbeatHold("DISPATCH_GUARD_REJECTED")
     key = os.environ.get("HETZNER_HEARTBEAT_SSH_KEY", "")
-    host_key = pinned_known_hosts_line(os.environ.get("HETZNER_HEARTBEAT_HOST_KEY_ED25519", ""))
+    try:
+        host_key = pinned_known_hosts_line(
+            os.environ.get("HETZNER_HEARTBEAT_HOST_KEY_ED25519", "")
+        )
+    except HeartbeatHold as exc:
+        raise HeartbeatHold("HOST_KEY_SECRET_INVALID") from exc
     nonce = secrets.token_hex(16)
     now = int(time.time())
     data = challenge(now, nonce)
     with tempfile.TemporaryDirectory(prefix="hetzner-heartbeat-") as temp:
         folder = Path(temp)
         key_path, host_path = folder / "id_ed25519", folder / "known_hosts"
-        _write_private_key(key_path, key)
+        try:
+            _write_private_key(key_path, key)
+        except (HeartbeatHold, UnicodeError) as exc:
+            raise HeartbeatHold("PRIVATE_KEY_SECRET_INVALID") from exc
         host_path.write_text(host_key, encoding="ascii")
         host_path.chmod(0o600)
         cmd = [
@@ -144,13 +175,16 @@ def main():
         try:
             response = subprocess.run(
                 cmd, input=data, stdout=subprocess.PIPE,
-                stderr=subprocess.DEVNULL, timeout=16, check=False,
+                stderr=subprocess.PIPE, timeout=16, check=False,
             )
         except (OSError, subprocess.TimeoutExpired) as exc:
-            raise HeartbeatHold("SSH heartbeat transport unavailable") from exc
+            raise HeartbeatHold("SSH_TRANSPORT_UNAVAILABLE") from exc
     if response.returncode != 0:
-        raise HeartbeatHold("SSH heartbeat failed closed")
-    check_ack(response.stdout, nonce=nonce, now=int(time.time()))
+        raise HeartbeatHold(_ssh_failure_category(response.stderr))
+    try:
+        check_ack(response.stdout, nonce=nonce, now=int(time.time()))
+    except HeartbeatHold as exc:
+        raise HeartbeatHold("HEARTBEAT_ACK_REJECTED") from exc
     print("HEARTBEAT ACK VERIFIED — LIVENESS ONLY; NO TRADE AUTHORITY")
     return 0
 
@@ -158,6 +192,19 @@ def main():
 if __name__ == "__main__":
     try:
         raise SystemExit(main())
-    except HeartbeatHold:
-        print("HEARTBEAT HOLD — NO TRADE AUTHORITY")
+    except HeartbeatHold as exc:
+        # These fixed, source-authored categories never contain secrets,
+        # arbitrary SSH output, private keys, or untrusted peer data.
+        code = str(exc)
+        allowed = {
+            "DISPATCH_GUARD_REJECTED", "HOST_KEY_SECRET_INVALID",
+            "PRIVATE_KEY_SECRET_INVALID", "SSH_TRANSPORT_UNAVAILABLE",
+            "SSH_HOST_KEY_REJECTED", "SSH_PRIVATE_KEY_UNUSABLE",
+            "SSH_AUTHENTICATION_REJECTED", "SSH_CONNECTION_REFUSED",
+            "SSH_NETWORK_UNAVAILABLE", "SSH_FAILED_UNCLASSIFIED",
+            "HEARTBEAT_ACK_REJECTED",
+        }
+        if code not in allowed:
+            code = "HEARTBEAT_HOLD_UNKNOWN"
+        print("HEARTBEAT HOLD: " + code + " — NO TRADE AUTHORITY")
         raise SystemExit(1)
