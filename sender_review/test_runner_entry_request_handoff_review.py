@@ -3,6 +3,7 @@ import hashlib
 import unittest
 from sender_review.runner_entry_request_handoff_review import (
     prepare_runner_entry_handoff_review_only,
+    prepare_testnet_only_runner_entry_handoff_review_only,
 )
 from sender_review.remote_request_boundary_offline import (
     inspect_signed_remote_request_offline,
@@ -106,6 +107,51 @@ class RunnerEntryHandoffReviewTests(unittest.TestCase):
         )
         self.assertEqual(rejected.state, "hold")
         self.assertFalse(rejected.submit_authorized)
+
+
+    def test_testnet_scoped_entry_handoff_never_selects_mainnet(self):
+        for bot in ("daily", "intraday", "aggressive"):
+            with self.subTest(bot=bot):
+                signed = self.fixture.token(bot)
+                result = prepare_testnet_only_runner_entry_handoff_review_only(
+                    candidate_runner_jwt=signed, fixture_bot=bot,
+                    action="open_long", coin="SOL", side="long",
+                    request_nonce="a" * 32, rounded_size="0.16",
+                    requested_leverage=2, proposed_network="testnet",
+                )
+                self.assertEqual(
+                    result.state,
+                    "unsigned_authority_runner_handoff_review_only_HOLD",
+                )
+                self.assertIsNotNone(result.body)
+                self.denied(result)
+
+                for network in ("mainnet", "MAINNET", "", None, False, "true", "testnet "):
+                    with self.subTest(network=network):
+                        result = prepare_testnet_only_runner_entry_handoff_review_only(
+                            candidate_runner_jwt=signed, fixture_bot=bot,
+                            action="open_long", coin="SOL", side="long",
+                            request_nonce="a" * 32, rounded_size="0.16",
+                            requested_leverage=2, proposed_network=network,
+                        )
+                        self.assertEqual(result.state, "hold")
+                        self.assertIsNone(result.body)
+                        self.assertIsNone(result.headers)
+                        self.denied(result)
+
+                for url in ("https://api.hyperliquid.xyz",
+                            "https://api.hyperliquid-testnet.xyz"):
+                    with self.subTest(url=url):
+                        result = prepare_testnet_only_runner_entry_handoff_review_only(
+                            candidate_runner_jwt=signed, fixture_bot=bot,
+                            action="open_long", coin="SOL", side="long",
+                            request_nonce="a" * 32, rounded_size="0.16",
+                            requested_leverage=2, proposed_network="testnet",
+                            proposed_api_url=url,
+                        )
+                        self.assertEqual(result.state, "hold")
+                        self.assertIsNone(result.body)
+                        self.denied(result)
 
 
 if __name__ == "__main__":
