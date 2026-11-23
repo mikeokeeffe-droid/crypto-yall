@@ -14,9 +14,16 @@ import json
 import re
 
 from sender_review.request_contract import inspect_sender_entry_request_offline
+from sender_review.testnet_only_scope_offline import inspect_testnet_only_scope_offline
 from sender_review.server_oidc_preflight_review import (
     inspect_server_oidc_preflight_review,
 )
+
+# These are internal review constants, never taken from ASGI scope, headers,
+# request JSON, environment variables or a caller-controlled endpoint.
+# This remains a NON-DEPLOYED entrypoint and is NOT a real server policy.
+_SERVER_REVIEW_NETWORK = "testnet"
+_SERVER_REVIEW_API_URL = "https://api.hyperliquid-testnet.xyz"
 
 _PATH = "/v1/review-only/entry-intents"
 _RAW_PATH = _PATH.encode("ascii")
@@ -135,6 +142,25 @@ async def review_only_asgi_app(scope, receive, send):
     exact_body = bytes(body)
     if inspect_sender_entry_request_offline(body=exact_body).state != "review_only":
         await _reply(send, 400, "invalid entry contract")
+        return
+
+    # Independent of the worker's request: the candidate server ingress
+    # refuses all scopes except the fixed, non-authorizing Testnet review.
+    # This check alone is NOT an operational network/egress firewall.
+    review_scope = inspect_testnet_only_scope_offline(
+        proposed_network=_SERVER_REVIEW_NETWORK,
+    )
+    if (review_scope.state != "REVIEW_ONLY_HOLD"
+            or review_scope.network != "testnet"
+            or review_scope.api_url != _SERVER_REVIEW_API_URL
+            or not review_scope.candidate_parsed
+            or review_scope.server_scope_verified
+            or review_scope.account_scope_verified
+            or review_scope.network_egress_verified
+            or review_scope.signing_enabled
+            or review_scope.order_authorized
+            or review_scope.close_authorized):
+        await _reply(send, 503, "review-only Testnet policy unavailable")
         return
 
     # This review-only preflight is non-authorizing and cannot enable
