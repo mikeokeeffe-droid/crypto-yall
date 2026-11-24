@@ -25,3 +25,5 @@ jobs:
         run: python3 -B -m unittest readonly_connection_review.test_on_run_connection_review -v
       - name: Reject unsafe Testnet egress-policy changes using synthetic offline requests
         run: python3 -B -m unittest readonly_connection_review.test_testnet_egress_policy_review_offline -v
+      - name: Verify offline gateway lease and request state machine
+        run: python3 -B -m unittest readonly_connection_review.test_offline_gateway_step_gate -v
