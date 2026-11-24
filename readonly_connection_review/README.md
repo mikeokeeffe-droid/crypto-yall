@@ -68,3 +68,27 @@ is required before executing a live one-shot checker.
 **Do not** start a gateway, alter server-wide firewall rules, disable
 PrivateNetwork on the existing collector, install a scheduled service,
 or merge this PR on the basis of passing synthetic policy tests.
+
+
+## Peer identity review — no real authentication yet
+
+The offline_gateway_peer_admission.py fixture models deny-by-default checks
+for an expected unprivileged UID/GID, valid process ID, a single-use review
+nonce, rejection of caller-provided identity, and an explicit synthetic
+approval flag. Its tests use **fabricated** peer IDs; they do not authenticate
+real processes. The nonce is a test constant, not a secret.
+
+Before any real gateway is built or enabled, independent review must establish
+a dedicated AF_UNIX socket with restrictive filesystem permissions; actual
+kernel-derived SO_PEERCRED validation on the accepted connection; a
+host-verified dedicated service/cgroup identity to distinguish other processes
+with the same UID; replay and process-restart protections; no user-controlled
+claimed identities; and an enforceable separation of network namespaces that
+prevents direct bypass. Linux UID/GID matching alone does not distinguish two
+processes under the same account. The socket must not be accessible from other
+service sandboxes. A real gateway would also need a fixed internal HTTP client,
+TLS hostname verification and independent egress filtering.
+
+**Peer admission is simulated only. No socket is opened, no authentication
+boundary is active, and no network authority has been granted.** This work
+does not authorize the checker, collector, or bot workflows to run.
