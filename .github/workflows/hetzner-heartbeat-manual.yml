@@ -27,6 +27,43 @@ jobs:
         with:
           ref: 8c1aceae55a5a937c1175a5e4fb3b588b1597a19
           persist-credentials: false
+      - name: Display server-presented public host key for fingerprint comparison
+        # This output is untrusted until independently compared with Hetzner's
+        # console fingerprint. This is a public-key read, NOT SSH authentication.
+        run: |
+          python3 - <<'PY'
+          import base64
+          import hashlib
+          import re
+          import struct
+          import subprocess
+          host = "2.29.170.69"
+          result = subprocess.run(
+              ["ssh-keyscan", "-T", "5", "-p", "22", "-t", "ed25519", host],
+              capture_output=True, timeout=12, check=False,
+          )
+          lines = [s.split() for s in result.stdout.decode("ascii", "replace").splitlines()
+                   if s.strip() and not s.lstrip().startswith("#")]
+          if len(lines) != 1 or len(lines[0]) != 3 or lines[0][0] != host or lines[0][1] != "ssh-ed25519":
+              raise SystemExit("SERVER_PUBLIC_KEY_SCAN_UNAVAILABLE")
+          raw_key = lines[0][2]
+          if not re.fullmatch(r"[A-Za-z0-9+/]+={0,2}", raw_key):
+              raise SystemExit("SERVER_PUBLIC_KEY_SCAN_INVALID")
+          try:
+              data = base64.b64decode(raw_key, validate=True)
+              n = struct.unpack(">I", data[:4])[0]
+              tag = data[4:4+n]
+              off = 4+n
+              m = struct.unpack(">I", data[off:off+4])[0]
+              if tag != b"ssh-ed25519" or m != 32 or len(data) != off+4+32:
+                  raise ValueError("invalid key blob")
+          except (ValueError, struct.error):
+              raise SystemExit("SERVER_PUBLIC_KEY_SCAN_INVALID")
+          fp = base64.b64encode(hashlib.sha256(data).digest()).decode("ascii").rstrip("=")
+          print("UNVERIFIED_SERVER_PUBLIC_FINGERPRINT SHA256:" + fp)
+          print("UNVERIFIED_SERVER_KNOWN_HOSTS " + host + " ssh-ed25519 " + raw_key)
+          print("Compare fingerprint with trusted Hetzner console before using this public key.")
+          PY
       - name: Report pinned ED25519 public host-key fingerprint only
         env:
           PINNED_HOST_KEY: ${{ secrets.HETZNER_HEARTBEAT_HOST_KEY_ED25519 }}
