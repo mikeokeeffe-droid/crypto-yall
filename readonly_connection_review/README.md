@@ -128,3 +128,21 @@ handling), verify service/cgroup attribution and deny bypass access. Neither
 review-provided expected metadata nor a /proc re-read is trusted authority
 on its own. There is no listening socket, gateway, egress permission, change
 to server firewall or authorization to run any Hetzner checker.
+
+
+## Offline identity-to-request integration fixture
+
+offline_gateway_integration_review.py composes the pre-existing
+kernel SO_PEERCRED reader, read-only /proc provenance comparison,
+synthetic peer-admission fixture, and synthetic two-frame request gate.
+CI uses a local, unnamed AF_UNIX socketpair and reads only the
+test runner's own process. It confirms rejection of mismatched UID,
+executable, cgroup, process start time, missing synthetic approval,
+and any attempt to mark the policy as network-authorized.
+
+**This code remains a test fixture, not a deployable gateway.**
+The expected identity, nonce and approval are supplied by the test caller,
+so they do not constitute production authentication. There is no Unix
+listener, no protected socket pathname, no pidfd lifetime binding,
+no real service/cgroup trust root, no TLS client or outbound network.
+Passing these tests does not authorize a Hetzner deployment or live read.
