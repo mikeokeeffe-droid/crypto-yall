@@ -1,0 +1,23 @@
+name: Testnet account read-only review (offline)
+
+# Static mocked tests only. No secrets, HTTP calls, server changes or deployment.
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'readonly_connection_review/**'
+      - '.github/workflows/testnet-account-read-review-offline.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  offline-review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Offline mock-only Testnet reader tests
+        run: python3 -B -m unittest readonly_connection_review.test_testnet_account_read_review_only -v
