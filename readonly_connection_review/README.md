@@ -109,3 +109,22 @@ does not prove the process is the approved checker, and PID checks alone
 may be subject to reuse. Independently review service/cgroup provenance,
 same-UID threats, filesystem socket permissions and restart/replay handling
 before considering any networked deployment.
+
+
+## Linux /proc provenance — offline inspection only
+
+linux_process_provenance_review_offline.py reads local Linux /proc/PID/stat,
+cgroup and executable-link metadata, then compares exact start ticks,
+cgroup path and executable name against a supplied review fixture. The
+tests cover malformed metadata, mismatched service group/executable,
+stale process identity and a read of the CI process itself.
+
+**This is not a production authentication boundary**: a caller might share
+the same Unix account, a PID can be reused, processes may be in separate PID
+namespaces, and /proc can change between reads. A real gateway must obtain
+the PID from kernel SO_PEERCRED on the accepted socket, bind and verify
+process lifetime/provenance (for example with independently reviewed pidfd
+handling), verify service/cgroup attribution and deny bypass access. Neither
+review-provided expected metadata nor a /proc re-read is trusted authority
+on its own. There is no listening socket, gateway, egress permission, change
+to server firewall or authorization to run any Hetzner checker.
