@@ -29,3 +29,5 @@ jobs:
         run: python3 -B -m unittest readonly_connection_review.test_offline_gateway_step_gate -v
       - name: Verify synthetic Unix peer-admission denial rules offline
         run: python3 -B -m unittest readonly_connection_review.test_offline_gateway_peer_admission -v
+      - name: Verify Linux kernel Unix peer credentials with local socketpairs only
+        run: python3 -B -m unittest readonly_connection_review.test_kernel_unix_peer_review_offline -v
