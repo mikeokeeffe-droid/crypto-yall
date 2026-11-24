@@ -27,6 +27,35 @@ jobs:
         with:
           ref: 8c1aceae55a5a937c1175a5e4fb3b588b1597a19
           persist-credentials: false
+      - name: Report pinned ED25519 public host-key fingerprint only
+        env:
+          PINNED_HOST_KEY: ${{ secrets.HETZNER_HEARTBEAT_HOST_KEY_ED25519 }}
+        run: |
+          python3 - <<'PY'
+          import base64
+          import hashlib
+          import os
+          import struct
+          key = os.environ.get("PINNED_HOST_KEY", "").strip().split()
+          if len(key) == 2 and key[0] == "ssh-ed25519":
+              encoded = key[1]
+          elif len(key) == 3 and key[0] == "2.29.170.69" and key[1] == "ssh-ed25519":
+              encoded = key[2]
+          else:
+              raise SystemExit("PINNED_HOST_KEY_FORMAT_INVALID")
+          try:
+              raw = base64.b64decode(encoded, validate=True)
+              name_length = struct.unpack(">I", raw[:4])[0]
+              name = raw[4:4 + name_length]
+              point_offset = 4 + name_length
+              point_length = struct.unpack(">I", raw[point_offset:point_offset + 4])[0]
+              if name != b"ssh-ed25519" or point_length != 32 or len(raw) != point_offset + 4 + 32:
+                  raise ValueError("bad host key structure")
+          except (ValueError, struct.error):
+              raise SystemExit("PINNED_HOST_KEY_FORMAT_INVALID")
+          digest = base64.b64encode(hashlib.sha256(raw).digest()).decode("ascii").rstrip("=")
+          print("GITHUB_PINNED_PUBLIC_HOST_FINGERPRINT SHA256:" + digest)
+          PY
       - name: One bounded SSH heartbeat, never an order
         env:
           HETZNER_HEARTBEAT_SSH_KEY: ${{ secrets.HETZNER_HEARTBEAT_SSH_KEY }}
