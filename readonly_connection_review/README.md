@@ -40,3 +40,31 @@ The GitHub workflow on this branch runs only mocked offline tests. It cannot
 connect to Testnet, activate any daemon or place an order.
 
 **Status: Draft; HOLD for execution.**
+
+
+## Proposed egress contract — OFFLINE REVIEW ONLY
+
+The file testnet_egress_policy_review_only.json describes a proposed **deny-by-default**
+security boundary. It is intentionally marked network_authorized=false,
+gateway_implemented=false and deployable_as_is=false. Its companion offline
+validator and synthetic tests reject requests outside two fixed public Testnet
+POST /info frames, including incorrect HTTP methods, arbitrary hosts,
+additional accounts, /exchange, excess requests, and authority flags.
+
+**These are design and test artifacts, not enforceable network controls.**
+No application-aware gateway, local IPC, independently verified process-level
+network allowlist, or service deployment has been built by this PR. A JSON
+declaration cannot prevent a malicious program from making an arbitrary
+connection if an actual process has unrestricted outbound network access.
+
+The current Hetzner account has broad host outbound reachability; previous
+transient PrivateNetwork=yes tests correctly denied direct network access.
+Neither fact by itself establishes a safe way to allow only Testnet /info
+through a gateway. Independent security review must establish the actual
+gateway implementation and enforceable network isolation before any server
+network permissions are changed, and a separately scoped operator decision
+is required before executing a live one-shot checker.
+
+**Do not** start a gateway, alter server-wide firewall rules, disable
+PrivateNetwork on the existing collector, install a scheduled service,
+or merge this PR on the basis of passing synthetic policy tests.
