@@ -92,3 +92,20 @@ TLS hostname verification and independent egress filtering.
 **Peer admission is simulated only. No socket is opened, no authentication
 boundary is active, and no network authority has been granted.** This work
 does not authorize the checker, collector, or bot workflows to run.
+
+
+## Linux kernel Unix peer credentials — offline test only
+
+kernel_unix_peer_review_offline.py can inspect real Linux SO_PEERCRED
+values from an **already connected AF_UNIX stream socket**. The tests create
+only unnamed local socketpairs and validate kernel-reported PID/UID/GID,
+rejection of Internet/datagram sockets and forged Python objects, and
+single-use denial in the existing synthetic admission fixture.
+
+This is NOT a gateway. There is no listening socket, socket path, process
+allowlist, authenticated approval, TLS proxy, or external network request.
+SO_PEERCRED identifies an OS process at connection time but matching UID/GID
+does not prove the process is the approved checker, and PID checks alone
+may be subject to reuse. Independently review service/cgroup provenance,
+same-UID threats, filesystem socket permissions and restart/replay handling
+before considering any networked deployment.
