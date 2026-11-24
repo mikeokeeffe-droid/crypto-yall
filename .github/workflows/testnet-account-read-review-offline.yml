@@ -21,3 +21,5 @@ jobs:
           persist-credentials: false
       - name: Offline mock-only Testnet reader tests
         run: python3 -B -m unittest readonly_connection_review.test_testnet_account_read_review_only -v
+      - name: Check one-shot TLS, network-failure and no-trading behavior offline
+        run: python3 -B -m unittest readonly_connection_review.test_on_run_connection_review -v
