@@ -1,0 +1,189 @@
+name: Protected Sender Contract Review (offline)
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'sender_review/**'
+      - '.github/workflows/execute-trades.yml'
+      - '.github/workflows/execute-intraday.yml'
+      - '.github/workflows/execute-aggressive.yml'
+      - 'hyperliquid_executor.py'
+      - 'intraday_executor.py'
+      - 'aggressive_executor.py'
+      - 'intraday_profit_protection.py'
+      - 'aggressive_profit_protection.py'
+      - 'usd_loss_cap.py'
+      - 'reentry_lock.py'
+      - 'strategy.py'
+      - 'intraday_strategy.py'
+      - 'aggressive_strategy.py'
+      - 'docs/accelerated-coordinated-sender-cutover-20261115.md'
+      - '.github/workflows/test-protected-sender-contract-review.yml'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  offline-request-review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Check strict no-trade sender request contract
+        run: python -m unittest sender_review.test_request_contract -v
+      - name: Reject Mainnet selection in review-only Testnet scope and audit legacy fallback
+        run: python -m unittest sender_review.test_testnet_only_scope_offline -v
+      - name: Install isolated RSA verifier test dependency
+        run: python -m pip install 'cryptography>=42,<47'
+      - name: Check offline signed GitHub Actions workload identity fixtures
+        run: python -m unittest sender_review.test_offline_oidc_identity_fixture -v
+      - name: Parse strict offline public JWKS without asserting issuer trust
+        run: python -m unittest sender_review.test_oidc_jwks_keyset_offline -v
+      - name: Review fake public JWKS to signed HTTP boundary without authority
+        run: python -m unittest sender_review.test_oidc_jwks_request_review_offline -v
+      - name: Verify public GitHub OIDC key retrieval is disabled and safely mocked
+        run: python -m unittest sender_review.test_github_oidc_public_keys_transport_review -v
+      - name: Test isolated fixed-origin OIDC public-key transport candidate without network access
+        run: python -m unittest sender_review.test_github_oidc_fixed_origin_transport_candidate -v
+      - name: Verify OIDC fixture identity bound to exact synthetic body remains non-authorizing
+        run: python -m unittest sender_review.test_candidate_identity_body_binding_offline -v
+      - name: Verify disabled runner OIDC token handoff using HTTP mocks
+        run: python -m unittest sender_review.test_github_runner_oidc_handoff_review -v
+      - name: Exercise existing three-bot entry handoff through offline HTTP identity review
+        run: python -m unittest sender_review.test_runner_entry_request_handoff_review -v
+      - name: Verify disabled server-clock and GitHub public-key identity preflight with mocks
+        run: python -m unittest sender_review.test_server_oidc_preflight_review -v
+      - name: Connect existing three-bot entry sizing to offline exact-body handoff
+        run: python -m unittest sender_review.test_captured_legacy_entry_handoff_review -v
+      - name: Verify ASGI entry ingress remains non-deploying HOLD using in-process requests
+        run: python -m unittest sender_review.test_asgi_review_only_ingress -v
+      - name: Verify offline heartbeat signatures, ACK, replay and outage detection (no trading)
+        run: python -m unittest sender_review.test_heartbeat_link_review_only -v
+      - name: Verify signed heartbeat over real localhost TCP (CI fixture only)
+        run: python -m unittest sender_review.test_heartbeat_local_tcp_review_only -v
+      - name: Test manual-only GitHub SSH heartbeat client offline (no network)
+        run: python -m unittest sender_review.test_ssh_heartbeat_client_manual -v
+      - name: Verify inert SSH forced-command heartbeat stdio fixture (no network)
+        run: python -m unittest sender_review.test_ssh_heartbeat_stdio_review_only -v
+      - name: Validate review-only SSH heartbeat restrictions (no SSH changes)
+        run: python -m unittest sender_review.test_cryptoheartbeat_ssh_template -v
+      - name: Validate inert heartbeat restricted login shell (no host changes)
+        run: python -m unittest sender_review.test_cryptoheartbeat_restricted_login_shell -v
+      - name: Syntax check inert restricted login shell without execution
+        run: sh -n sender_review/deployment/cryptoheartbeat-login-shell.sh.example
+      - name: Check GitHub Actions read-only public metadata observer with network mocked
+        run: python -m unittest sender_review.test_github_actions_readonly_observer -v
+      - name: Check non-deployed read-only user service and timer templates
+        run: python -m unittest sender_review.test_github_status_unit_templates -v
+      - name: Test strict offline remote signed identity and request envelope
+        run: python -m unittest sender_review.test_remote_request_boundary_offline -v
+      - name: Exercise unchanged executor sizing against inert no-send capture and flag pyramid ambiguity
+        run: python -m unittest sender_review.test_legacy_order_capture_preview -v
+      - name: Capture original sized protective closes offline without execution
+        run: python -m unittest sender_review.test_legacy_protective_close_capture_offline -v
+      - name: Reconcile original close proposals with synthetic account-wide read-set (HOLD)
+        run: python -m unittest sender_review.test_legacy_close_reconciliation_handoff_offline -v
+      - name: Audit original three-bot signing and order paths (NO-GO)
+        run: |
+          python -m unittest sender_review.test_legacy_cutover_audit -v
+          python -m sender_review.legacy_cutover_audit
+      - name: Pin coordinated three-bot trading and protection cutover coverage
+        run: |
+          python -m unittest sender_review.test_three_bot_cutover_matrix -v
+          python -m sender_review.three_bot_cutover_matrix
+      - name: Hold interrupted private report publish outcomes (offline only)
+        run: python -m unittest sender_review.test_private_report_recovery_offline -v
+      - name: Check private report concurrent-writer CAS preview (offline only)
+        run: python -m unittest sender_review.test_private_report_cas_preview_offline -v
+      - name: Review private report continuity without publication or trade access (offline)
+        run: python -m unittest sender_review.test_isolated_report_handoff_offline -v
+      - name: Validate report snapshot freshness and completeness (offline)
+        run: python -m unittest sender_review.test_report_snapshot_health_offline -v
+      - name: Detect legacy report direct-push and mid-job reset risks (offline)
+        run: python -m unittest sender_review.test_legacy_report_publisher_audit_offline -v
+      - name: Pin exact original strategy and protection file bytes (offline)
+        run: python -m unittest sender_review.test_legacy_exact_source_pin_offline -v
+      - name: Verify synthetic pre-submit leverage and notional checks always HOLD
+        run: python -m unittest sender_review.test_pre_submit_leverage_risk_review_offline -v
+      - name: Test proposed signer-free protective close and bot intents (offline)
+        run: python -m unittest sender_review.test_proposed_intent_interfaces_offline -v
+      - name: Test signer-free account snapshot extraction and spot fallback (offline)
+        run: python -m unittest sender_review.test_signer_free_account_view_offline -v
+      - name: Test unwired signer-free info client without network or keys
+        run: python -m unittest sender_review.test_signer_free_readonly_client_unwired -v
+      - name: Compare pure signer-free three-bot decision fixtures with AST-isolated legacy functions
+        run: python -m unittest sender_review.test_pure_strategy_decisions_offline -v
+      - name: Test isolated Intraday and Aggressive profit-protection trigger parity offline
+        run: python -m unittest sender_review.test_pure_profit_protection_offline -v
+      - name: Differential test original profit protection wrappers vs signer-free triggers (offline)
+        run: python -m unittest sender_review.test_pure_profit_protection_legacy_parity_offline -v
+      - name: Reject unsafe synthetic re-entry lock release after unknown outcomes
+        run: python -m unittest sender_review.test_reentry_lock_transition_review_offline -v
+      - name: Verify synthetic six-frame readset is safely joined to three shadow bots
+        run: python -m unittest sender_review.test_six_frame_shadow_pipeline_offline -v
+      - name: Verify fully composed signer-free three-bot shadow worker stays HOLD
+        run: python -m unittest sender_review.test_composed_shadow_worker_offline -v
+      - name: Verify metadata-only shadow boundary cannot output executable intents
+        run: python -m unittest sender_review.test_shadow_report_boundary_offline -v
+      - name: Review pure signer-free worker intent fixture builder
+        run: python -m unittest sender_review.test_worker_intent_fixture_builder_offline -v
+      - name: Quarantine CI-only sender fixtures from all five legacy execution paths
+        run: python -m unittest sender_review.test_review_only_quarantine_offline -v
+      - name: Classify synthetic outage exposure and emergency recovery as NO-GO
+        run: python -m unittest sender_review.test_outage_exposure_triage_offline -v
+      - name: Verify synthetic protective-close and unknown-ACK recovery always HOLD
+        run: python -m unittest sender_review.test_protective_recovery_simulator_offline -v
+      - name: Verify offline P3 recovery triage never authorizes actions
+        run: python -m unittest sender_review.test_recovery_triage_decision_table_offline -v
+      - name: Verify synthetic three-bot shared account netting always HOLD
+        run: python -m unittest sender_review.test_shared_account_reconciliation_offline -v
+      - name: Verify synthetic account-wide ownership and fill reconciliation stays HOLD
+        run: python -m unittest sender_review.test_account_wide_reconciliation_fixture_offline -v
+      - name: Verify offline exchange read-set provenance handoff and pagination HOLD
+        run: python -m unittest sender_review.test_exchange_readset_gate_offline -v
+      - name: Verify offline-only Hyperliquid read query plan and capped histories
+        run: python -m unittest sender_review.test_hyperliquid_readonly_collection_plan_offline -v
+      - name: Validate opt-in read-only testnet info snapshot using HTTPS mocks only
+        run: python -m unittest sender_review.test_hyperliquid_testnet_readonly_snapshot_review -v
+      - name: Test exact synthetic info request-response binding and deny false provenance
+        run: python -m unittest sender_review.test_six_frame_payload_binding_offline -v
+      - name: Verify combined six-frame read-only position and history HOLD
+        run: python -m unittest sender_review.test_coordinated_testnet_readset_review -v
+      - name: Check bounded recent testnet order and fill history with HTTP mocks only
+        run: python -m unittest sender_review.test_hyperliquid_testnet_recent_history_review -v
+      - name: Validate mock-only Hyperliquid info responses and zero trade authority
+        run: python -m unittest sender_review.test_mock_hyperliquid_info_collector_offline -v
+      - name: Review inert systemd collector unit and reject privilege exceptions
+        run: python -m unittest sender_review.test_ci_only_readonly_collector_service -v
+      - name: Check disabled credential and outbound egress policy (offline only)
+        run: python -m unittest sender_review.test_ci_only_collector_policy_review -v
+      - name: Review disabled PostgreSQL 18 offline provisioning package
+        run: python -m unittest sender_review.postgresql18_offline.test_package -v
+      - name: Enforce explicit deployment-readiness NO-GO gates offline
+        run: python -m unittest sender_review.test_ci_only_deployment_readiness_review -v
+      - name: Verify offline host-evidence request cannot assert attestation
+        run: python -m unittest sender_review.test_host_evidence_request_offline -v
+      - name: Guard five draft network entrypoints against reactivation
+        run: python -m unittest sender_review.test_review_only_network_import_guard -v
+      - name: Verify no signer, socket, DB or HTTP imports in S1 module
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import ast
+          from pathlib import Path
+          path = Path("sender_review/request_contract.py")
+          tree = ast.parse(path.read_text(encoding="utf-8"))
+          allowed = {"dataclasses", "decimal", "json", "re"}
+          for node in ast.walk(tree):
+              if isinstance(node, ast.Import):
+                  assert all(alias.name in allowed for alias in node.names)
+              elif isinstance(node, ast.ImportFrom):
+                  assert node.module in allowed
+          print("S1 source imports are limited to pure standard-library parsing")
+          PY

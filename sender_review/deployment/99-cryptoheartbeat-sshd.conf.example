@@ -1,0 +1,39 @@
+# REVIEW TEMPLATE ONLY — do NOT copy into /etc/ssh/sshd_config.d yet.
+#
+# Intended ONLY for the standalone SSH heartbeat account after explicit
+# operator approval, verified rescue console and end-to-end safety tests.
+# Not installed, enabled, or executed by GitHub Actions.
+# The target executable must be separately installed, root-owned,
+# dependency-free and readable by cryptoheartbeat at the pinned path.
+#
+# IMPORTANT: the existing /usr/sbin/nologin shell is incompatible with a
+# Python SSH ForceCommand on common OpenSSH configurations. Do NOT just
+# change that shell: first enforce and verify this exact Match block,
+# provision a restricted *public* key, then separately approve a controlled
+# shell change and negative shell/forwarding tests. The password must remain
+# locked. A locked shadow account may itself prevent public-key login on
+# some sshd/PAM combinations: HOLD rather than unlock its password.
+#
+# Set in a late-numbered drop-in, verify with:
+# sudo sshd -t
+# sudo sshd -T -C user=cryptoheartbeat,host=localhost,addr=127.0.0.1
+# Test the existing testadmin SSH session via a separate connection before
+# any sshd reload. Do not loosen sshd globally.
+Match User cryptoheartbeat
+    AuthenticationMethods publickey
+    PubkeyAuthentication yes
+    PasswordAuthentication no
+    KbdInteractiveAuthentication no
+    AuthorizedKeysFile /etc/ssh/heartbeat-authorized-keys/cryptoheartbeat
+    ForceCommand /usr/bin/python3 -I /usr/local/libexec/crypto-yall/ssh_heartbeat_stdio_review_only.py
+    DisableForwarding yes
+    AllowTcpForwarding no
+    AllowStreamLocalForwarding no
+    AllowAgentForwarding no
+    X11Forwarding no
+    PermitTTY no
+    PermitUserRC no
+    PermitTunnel no
+# PermitUserEnvironment is a GLOBAL-only directive on this OpenSSH build.
+# The existing global sshd configuration already sets permituserenvironment no.
+# Do not modify global sshd settings as part of this heartbeat review.

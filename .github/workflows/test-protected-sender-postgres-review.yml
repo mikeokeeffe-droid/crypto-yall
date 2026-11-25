@@ -1,0 +1,175 @@
+name: Protected Sender Disposable PostgreSQL Review
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'sender_review/**'
+      - '.github/workflows/test-protected-sender-postgres-review.yml'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  disposable-pg-journal:
+    name: disposable-pg-journal-pg${{ matrix.postgres_major }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    strategy:
+      fail-fast: false
+      matrix:
+        postgres_major: ['16', '18']
+    services:
+      postgres:
+        image: postgres:${{ matrix.postgres_major }}
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: disposable-only-ci-password
+          POSTGRES_DB: sender_review_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d sender_review_test"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    env:
+      SENDER_REVIEW_DISPOSABLE_CI: '1'
+      PGHOST: 127.0.0.1
+      PGDATABASE: sender_review_test
+      PG_EXPECTED_MAJOR: ${{ matrix.postgres_major }}
+      PGPASSWORD: disposable-only-ci-password
+      PYTHONDONTWRITEBYTECODE: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install disposable PostgreSQL client
+        run: python -m pip install 'psycopg[binary]>=3.2,<4' 'cryptography>=42,<47'
+      # Docker's health check is not proof that SQL works with the exact
+      # CI role/DB, or that this job started the intended PostgreSQL major.
+      - name: Verify SQL connection and matrix PostgreSQL major
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import os
+          import sys
+          import time
+          import psycopg
+
+          expected = int(os.environ["PG_EXPECTED_MAJOR"])
+          last_error = "no successful database connection"
+          for attempt in range(1, 21):
+              try:
+                  with psycopg.connect(
+                      host="127.0.0.1", port=5432,
+                      dbname="sender_review_test", user="postgres",
+                      password=os.environ["PGPASSWORD"],
+                      connect_timeout=3,
+                  ) as db:
+                      version, database, username = db.execute(
+                          "SELECT current_setting('server_version_num')::integer, "
+                          "current_database(), current_user"
+                      ).fetchone()
+                  actual = version // 10000
+                  if actual != expected or database != "sender_review_test" or username != "postgres":
+                      sys.exit(f"PostgreSQL fixture mismatch: expected major {expected}, "
+                               f"found major {actual}, database={database}, role={username}")
+                  print(f"Disposable PostgreSQL {actual}: SQL connection and identity verified")
+                  break
+              except (psycopg.Error, OSError) as exc:
+                  last_error = f"{type(exc).__name__}: {exc}"
+                  print(f"Attempt {attempt}/20: disposable PostgreSQL not ready", flush=True)
+                  time.sleep(1)
+          else:
+              sys.exit(f"PostgreSQL SQL readiness failed: {last_error}")
+          PY
+      - name: Concurrent review-only journal and unknown-ack recovery
+        run: python -m unittest sender_review.test_ci_journal_postgres -v
+      - name: Verify signed fixture identity, durable replay and fail-closed journal bridge
+        run: python -m unittest sender_review.test_ci_identity_bridge_postgres -v
+      - name: Test signer-free worker drafts against signed fixture and review-only journal
+        run: python -m unittest sender_review.test_ci_worker_draft_bridge_postgres -v
+      - name: Test fake signed remote envelope to disposable review-only journal
+        run: python -m unittest sender_review.test_ci_remote_journal_boundary_postgres -v
+      - name: Verify in-process ASGI HOLD joins disposable fenced journal without a listener
+        run: python -m unittest sender_review.test_ci_asgi_journal_handoff_postgres -v
+      - name: Exercise original three-bot sizing into signed disposable HOLD journal
+        run: python -m unittest sender_review.test_ci_legacy_capture_journal_postgres -v
+      - name: Check denied PostgreSQL role permissions in disposable CI
+        run: python -m unittest sender_review.test_ci_journal_permissions_postgres -v
+      - name: Test CI-only restricted role and no direct journal permissions
+        run: python -m unittest sender_review.test_ci_restricted_role_postgres -v
+      - name: Verify simulated durable attempt lifecycle has no order sender
+        run: python -m unittest sender_review.test_ci_attempt_lifecycle_postgres -v
+      - name: Verify immutable synthetic protection re-entry HOLD with signed disposable evidence
+        run: python -m unittest sender_review.test_ci_protection_reentry_holds_postgres -v
+      - name: Verify signed fake HTTP request binds to permanent disposable protection HOLD
+        run: python -m unittest sender_review.test_ci_signed_protection_handoff_postgres -v
+      - name: Confirm cross-bot cross-coin account quarantine after synthetic unknown outcomes
+        run: python -m unittest sender_review.test_ci_account_wide_quarantine_postgres -v
+      - name: Verify no trade-authorizing SQL state or send function
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          text = Path("sender_review/ci_only_journal.sql").read_text("utf-8")
+          assert "hold_unknown" in text and "review_only" in text
+          assert "SECURITY INVOKER" in text
+          for marker in ("market_open(", "market_close(", "HL_PRIVATE_KEY",
+                         "submit_authorized", "release_claim(", "retry_order("):
+              assert marker not in text, marker
+          print("CI journal is review-only with no exchange sender")
+          PY
+
+  pg18-provisioning-integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Execute guarded PostgreSQL 18 provisioning SQL in disposable container
+        run: python -m unittest sender_review.postgresql18_offline.test_provisioning_integration -v
+
+  pg18-startup-stress-20:
+    if: github.event_name == 'pull_request' && github.event.pull_request.number == 42
+    name: pg18-startup-stress-20
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Run 20 fresh offline PostgreSQL 18 cold starts without retries
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p pg18-stress-logs
+          for attempt in $(seq 1 20); do
+            printf -v log 'pg18-stress-logs/attempt-%02d.log' "$attempt"
+            echo "Starting PG18 cold start $attempt/20"
+            if python -m unittest sender_review.postgresql18_offline.test_provisioning_integration -v >"$log" 2>&1; then
+              echo "PASS $attempt/20" | tee -a pg18-stress-logs/summary.txt
+            else
+              echo "FAIL $attempt/20 (no retry)" | tee -a pg18-stress-logs/summary.txt
+              cat "$log"
+              exit 1
+            fi
+          done
+          echo "20/20 PASS without retries" | tee -a pg18-stress-logs/summary.txt
+      - name: Upload all PG18 attempt logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pg18-stress-logs
+          path: pg18-stress-logs/
+          retention-days: 30
