@@ -25,6 +25,37 @@ class TestnetDailyAdmissionTests(unittest.TestCase):
         self.assertEqual(v.status,"READY_FOR_REVIEW")
         self.assertFalse(v.allows_order)
 
+    def test_unified_spot_collateral_with_zero_perp_review_only(self):
+        d=fixture()
+        d["state"]["withdrawable"]="0.0"
+        d["state"]["marginSummary"]["accountValue"]="0.0"
+        d["account_mode"]="unifiedAccount"
+        d["spot_state"]={"balances":[
+            {"coin":"USDC","total":"1003.250563","hold":"0.0"}
+        ]}
+        answer=gate.assess(**d)
+        self.assertEqual(answer.status,"READY_FOR_REVIEW")
+        self.assertFalse(answer.allows_order)
+
+    def test_unified_insufficient_missing_duplicate_or_held_spot_holds(self):
+        d=fixture()
+        d["state"]["withdrawable"]="0.0"
+        d["state"]["marginSummary"]["accountValue"]="0.0"
+        d["account_mode"]="unifiedAccount"
+        for spot in (
+            None,{},{"balances":[]},{"balances":None},
+            {"balances":[{"coin":"USDC","total":"19","hold":"0"}]},
+            {"balances":[{"coin":"USDC","total":"100","hold":"90"}]},
+            {"balances":[{"coin":"USDC","total":"10","hold":"11"}]},
+            {"balances":[{"coin":"USDC","total":"NaN","hold":"0"}]},
+            {"balances":[{"coin":"USDC","total":"100","hold":"0"}]*2},
+        ):
+            with self.subTest(spot=spot):
+                self.assertEqual(gate.assess(**{**d,"spot_state":spot}).status,"HOLD")
+        for mode in ("portfolioMargin","other","",False):
+            with self.subTest(mode=mode):
+                self.assertEqual(gate.assess(**{**d,"account_mode":mode}).status,"HOLD")
+
     def test_manual_sol_position_blocks(self):
         d=fixture()
         d["state"]["assetPositions"]=[{"position":{"coin":"SOL","szi":"0.30"}}]
