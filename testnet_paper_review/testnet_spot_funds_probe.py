@@ -42,3 +42,24 @@ def review_usdc_spot(state):
     if any(not x.is_finite() or x<0 for x in (total,held)) or held>total:
         raise SpotHold("HOLD: invalid or held spot USDC")
     return {"total":str(total),"available":str(total-held),"may_trade":False}
+
+def read_account_mode(*, connection_factory=None):
+    """Public TESTNET userAbstraction; no keys, trades or transfers."""
+    factory=connection_factory or (lambda: http.client.HTTPSConnection(
+        HOST,443,timeout=8,context=ssl.create_default_context()))
+    conn=factory()
+    try:
+        body=json.dumps({"type":"userAbstraction","user":EXPECTED_ACCOUNT})
+        conn.request("POST","/info",body=body,headers={"Content-Type":"application/json"})
+        response=conn.getresponse()
+        if response.status!=200:raise SpotHold("HOLD: abstraction HTTP error")
+        raw=response.read(257)
+        if len(raw)>256:raise SpotHold("HOLD: abstraction oversized")
+        mode=json.loads(raw)
+        if type(mode) is not str or mode not in (
+            "unifiedAccount","disabled","default","portfolioMargin"):
+            raise SpotHold("HOLD: unknown Testnet account mode")
+        return mode
+    except (OSError,ValueError,http.client.HTTPException) as exc:
+        raise SpotHold("HOLD: account mode unavailable") from exc
+    finally:conn.close()
