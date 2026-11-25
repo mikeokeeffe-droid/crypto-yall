@@ -77,3 +77,10 @@ jobs:
           print('HOLD: listed agents are not approved for this isolated sender')
           print('HOLD: this snapshot provides no permission to sign or send orders')
           PY
+      - name: Standalone no-key Testnet server public readiness probe (no orders)
+        shell: bash
+        env:
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: |
+          set -euo pipefail
+          python3 -B -m testnet_paper_review.testnet_server_deployment_check --read-only-check
