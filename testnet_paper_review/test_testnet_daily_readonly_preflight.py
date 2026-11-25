@@ -82,6 +82,8 @@ class TestnetReadOnlyPreflightTests(unittest.TestCase):
         result = reader.review_once(fetcher=lambda k: responses[k], clock=lambda: 1000)
         self.assertEqual(result["positions"], 1)
         self.assertEqual(result["open_orders"], 2)
+        self.assertEqual(result["equity_usdc"], "1000")
+        self.assertEqual(result["withdrawable_usdc"], "1000")
         self.assertEqual(result["reduce_only_orders"], 2)
         self.assertEqual(result["stop_market_orders"], 1)
         self.assertEqual(result["decision"].status, "HOLD")
