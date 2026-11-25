@@ -146,3 +146,22 @@ so they do not constitute production authentication. There is no Unix
 listener, no protected socket pathname, no pidfd lifetime binding,
 no real service/cgroup trust root, no TLS client or outbound network.
 Passing these tests does not authorize a Hetzner deployment or live read.
+
+
+## Local AF_UNIX protocol prototype — NO NETWORK, MOCK OUTPUT ONLY
+
+unix_gateway_protocol_review_offline.py adds a fixed-length command parser for
+an **already connected local Unix stream socket** and returns an explicitly
+labeled MOCK response. The local socketpair tests verify malformed commands,
+trading-like commands, missing approval, wrong peer identity, and prohibited
+network-authority settings fail closed. It does not open a listening socket,
+perform HTTPS, bind a pathname, handle actual API responses, or start anything.
+
+The prototype is **not deployable**: an actual gateway would need
+independently reviewed protected socket creation and peer/service identity,
+strong one-shot authorization and replay protection, enforceable egress
+isolation, controlled TLS/DNS transport, robust framing/timeouts, and
+a safe shutdown path. In particular, a mock 0 positions/0 orders reply
+is **never** a verified Hyperliquid account result. Neither the original
+collector nor the live trading bots may be changed or started through
+this draft work.
