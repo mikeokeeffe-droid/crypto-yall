@@ -87,6 +87,43 @@ class DurableOfflineReviewTests(unittest.TestCase):
             with self.subTest(path=str(path)), self.assertRaises(HoldError):
                 DisposableReviewJournal(path)
 
+    def test_emergency_freeze_survives_restart_and_preserves_claim(self):
+        with DisposableReviewJournal(self.path) as j:
+            j.stage(good_intent(), good_snapshot(), now_s=NOW, writer_id=REVIEW_WRITER)
+            self.assertFalse(j.is_frozen())
+            self.assertIn("HOLD", j.freeze_review())
+            self.assertTrue(j.is_frozen())
+            self.assertEqual(j.view()[0], good_intent().request_id)
+        with DisposableReviewJournal(self.path) as restarted:
+            self.assertTrue(restarted.is_frozen())
+            self.assertEqual(restarted.view()[-1], "STAGED_HOLD")
+            with self.assertRaises(HoldError):
+                restarted.stage(replace(good_intent(),request_id="review-freeze-0002"),
+                                good_snapshot(),now_s=NOW,writer_id=REVIEW_WRITER)
+            self.assertIn("HOLD",restarted.freeze_review())
+            self.assertTrue(restarted.is_frozen())
+
+    def test_freeze_before_any_claim_blocks_claim(self):
+        with DisposableReviewJournal(self.path) as j:
+            self.assertIn("HOLD", j.freeze_review())
+            with self.assertRaises(HoldError):
+                j.stage(good_intent(),good_snapshot(),now_s=NOW,writer_id=REVIEW_WRITER)
+            self.assertIsNone(j.view())
+
+    def test_invalid_ack_or_unmatched_request_does_not_release_claim(self):
+        with DisposableReviewJournal(self.path) as j:
+            j.stage(good_intent(),good_snapshot(),now_s=NOW,writer_id=REVIEW_WRITER)
+            for rid, outcome in (("wrong-review-id","unknown"),
+                                 (good_intent().request_id,"partial"),
+                                 (good_intent().request_id,"")):
+                with self.subTest(rid=rid,outcome=outcome),self.assertRaises(HoldError):
+                    j.simulated_ack(rid,outcome)
+            self.assertEqual(j.view()[-1], "STAGED_HOLD")
+            j.simulated_ack(good_intent().request_id,"unknown")
+            with self.assertRaises(HoldError):
+                j.simulated_ack(good_intent().request_id,"unknown")
+            self.assertEqual(j.view()[-1], "UNKNOWN_ACK_HOLD")
+
     def test_no_order_execution_surface(self):
         import ast
         import testnet_paper_review.offline_durable_restart_journal as mod
