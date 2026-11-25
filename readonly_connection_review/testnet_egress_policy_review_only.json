@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "label": "OFFLINE REVIEW CONTRACT ONLY — NOT AN ACTIVE NETWORK POLICY",
+  "status": "HOLD_NO_TESTNET_NETWORK_AUTHORIZATION",
+  "network_authorized": false,
+  "gateway_implemented": false,
+  "automatic_execution": false,
+  "deployable_as_is": false,
+  "credential_access_authorized": false,
+  "order_execution_authorized": false,
+  "mainnet_access_authorized": false,
+  "proposed_runner": {
+    "user": "readonlycheck",
+    "require_transient_unit": true,
+    "direct_network": "deny",
+    "no_new_privileges": true,
+    "readonly_code": true,
+    "allow_signing_credentials": false,
+    "allow_production_database": false,
+    "allow_privileged_unix_sockets": false
+  },
+  "proposed_gateway": {
+    "separate_identity": true,
+    "independently_reviewed": true,
+    "destination": {
+      "scheme": "https",
+      "host": "api.hyperliquid-testnet.xyz",
+      "port": 443,
+      "method": "POST",
+      "path": "/info"
+    },
+    "allow_arbitrary_urls": false,
+    "allow_redirects": false,
+    "allow_connect_proxy": false,
+    "allow_exchange_endpoint": false,
+    "require_certificate_validation": true,
+    "require_hostname_validation": true,
+    "public_account": "0xF14348Bdf59BA186F9CdD0fC5F369e1f6D3b7dC0",
+    "request_types": [
+      "clearinghouseState",
+      "openOrders"
+    ],
+    "request_dex": "",
+    "max_requests_per_run": 2,
+    "max_requests_per_type": 1,
+    "max_response_bytes": 524288,
+    "timeout_seconds_per_request": 8,
+    "deny_retries": true,
+    "require_exact_request_json": true,
+    "fail_closed": true
+  }
+}
