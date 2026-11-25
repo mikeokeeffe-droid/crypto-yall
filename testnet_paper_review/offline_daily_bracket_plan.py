@@ -97,16 +97,16 @@ def compose_mock_bracket(*, account, network, state, open_orders, signal,
     if action not in ("buy", "enter_short"):
         raise BracketHold("HOLD: no entry signal")
     qty_quantum = Decimal(1).scaleb(-size_decimals)
-    qty = (amount / reference).quantize(qty_quantum, rounding=ROUND_DOWN)
-    if qty <= 0:
-        raise BracketHold("HOLD: rounded size is zero")
-    # IOC parent can execute up to the explicit aggressive limit. The notional
-    # ceiling is enforced at THAT price, not merely the mid quote.
+    # Compute the aggressive IOC limit before sizing the order. Capping only
+    # at mid-quote can exceed the user's approved amount for a long entry.
     entry_px = _price(
         reference * (1 + AGGRESSIVE_ENTRY_PCT if is_buy else 1 - AGGRESSIVE_ENTRY_PCT),
         decimals=px_decimals, round_up=is_buy,
     )
     entry_limit = Decimal(entry_px)
+    qty = (amount / entry_limit).quantize(qty_quantum, rounding=ROUND_DOWN)
+    if qty <= 0:
+        raise BracketHold("HOLD: rounded size is zero")
     effective = entry_limit * qty
     if not MIN_NOTIONAL <= effective <= MAX_NOTIONAL:
         raise BracketHold("HOLD: rounded worst-case entry exceeds notional bounds")
