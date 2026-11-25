@@ -151,5 +151,5 @@ def review_testnet_daily_once(*, signal_fact, fetch_account=fetch_public_info,
             plan=plan
         )
     except (SignalReviewHold, ReadOnlyError, MarketReadHold, BracketHold,
-            KeyError, TypeError, ValueError) as exc:
+            OSError, TimeoutError, KeyError, TypeError, ValueError) as exc:
         raise TestnetPipelineHold("HOLD: Testnet public preflight failed closed") from exc
