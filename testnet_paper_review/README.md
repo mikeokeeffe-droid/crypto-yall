@@ -33,3 +33,24 @@ The faucet may require the **same address to have previously deposited on Mainne
 ## Operator decision
 
 No trading authorization has been given for any specific executable, signer, symbol, size, or order yet. A general request to prepare for Testnet paper trading is authorization to review and draft only. **NO-GO for order placement.**
+
+
+## Reusing the original Daily strategy — PR-only offline rehearsal
+
+The separate workflow \`.github/workflows/crypto-yall-testnet-daily-rehearsal.yml\`
+runs on pull requests only (not \`workflow_dispatch\` or a schedule). Its
+\`offline_daily_testnet_rehearsal.py\` tests the exact pinned original Daily
+\`execute_trade\` body using a **fake exchange**, fake market price and
+fake response. It exercises synthetic SOL long, short, close, and
+minimum-notional skip behavior without installing the Hyperliquid SDK,
+loading GitHub Secrets, contacting APIs or persisting state.
+
+The reviewed Daily file's Git blob hash is checked before running; code
+changes deliberately fail the rehearsal until re-reviewed. The workflow's
+\`HL_TESTNET=false\` and \`KILL_SWITCH=off\` environment values are inert
+offline test fixtures and **do not edit repository variables**.
+
+This is **not a live trading workflow**, not proof of correct live
+signing/cross-bot order ownership, and not an authorization to use
+an existing Mainnet-capable agent wallet or to unpause the original bots.
+The new test branch does not contain any actual order-sending entrypoint.
