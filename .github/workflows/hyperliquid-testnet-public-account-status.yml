@@ -1,6 +1,6 @@
 name: Hyperliquid TESTNET Daily public account status (READ ONLY)
 
-# This workflow cannot sign or submit an order, and has NO trading secrets.
+# This workflow cannot sign or submit an order, and has NO credentials.
 # Runs only when manually selected on the repository default branch.
 on:
   workflow_dispatch: {}
