@@ -74,12 +74,14 @@ def _price(value, *, decimals, round_up):
 
 def compose_mock_bracket(*, account, network, state, open_orders, signal,
                          now_s, snapshot_at_s, mid_price, notional_usdc="20",
-                         leverage=1, size_decimals=2, px_decimals=2):
+                         leverage=1, size_decimals=2, px_decimals=2,
+                         account_mode=None, spot_state=None):
     """Compose exactly 3 synthetic orders ONLY after pure admission review."""
     result = assess(
         account=account, network=network, state=state, open_orders=open_orders,
         signal=signal, now_s=now_s, snapshot_at_s=snapshot_at_s,
-        notional_usdc=notional_usdc, leverage=leverage
+        notional_usdc=notional_usdc, leverage=leverage,
+        account_mode=account_mode, spot_state=spot_state
     )
     if result.status != "READY_FOR_REVIEW":
         raise BracketHold(f"HOLD: Daily account admission failed: {result.reason}")
