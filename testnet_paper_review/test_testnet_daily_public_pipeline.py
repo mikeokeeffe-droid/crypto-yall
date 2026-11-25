@@ -68,6 +68,20 @@ class TestTestnetDailyPublicPipeline(unittest.TestCase):
         with self.assertRaises(TestnetPipelineHold):
             trial(account=Account(mutate=True))
 
+    def test_public_account_timeout_is_a_wrapped_hold(self):
+        def fail_account(kind):
+            raise TimeoutError("read-only account query timeout")
+        with self.assertRaises(TestnetPipelineHold) as error:
+            trial(account=fail_account)
+        self.assertIn("HOLD",str(error.exception))
+
+    def test_public_market_timeout_is_a_wrapped_hold(self):
+        def fail_market(kind):
+            raise OSError("read-only market query unreachable")
+        with self.assertRaises(TestnetPipelineHold) as error:
+            trial(market_reader=fail_market)
+        self.assertIn("HOLD",str(error.exception))
+
     def test_invalid_market_and_daily_signals_block(self):
         for bad in ({}, {"SOL":"nan"}, {"SOL":"0"}):
             def bad_market(kind):
