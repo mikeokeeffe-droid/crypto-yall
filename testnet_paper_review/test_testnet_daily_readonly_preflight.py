@@ -1,8 +1,7 @@
-"""Mocked read-only /info preflight; never contacts Hyperliquid."""
+"""Mocked read-only Testnet /info preflight: never contacts Hyperliquid."""
 import json
 import unittest
 from unittest.mock import patch
-
 from testnet_paper_review import testnet_daily_readonly_preflight as reader
 
 
@@ -32,98 +31,137 @@ class Conn:
 
 def state(positions=None):
     return {"assetPositions": [] if positions is None else positions,
-            "marginSummary":{"accountValue":"1000"},
-            "withdrawable":"1000"}
+            "marginSummary": {"accountValue": "1000"},
+            "withdrawable": "1000"}
+
+
+def orders():
+    basic = [{"oid": 1, "coin": "SOL", "side": "A", "sz": "0.30"},
+             {"oid": 2, "coin": "SOL", "side": "A", "sz": "0.30"}]
+    details = [
+        {**basic[0], "reduceOnly": True, "isTrigger": True,
+         "orderType": "Take Profit Market", "triggerPx": "67.68"},
+        {**basic[1], "reduceOnly": True, "isTrigger": True,
+         "orderType": "Stop Market", "triggerPx": "65.69"},
+    ]
+    return basic, details
 
 
 class TestnetReadOnlyPreflightTests(unittest.TestCase):
     def test_fixed_host_path_query_types(self):
-        for name in ("clearinghouseState", "openOrders"):
-            obj=json.loads(reader.query_body(name))
-            self.assertEqual(obj["user"],reader.EXPECTED_ACCOUNT)
-            self.assertEqual(obj["type"],name)
-            self.assertEqual(obj["dex"],"")
+        for name in ("clearinghouseState", "openOrders", "frontendOpenOrders"):
+            obj = json.loads(reader.query_body(name))
+            self.assertEqual(obj["user"], reader.EXPECTED_ACCOUNT)
+            self.assertEqual(obj["type"], name)
+            self.assertEqual(obj["dex"], "")
         for name in ("exchange", "userFills", "order", "userRole", "/exchange"):
-            with self.subTest(name=name),self.assertRaises(reader.ReadOnlyError):
+            with self.subTest(name=name), self.assertRaises(reader.ReadOnlyError):
                 reader.query_body(name)
 
-    def test_reads_only_two_fixed_testnet_requests(self):
-        for kind, response in (
-            ("clearinghouseState",state()),
-            ("openOrders",[{"oid":1,"coin":"SOL"}])
+    def test_reads_only_three_fixed_testnet_requests(self):
+        basic, details = orders()
+        for kind, value in (
+            ("clearinghouseState", state()),
+            ("openOrders", basic),
+            ("frontendOpenOrders", details),
         ):
-            c=Conn(Response(response))
-            self.assertEqual(reader.fetch_public_info(kind,connection_factory=lambda:c),response)
+            c = Conn(Response(value))
+            self.assertEqual(reader.fetch_public_info(kind, connection_factory=lambda: c), value)
             self.assertTrue(c.closed)
-            args,kwargs=c.requests[0]
-            self.assertEqual(args[:2],("POST","/info"))
-            self.assertEqual(json.loads(kwargs["body"])["type"],kind)
-            self.assertNotIn("Authorization",kwargs["headers"])
+            args, kwargs = c.requests[0]
+            self.assertEqual(args[:2], ("POST", "/info"))
+            self.assertEqual(json.loads(kwargs["body"])["type"], kind)
+            self.assertNotIn("Authorization", kwargs["headers"])
 
     def test_existing_manual_sol_and_protective_orders_hold(self):
-        fake_state=state([{"position":{"coin":"SOL","szi":"0.30"}}])
-        orders=[{"coin":"SOL","reduceOnly":True,"orderType":"Take Profit Market"},
-                {"coin":"SOL","reduceOnly":True,"orderType":"Stop Market"}]
-        def fetch(k):
-            return fake_state if k=="clearinghouseState" else orders
-        result=reader.review_once(fetcher=fetch,clock=lambda:1000)
-        self.assertEqual(result["positions"],1)
-        self.assertEqual(result["open_orders"],2)
-        self.assertEqual(result["decision"].status,"HOLD")
+        fake_state = state([{"position": {"coin": "SOL", "szi": "0.30"}}])
+        basic, details = orders()
+        responses = {"clearinghouseState": fake_state,
+                     "openOrders": basic,
+                     "frontendOpenOrders": details}
+        result = reader.review_once(fetcher=lambda k: responses[k], clock=lambda: 1000)
+        self.assertEqual(result["positions"], 1)
+        self.assertEqual(result["open_orders"], 2)
+        self.assertEqual(result["reduce_only_orders"], 2)
+        self.assertEqual(result["stop_market_orders"], 1)
+        self.assertEqual(result["decision"].status, "HOLD")
         self.assertFalse(result["decision"].allows_order)
 
     def test_empty_account_still_cannot_authorize_trading(self):
-        calls=[]
+        calls = []
         def fetch(k):
             calls.append(k)
-            return state() if k=="clearinghouseState" else []
-        result=reader.review_once(fetcher=fetch,clock=lambda:1000)
-        self.assertEqual(calls,["clearinghouseState","openOrders"])
-        self.assertEqual(result["decision"].status,"HOLD")
+            return state() if k == "clearinghouseState" else []
+        result = reader.review_once(fetcher=fetch, clock=lambda: 1000)
+        self.assertEqual(calls, ["clearinghouseState", "openOrders", "frontendOpenOrders"])
+        self.assertEqual(result["decision"].status, "HOLD")
         self.assertFalse(result["decision"].allows_order)
 
-    def test_missing_orders_or_timeout_fails_closed(self):
+    def test_order_view_disagreement_and_missing_metadata_hold(self):
+        basic, details = orders()
+        self.assertEqual(reader.verify_consistent_order_views(basic, details), 2)
+        for changed in (
+            details[:1],
+            details + [dict(details[1])],
+            [dict(details[0], oid=999), details[1]],
+            [dict(details[0], coin="ETH"), details[1]],
+            [dict(details[0], side="B"), details[1]],
+            [dict(details[0], sz="0.01"), details[1]],
+            [dict(details[0], reduceOnly=None), details[1]],
+            [dict(details[0], isTrigger=None), details[1]],
+            [dict(details[0], orderType=None), details[1]],
+            [dict(details[0], triggerPx=None), details[1]],
+        ):
+            with self.subTest(changed=changed), self.assertRaises(reader.ReadOnlyError):
+                reader.verify_consistent_order_views(basic, changed)
+        with self.assertRaises(reader.ReadOnlyError):
+            reader.verify_consistent_order_views([basic[0], basic[0]], details)
+
+    def test_missing_frontend_request_or_timeout_fails_closed(self):
         def fail(k):
-            if k=="clearinghouseState":
+            if k == "clearinghouseState":
                 return state()
-            raise reader.ReadOnlyError("HOLD: timed out reading openOrders")
+            if k == "openOrders":
+                return []
+            raise reader.ReadOnlyError("HOLD: third public info request failed")
         with self.assertRaises(reader.ReadOnlyError):
-            reader.review_once(fetcher=fail,clock=lambda:1000)
-        values=iter((1000,1016))
+            reader.review_once(fetcher=fail, clock=lambda: 1000)
+        values = iter((1000, 1016))
         with self.assertRaises(reader.ReadOnlyError):
-            reader.review_once(fetcher=lambda k:state() if k=="clearinghouseState" else [],
-                               clock=lambda:next(values))
+            reader.review_once(fetcher=lambda k: state() if k == "clearinghouseState" else [],
+                               clock=lambda: next(values))
 
     def test_reject_http_malformed_oversize(self):
         for kind, reply in (
-            ("clearinghouseState",Response(state(),status=503)),
-            ("clearinghouseState",Response(b"not JSON")),
-            ("clearinghouseState",Response([],status=200)),
-            ("clearinghouseState",Response(state(),length=str(reader.MAX_BYTES+1))),
-            ("openOrders",Response({"wrong":"type"})),
-            ("openOrders",Response(b"x"*(reader.MAX_BYTES+1))),
+            ("clearinghouseState", Response(state(), status=503)),
+            ("clearinghouseState", Response(b"not JSON")),
+            ("clearinghouseState", Response([])),
+            ("clearinghouseState", Response(state(), length=str(reader.MAX_BYTES + 1))),
+            ("openOrders", Response({"wrong": "type"})),
+            ("openOrders", Response(b"x" * (reader.MAX_BYTES + 1))),
+            ("frontendOpenOrders", Response({"wrong": "type"})),
         ):
-            c=Conn(reply)
-            with self.subTest(kind=kind,reply=reply),self.assertRaises(reader.ReadOnlyError):
-                reader.fetch_public_info(kind,connection_factory=lambda:c)
+            c = Conn(reply)
+            with self.subTest(kind=kind), self.assertRaises(reader.ReadOnlyError):
+                reader.fetch_public_info(kind, connection_factory=lambda: c)
             self.assertTrue(c.closed)
 
     def test_no_manual_flag_no_io(self):
-        with patch.object(reader,"review_once") as call:
-            self.assertEqual(reader.main([]),2)
+        with patch.object(reader, "review_once") as call:
+            self.assertEqual(reader.main([]), 2)
             call.assert_not_called()
 
-    def test_uses_only_read_only_transport(self):
+    def test_no_signer_import_or_trade_method(self):
         import ast
         from pathlib import Path
-        tree=ast.parse(Path(reader.__file__).read_text())
-        imports={n.module.split(".")[0] for n in ast.walk(tree)
-                 if isinstance(n,ast.ImportFrom) and n.module}
-        imports|={a.name.split(".")[0] for n in ast.walk(tree)
-                  if isinstance(n,ast.Import) for a in n.names}
-        self.assertFalse({"hyperliquid","requests","eth_account","subprocess"}.intersection(imports))
-        methods={n.name for n in ast.walk(tree) if isinstance(n,ast.FunctionDef)}
-        self.assertFalse({"execute_trade","submit_order","market_open","market_close"}.intersection(methods))
+        tree = ast.parse(Path(reader.__file__).read_text())
+        imports = {n.module.split(".")[0] for n in ast.walk(tree)
+                   if isinstance(n, ast.ImportFrom) and n.module}
+        imports |= {a.name.split(".")[0] for n in ast.walk(tree)
+                    if isinstance(n, ast.Import) for a in n.names}
+        self.assertFalse({"hyperliquid", "requests", "eth_account", "subprocess"} & imports)
+        methods = {n.name for n in ast.walk(tree) if isinstance(n, ast.FunctionDef)}
+        self.assertFalse({"execute_trade", "submit_order", "market_open", "market_close"} & methods)
 
 
 if __name__ == "__main__":
