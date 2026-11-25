@@ -151,6 +151,21 @@ class TestnetReadOnlyPreflightTests(unittest.TestCase):
             self.assertEqual(reader.main([]), 2)
             call.assert_not_called()
 
+    def test_diagnostic_main_is_never_a_successful_trading_gate(self):
+        # Even a completely empty valid account is only an offline read-only
+        # review, not authority to sign or send any order.
+        from testnet_paper_review.testnet_daily_admission_gate import hold
+        healthy = {
+            "decision": hold("No independently approved Daily signal"),
+            "positions": 0,
+            "open_orders": 0,
+            "reduce_only_orders": 0,
+            "stop_market_orders": 0
+        }
+        with patch.object(reader, "review_once", return_value=healthy) as call:
+            self.assertEqual(reader.main(["--read-only-review"]), 2)
+            call.assert_called_once_with()
+
     def test_no_signer_import_or_trade_method(self):
         import ast
         from pathlib import Path
