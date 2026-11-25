@@ -20,7 +20,9 @@ jobs:
         shell: bash
         env:
           AGENT_PRIVATE_KEY: ${{ secrets.HL_TESTNET_PRIVATE_KEY }}
-          # Environment-level variables are injected at the runner, not here.
+          EXPECTED_AGENT: ${{ vars.HL_TESTNET_AGENT_ADDRESS }}
+          EXPECTED_ACCOUNT: ${{ vars.HL_TESTNET_ACCOUNT_ADDRESS }}
+          TESTNET_ONLY: 'true' # Verification is hard-pinned to Testnet; no trades exist.
         run: |
           python - <<'PY'
           import json
@@ -33,11 +35,11 @@ jobs:
               print("FAIL:", message)
               sys.exit(1)
 
-          if os.getenv("HL_TESTNET", "").strip().lower() != "true":
+          if os.getenv("TESTNET_ONLY", "").strip().lower() != "true":
               fail("Testnet flag is not explicitly true")
           key = os.getenv("AGENT_PRIVATE_KEY", "").strip()
-          agent = os.getenv("HL_TESTNET_AGENT_ADDRESS", "").strip()
-          account = os.getenv("HL_TESTNET_ACCOUNT_ADDRESS", "").strip()
+          agent = os.getenv("EXPECTED_AGENT", "").strip()
+          account = os.getenv("EXPECTED_ACCOUNT", "").strip()
           if not key or not agent or not account:
               fail("A required Testnet secret or address is missing")
           if not (agent.startswith("0x") and len(agent) == 42 and
