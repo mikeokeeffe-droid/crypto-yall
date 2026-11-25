@@ -58,6 +58,9 @@ def verify_exact_request(*, bundle, approval, now_s):
             or bundle.endpoint != TESTNET_ENDPOINT
             or approval.endpoint != TESTNET_ENDPOINT):
         raise SenderHold("HOLD: wrong owner or Mainnet endpoint")
+    if (bundle.request_id != approval.request_id
+            or bundle.code_sha != approval.code_sha):
+        raise SenderHold("HOLD: approval request/code identity differs from order bundle")
     if not HEX_ADDRESS_RE.fullmatch(approval.signer_address) \
             or approval.signer_address.lower() == TESTNET_ACCOUNT.lower():
         raise SenderHold("HOLD: dedicated non-owner Testnet signer required")
@@ -155,7 +158,7 @@ def send_once(*, exchange, journal, bundle, approval, now_s):
         journal.freeze()
         raise SenderHold("HOLD: send outcome unknown; independently reconcile, never retry") from exc
     # An apparent OK is not confirmation that both exits are active.
-    if type(response) is not dict or response.get("status") != "ok":
+    if not acknowledge_exact_protected_order(response=response,bundle=bundle):
         journal.report_response(request_id=approval.request_id, known_success=False)
         journal.freeze()
         raise SenderHold("HOLD: exchange response ambiguous; no retry")
@@ -165,3 +168,43 @@ def send_once(*, exchange, journal, bundle, approval, now_s):
         "status":"POST_ACK_HOLD_NO_MORE_ORDERS",
         "needs_independent_position_stop_reconciliation":True
     }
+
+
+def acknowledge_exact_protected_order(*, response, bundle):
+    """Strictly validate THREE exchange ACKs; this is never stop-live evidence.
+
+    Even a matched response needs independent live position and open-order
+    reconciliation before being called protected. Any partial IOC fill, missing
+    child, error, duplicate order ID, or malformed reply is unknown and HOLD.
+    """
+    if type(bundle) is not OfflineClientOrderBundle \
+            or type(response) is not dict or response.get("status") != "ok":
+        return False
+    container = response.get("response")
+    if type(container) is not dict or type(container.get("data")) is not dict:
+        return False
+    statuses = container["data"].get("statuses")
+    if type(statuses) is not list or len(statuses) != 3:
+        return False
+    entry, take, stop = statuses
+    if any(type(x) is not dict for x in (entry,take,stop)):
+        return False
+    if (set(entry) != {"filled"} or set(take) != {"resting"}
+            or set(stop) != {"resting"}):
+        return False
+    try:
+        fill, tp, sl = entry["filled"], take["resting"], stop["resting"]
+        if any(type(x) is not dict for x in (fill,tp,sl)):
+            return False
+        oids = [fill.get("oid"),tp.get("oid"),sl.get("oid")]
+        if any(type(i) is not int or i <= 0 for i in oids) or len(set(oids)) != 3:
+            return False
+        total_sz = fill.get("totalSz")
+        if type(total_sz) is not str or not re.fullmatch(
+                r"(?:0|[1-9][0-9]*)(?:\.[0-9]{1,8})?",total_sz):
+            return False
+        if Decimal(total_sz) != Decimal(bundle.orders[0]["sz"]):
+            return False
+    except (ArithmeticError,KeyError,ValueError,TypeError,IndexError):
+        return False
+    return True
