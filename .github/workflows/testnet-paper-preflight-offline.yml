@@ -1,0 +1,22 @@
+name: Testnet paper trading preflight (offline hold only)
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'testnet_paper_review/**'
+      - '.github/workflows/testnet-paper-preflight-offline.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  deny-by-default:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Review paper-trade readiness without any keys or network
+        run: python3 -B -m unittest testnet_paper_review.test_offline_paper_preflight -v
