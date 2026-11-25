@@ -165,3 +165,26 @@ a safe shutdown path. In particular, a mock 0 positions/0 orders reply
 is **never** a verified Hyperliquid account result. Neither the original
 collector nor the live trading bots may be changed or started through
 this draft work.
+
+
+## HTTPS adapter — MOCKED CONNECTIONS ONLY, NOT AN EGRESS BOUNDARY
+
+https_gateway_transport_review.py composes the previously reviewed fixed
+request-frame validator with the existing two-query Testnet /info reader.
+There is **no default transport**; tests inject fake in-memory HTTPS
+connections and verify fixed request bodies, ordering, response counts,
+no retries, rejection of invalid frames before connecting, and refusal
+when the policy attempts to authorize networking.
+
+IMPORTANT: The optional, caller-supplied connection factory is **not
+trusted**. This Python interface does not by itself enforce the destination
+IP/port, verify that a supplied fake/custom factory performs TLS, or prevent
+processes with unrestricted outbound access from bypassing the adapter.
+Do not pass a real HTTPSConnection factory or use this in a networked
+service as-is. A separately reviewed gateway must independently own and
+enforce its transport and network namespace, trusted process identity,
+fixed outbound destination and TLS verification; it must have no untrusted
+factory injection or caller-supplied HTTP framing.
+
+No network connection has been made by these tests, and no Hetzner
+configuration or trading workflow is modified.
