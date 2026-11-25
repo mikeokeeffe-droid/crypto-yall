@@ -1,0 +1,41 @@
+name: Hyperliquid TESTNET Daily public account status (READ ONLY)
+
+# This workflow cannot sign or submit an order, and has NO trading secrets.
+# Runs only when manually selected on the repository default branch.
+on:
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hyperliquid-testnet-public-account-diagnostic
+  cancel-in-progress: false
+
+jobs:
+  inspect-account:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Checkout public read-only diagnostic code
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Query public TESTNET account state only
+        shell: bash
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: |
+          set -euo pipefail
+          python3 -B - <<'PY'
+          from testnet_paper_review.testnet_daily_readonly_preflight import review_once
+          result = review_once()
+          if result["decision"].status != "HOLD" or result["decision"].allows_order:
+              raise RuntimeError("HOLD: unexpected diagnostic authorization")
+          print("Hyperliquid TESTNET public diagnostic (NO ORDERS)")
+          print(f"Existing positions: {result['positions']}")
+          print(f"Existing orders: {result['open_orders']}")
+          print(f"Reduce-only orders: {result['reduce_only_orders']}")
+          print(f"Stop-market orders: {result['stop_market_orders']}")
+          print("HOLD: read-only status does not grant signing or trading authorization")
+          PY
