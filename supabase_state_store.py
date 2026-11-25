@@ -4,6 +4,8 @@ Never silently fall back to Gist after a Supabase error. This module only stores
 state; it does not authorize or perform exchange orders.
 """
 import os
+from urllib.parse import urlsplit
+
 import requests
 
 _REVISIONS = {}
@@ -18,6 +20,11 @@ def _config(bot):
     if bot not in _ALLOWED:
         raise ValueError("Unknown bot")
     url = os.environ["SUPABASE_URL"].rstrip("/")
+    parsed_url = urlsplit(url)
+    if (parsed_url.scheme != "https" or not parsed_url.hostname
+            or parsed_url.username or parsed_url.password
+            or parsed_url.query or parsed_url.fragment):
+        raise ValueError("SUPABASE_URL must be an HTTPS origin")
     key = os.environ["SUPABASE_SERVICE_ROLE_KEY"]
     headers = {"apikey": key, "Content-Type": "application/json"}
     if key.startswith("eyJ"):
@@ -32,7 +39,10 @@ def load(bot):
         headers=headers,
         params={"select": "state,revision", "bot": "eq." + bot},
         timeout=30,
+        allow_redirects=False,
     )
+    if 300 <= response.status_code < 400:
+        raise RuntimeError("Supabase redirects are not permitted")
     response.raise_for_status()
     rows = response.json()
     if len(rows) != 1 or not isinstance(rows[0].get("state"), dict):
@@ -59,7 +69,10 @@ def save(bot, state):
             "p_state": state,
         },
         timeout=30,
+        allow_redirects=False,
     )
+    if 300 <= response.status_code < 400:
+        raise RuntimeError("Supabase redirects are not permitted")
     response.raise_for_status()
     revision = response.json()
     if type(revision) is not int or revision != _REVISIONS[bot] + 1:

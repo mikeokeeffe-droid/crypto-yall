@@ -1,0 +1,240 @@
+name: Test Atomic Entry Reservations (Isolated PostgreSQL)
+on:
+  pull_request:
+    paths:
+      - 'db/entry_reservations_staging.sql'
+      - 'db/entry_reservations_staging_grants.sql'
+      - 'db/entry_reservations_restricted_grants_trial.sql'
+      - 'db/entry_reservation_identity_preflight_staging.sql'
+      - 'db/position_ownership_staging.sql'
+      - 'db/trusted_reconciler_role_staging.sql'
+      - 'tests/**'
+      - 'server_staging_guard.py'
+      - 'server_staging_control.py'
+      - 'server_staging_crash_recovery.py'
+      - 'deploy/staging/**'
+      - 'entry_gate_staging.py'
+      - 'order_reconciliation_staging.py'
+      - 'supabase_entry_store_staging.py'
+      - 'entry_lifecycle_staging.py'
+      - 'executor_entry_dry_run_staging.py'
+      - 'shared_entry_gate_staging.py'
+      - 'ownership_handoff_staging.py'
+      - 'executor_integration_contract_staging.py'
+      - 'hyperliquid_reconciliation_staging.py'
+      - 'hyperliquid_fill_verification_staging.py'
+      - 'hyperliquid_position_snapshot_staging.py'
+      - 'hyperliquid_testnet_probe_staging.py'
+      - 'intraday_single_bot_trial_staging.py'
+      - 'intraday_executor.py'
+      - 'intraday_entry_observer_staging.py'
+      - 'trusted_reconciliation_staging.py'
+      - 'trusted_reconciler_worker_staging.py'
+      - 'trusted_reconciler_db_adapter_staging.py'
+      - 'trusted_reconciler_release_staging.py'
+      - 'trusted_reconciler_transport_staging.py'
+      - 'trusted_reconciler_service_staging.py'
+      - 'trusted_reconciler_gateway_auth_staging.py'
+      - 'trusted_reconciler_gateway_jwt_staging.py'
+      - 'trusted_reconciler_authenticated_staging.py'
+      - 'trusted_reconciler_postgres_transport_staging.py'
+      - 'hyperliquid_readonly_evidence_staging.py'
+      - 'hyperliquid_reconciliation_pipeline_staging.py'
+      - 'hyperliquid_fill_pagination_staging.py'
+      - 'intraday_restart_recovery_staging.py'
+      - 'staging_executor_http_gateway.py'
+      - 'trusted_executor_gateway_staging.py'
+      - 'trusted_executor_jwt_staging.py'
+      - 'trusted_executor_postgres_transport_staging.py'
+      - '.github/workflows/test-atomic-entry-reservations.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  isolated-postgres:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: safety_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d safety_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 15
+    env:
+      PGHOST: localhost
+      PGPORT: "5432"
+      PGUSER: postgres
+      PGPASSWORD: postgres
+      PGDATABASE: safety_test
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install test dependencies
+        run: |
+          python -m pip install --disable-pip-version-check "psycopg[binary]>=3.2,<4"
+      - name: Create Supabase-compatible roles in disposable PostgreSQL
+        run: |
+          psql -v ON_ERROR_STOP=1 -c 'CREATE ROLE anon NOLOGIN;'
+          psql -v ON_ERROR_STOP=1 -c 'CREATE ROLE authenticated NOLOGIN;'
+          psql -v ON_ERROR_STOP=1 -c 'CREATE ROLE service_role NOLOGIN;'
+      - name: Apply staging schema and smoke test
+        run: |
+          psql -v ON_ERROR_STOP=1 -f db/entry_reservations_staging.sql
+          psql -v ON_ERROR_STOP=1 -f db/entry_reservations_staging_grants.sql
+          psql -v ON_ERROR_STOP=1 -f tests/entry_reservations_staging_grants_fail_closed.sql
+          psql -v ON_ERROR_STOP=1 -f db/position_ownership_staging.sql
+          psql -v ON_ERROR_STOP=1 -f db/trusted_reconciler_role_staging.sql
+          psql -v ON_ERROR_STOP=1 -f tests/position_ownership_permissions.sql
+          psql -v ON_ERROR_STOP=1 -f tests/trusted_reconciler_permissions.sql
+          psql -v ON_ERROR_STOP=1 -f tests/position_ownership_staging.sql
+          psql -v ON_ERROR_STOP=1 -f tests/entry_reservation_permissions.sql
+          psql -v ON_ERROR_STOP=1 -f tests/entry_reservations_staging.sql
+      - name: Verify isolated least-privilege executor trial
+        run: |
+          psql -v ON_ERROR_STOP=1 -f db/entry_reservation_least_privilege_trial.sql
+          psql -v ON_ERROR_STOP=1 -f tests/entry_reservation_least_privilege_trial.sql
+      - name: Test simulated authenticated HTTP entry gateway
+        run: |
+          python -m unittest discover -s tests -p 'test_staging_executor_http_gateway.py' -v
+          python -m unittest discover -s tests -p 'test_trusted_executor_gateway_staging.py' -v
+      - name: Verify isolated service-role write-bypass revocation
+        run: |
+          psql -v ON_ERROR_STOP=1 -f db/entry_reservations_restricted_grants_trial.sql
+          psql -v ON_ERROR_STOP=1 -f tests/entry_reservation_restricted_grants_trial.sql
+          psql -v ON_ERROR_STOP=1 -f tests/entry_reservation_cross_role_isolation.sql
+      - name: Test HTTP gateway with three disposable PostgreSQL LOGINs
+        env:
+          ISOLATED_POSTGRES_CI: '1'
+        run: |
+          python -m unittest discover -s tests -p 'test_executor_gateway_postgres_integration.py' -v
+          python -m unittest discover -s tests -p 'test_executor_dedicated_login_postgres.py' -v
+          python -m unittest discover -s tests -p 'test_authenticated_executor_integration_postgres.py' -v
+          python -m unittest discover -s tests -p 'test_entry_reservation_identity_preflight_postgres.py' -v
+      - name: Verify signed gateway to restricted PostgreSQL identity boundary
+        run: python -m unittest discover -s tests -p 'test_gateway_database_boundary_postgres.py' -v
+      - name: Verify ephemeral restricted PostgreSQL LOGIN (isolated CI only)
+        env:
+          ISOLATED_POSTGRES_CI: '1'
+        run: python -m unittest discover -s tests -p 'test_reconciler_dedicated_login_postgres.py' -v
+      - name: Test dedicated-login PostgreSQL transport safeguards
+        run: python -m unittest discover -s tests -p 'test_trusted_reconciler_postgres_transport_staging.py' -v
+      - name: Test three-bot staging reconciliation and recovery
+        env:
+          ISOLATED_POSTGRES_CI: '1'
+        run: python -m unittest discover -s tests -p 'test_*reconcil*staging.py' -v
+      - name: Test offline re-entry lock safeguards
+        run: python -m unittest discover -s tests -p 'test_reentry_safety.py' -v
+      - name: Test fail-closed entry adapter
+        run: python -m unittest discover -s tests -p 'test_entry_gate_staging.py' -v
+      - name: Test simulated order outcome reconciliation
+        run: python -m unittest discover -s tests -p 'test_order_reconciliation_staging.py' -v
+      - name: Test staging Supabase RPC adapter (mock only)
+        run: python -m unittest discover -s tests -p 'test_supabase_entry_store_staging.py' -v
+      - name: Test simulated order lifecycle
+        run: python -m unittest discover -s tests -p 'test_entry_lifecycle_staging.py' -v
+      - name: Test non-trading executor dry run
+        run: python -m unittest discover -s tests -p 'test_executor_entry_dry_run_staging.py' -v
+      - name: Verify three real executor order paths (static)
+        run: python -m unittest discover -s tests -p 'test_executor_paths_staging.py' -v
+      - name: Test shared three-bot entry inspection wrapper
+        run: |
+          python -m unittest discover -s tests -p 'test_shared_entry_gate_staging.py' -v
+          python -m unittest discover -s tests -p 'test_three_bot_collision_offline.py' -v
+          python -m unittest discover -s tests -p 'test_real_executor_order_boundaries_offline.py' -v
+          python -m unittest discover -s tests -p 'test_three_bot_entry_denials_offline.py' -v
+          python -m unittest discover -s tests -p 'test_three_bot_db_outages_offline.py' -v
+          python -m unittest discover -s tests -p 'test_real_executor_fence_offline.py' -v
+          python -m unittest discover -s tests -p 'test_entry_restart_recovery_offline.py' -v
+          python -m unittest discover -s tests -p 'test_partial_fill_recovery_offline.py' -v
+          python -m unittest discover -s tests -p 'test_partial_fill_accounting_staging.py' -v
+          python -m unittest discover -s tests -p 'test_hyperliquid_fill_adapter_staging.py' -v
+          python -m unittest discover -s tests -p 'test_hyperliquid_fill_readonly_staging.py' -v
+          python -m unittest discover -s tests -p 'test_hyperliquid_order_status_staging.py' -v
+          python -m unittest discover -s tests -p 'test_entry_recovery_decision_staging.py' -v
+          python -m unittest discover -s tests -p 'test_hyperliquid_position_readonly_staging.py' -v
+          python -m unittest discover -s tests -p 'test_hyperliquid_readonly_recovery_staging.py' -v
+      - name: Test simulated entry failures and cross-bot conflicts
+        run: python -m unittest discover -s tests -p 'test_shared_entry_failure_staging.py' -v
+      - name: Test offline ownership handoff and release safeguards
+        run: python -m unittest discover -s tests -p 'test_ownership_handoff_staging.py' -v
+      - name: Test offline three-bot executor integration contract
+        run: python -m unittest discover -s tests -p 'test_executor_integration_contract_staging.py' -v
+      - name: Test mocked Hyperliquid reconciliation evidence
+        run: python -m unittest discover -s tests -p 'test_hyperliquid_reconciliation_staging.py' -v
+      - name: Test mocked Hyperliquid user fill records
+        run: python -m unittest discover -s tests -p 'test_hyperliquid_fill_verification_staging.py' -v
+      - name: Test Hyperliquid user_state position snapshots
+        run: python -m unittest discover -s tests -p 'test_hyperliquid_position_snapshot_staging.py' -v
+      - name: Test opt-in read-only Hyperliquid testnet probe with mocks
+        run: python -m unittest discover -s tests -p 'test_hyperliquid_testnet_probe_staging.py' -v
+      - name: Test Intraday-only order-free trial
+        run: python -m unittest discover -s tests -p 'test_intraday_single_bot_trial_staging.py' -v
+      - name: Verify Intraday real order-dispatch trial guard
+        run: python -m unittest discover -s tests -p 'test_intraday_trial_dispatch_staging.py' -v
+      - name: Test fail-closed Intraday candidate observer
+        run: python -m unittest discover -s tests -p 'test_intraday_entry_observer_staging.py' -v
+      - name: Test lossless fill pagination boundary
+        run: python -m unittest discover -s tests -p 'test_fill_page_boundary_regression_staging.py' -v
+      - name: Test fake-exchange Intraday close-only dispatch
+        run: python -m unittest discover -s tests -p 'test_intraday_close_only_execution_offline.py' -v
+      - name: Verify halted protection wiring regression checks
+        run: python -m unittest discover -s tests -p 'test_intraday_halted_protection_wiring.py' -v
+      - name: Check halted protection is opt-in and close-only
+        run: python -m unittest discover -s tests -p 'test_intraday_halted_protection_staging.py' -v
+      - name: Check trusted reconciliation permission contract
+        run: python -m unittest discover -s tests -p 'test_reconciliation_permission_contract_staging.py' -v
+      - name: Test read-only exchange evidence
+        run: python -m unittest discover -s tests -p 'test_hyperliquid_readonly_evidence_staging.py' -v
+      - name: Test Hyperliquid fill pagination
+        run: python -m unittest discover -s tests -p 'test_hyperliquid_fill_pagination_staging.py' -v
+      - name: Test offline reconciler end-to-end handoff and release
+        run: python -m unittest discover -s tests -p 'test_trusted_reconciler_end_to_end_staging.py' -v
+      - name: Test independent reconciler service orchestration
+        run: python -m unittest discover -s tests -p 'test_trusted_reconciler_service_staging.py' -v
+      - name: Test signed identity-gated staging reconciliation
+        run: |
+          python -m unittest discover -s tests -p 'test_trusted_reconciler_authenticated_staging.py' -v
+          python -m unittest discover -s tests -p 'test_trusted_reconciler_dispatch_staging.py' -v
+      - name: Test offline signed reconciler identity verification
+        run: python -m unittest discover -s tests -p 'test_trusted_reconciler_gateway_jwt_staging.py' -v
+      - name: Test verified gateway principal authorization contract
+        run: python -m unittest discover -s tests -p 'test_trusted_reconciler_gateway_auth_staging.py' -v
+      - name: Test isolated reconciler HTTPS transport
+        run: python -m unittest discover -s tests -p 'test_trusted_reconciler_transport_staging.py' -v
+      - name: Test trusted two-stage position release
+        run: python -m unittest discover -s tests -p 'test_trusted_reconciler_release_staging.py' -v
+      - name: Test trusted reconciliation RPC adapter
+        run: python -m unittest discover -s tests -p 'test_trusted_reconciler_db_adapter_staging.py' -v
+      - name: Test independent reconciler worker
+        run: python -m unittest discover -s tests -p 'test_trusted_reconciler_worker_staging.py' -v
+      - name: Test Intraday restart recovery
+        run: python -m unittest discover -s tests -p 'test_intraday_restart_recovery_staging.py' -v
+      - name: Test read-only reconciliation pipeline
+        run: python -m unittest discover -s tests -p 'test_hyperliquid_reconciliation_pipeline_staging.py' -v
+      - name: Test independent reconciliation decisions
+        run: python -m unittest discover -s tests -p 'test_trusted_reconciliation_staging.py' -v
+      - name: Verify three-bot PostgreSQL collision and restart acceptance
+        run: python -m unittest discover -s tests -p 'test_three_bot_postgres_acceptance.py' -v
+      - name: Test competing transactions and failure cases
+        run: python -m unittest discover -s tests -p 'test_entry_reservation_postgres.py' -v
+
+      - name: Test three-bot uncertain order restart matrix (offline)
+        run: python -m unittest discover -s tests -p 'test_three_bot_uncertain_order_matrix_offline.py' -v
+
+      - name: Test fail-closed Hetzner offline startup preflight
+        run: python -m unittest discover -s tests -p 'test_server_staging_guard.py' -v
+
+      - name: Test offline three-bot server stop and restart controls
+        run: python -m unittest discover -s tests -p 'test_server_staging_control.py' -v
+
+      - name: Test offline crash and unreconciled intent restart policy
+        run: python -m unittest discover -s tests -p 'test_server_staging_crash_recovery.py' -v
+
+      - name: Test durable entry fence across fresh Python process
+        run: python -m unittest discover -s tests -p 'test_entry_intent_process_restart_postgres.py' -v
