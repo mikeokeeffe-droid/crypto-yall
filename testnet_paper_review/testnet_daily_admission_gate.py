@@ -45,7 +45,8 @@ def _amount(raw):
 
 
 def assess(*, account, network, state, open_orders, signal,
-           now_s, snapshot_at_s, notional_usdc="20", leverage=1) -> Decision:
+           now_s, snapshot_at_s, notional_usdc="20", leverage=1,
+           account_mode=None, spot_state=None) -> Decision:
     """Evaluate explicit public account snapshot + one Daily signal; HOLD by default.
 
     No trusted orders, prices or identities may be supplied by unreviewed callers.
@@ -75,17 +76,43 @@ def assess(*, account, network, state, open_orders, signal,
     margin = state.get("marginSummary")
     if type(margin) is not dict:
         return hold("Unverified perp collateral summary")
-    # A unified/spot balance shown in a UI must not substitute for confirmed
-    # perp collateral without a separately reviewed Unified Account check.
-    available = _amount(state.get("withdrawable"))
-    equity = _amount(margin.get("accountValue"))
-    if available is None or equity is None:
-        return hold("Unverified test-fund collateral")
+    # Unified Account reports collateral and holds in spotClearinghouseState.
+    # Do not require a positive perp clearinghouseState.accountValue in this
+    # mode: the independently observed perp view may legitimately show zero.
+    # A stale UI balance is not evidence; the caller MUST use the pinned public
+    # TESTNET spot /info response and public userAbstraction mode, with a
+    # second matching snapshot before any human review.
+    perp_available = _amount(state.get("withdrawable"))
+    perp_equity = _amount(margin.get("accountValue"))
+    if perp_available is None or perp_equity is None:
+        return hold("Invalid or missing perpetual account summary")
     requested = _amount(notional_usdc)
     if requested is None or not MIN_NOTIONAL <= requested <= MAX_NOTIONAL:
         return hold("Order outside $12-$25 Testnet review bounds")
-    if available < requested or equity < requested:
-        return hold("Insufficient independently confirmed perp collateral")
+    if account_mode == "unifiedAccount":
+        if type(spot_state) is not dict or type(spot_state.get("balances")) is not list:
+            return hold("Missing independently observed Unified Testnet Spot USDC")
+        balances = spot_state["balances"]
+        if len(balances) > 1000 or any(type(row) is not dict for row in balances):
+            return hold("Malformed Unified Spot balance view")
+        usdc = [row for row in balances if row.get("coin") == "USDC"]
+        if len(usdc) != 1:
+            return hold("Missing or duplicate Unified USDC collateral")
+        total = _amount(usdc[0].get("total"))
+        held = _amount(usdc[0].get("hold"))
+        if total is None or held is None or held > total:
+            return hold("Invalid or overheld Unified USDC collateral")
+        if total - held < requested:
+            return hold("Insufficient independent Unified USDC collateral")
+    elif account_mode in (None, "disabled"):
+        if spot_state is not None:
+            return hold("Unexpected Spot collateral on Standard perp review")
+        if perp_available < requested or perp_equity < requested:
+            return hold("Insufficient independently confirmed perp collateral")
+    else:
+        # Portfolio Margin and other modes require their own verified
+        # margin/risk calculation, not this single-USDC review.
+        return hold("Unsupported or unknown Testnet account mode")
     if type(leverage) is not int or leverage != 1:
         return hold("Leverage must equal exactly 1x")
     if type(signal) is not dict:
