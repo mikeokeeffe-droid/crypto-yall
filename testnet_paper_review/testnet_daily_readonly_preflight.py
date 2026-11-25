@@ -131,6 +131,11 @@ def review_once(*, fetcher=fetch_public_info, clock=None):
     if type(start) is not int or type(end) is not int or end - start > 15 or end < start:
         raise ReadOnlyError("HOLD: inconsistent/stale Testnet snapshot")
     verified_order_count = verify_consistent_order_views(orders, detailed)
+    # Report owner's public Testnet perp collateral, never the API-agent balance.
+    # Unknown values are explicitly unavailable rather than treated as zero.
+    margin = state.get("marginSummary") if type(state) is dict else None
+    equity = margin.get("accountValue") if type(margin) is dict else None
+    withdrawable = state.get("withdrawable") if type(state) is dict else None
     decision = assess(
         account=EXPECTED_ACCOUNT,
         network=EXPECTED_NETWORK,
@@ -145,6 +150,8 @@ def review_once(*, fetcher=fetch_public_info, clock=None):
     return {
         "decision": decision,
         "positions": len(state["assetPositions"]),
+        "equity_usdc": equity if type(equity) is str else "UNAVAILABLE",
+        "withdrawable_usdc": withdrawable if type(withdrawable) is str else "UNAVAILABLE",
         "open_orders": verified_order_count,
         "reduce_only_orders": sum(1 for item in detailed if item["reduceOnly"]),
         "stop_market_orders": sum(1 for item in detailed if item["orderType"] == "Stop Market" and item["reduceOnly"]),
