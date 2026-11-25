@@ -169,7 +169,10 @@ def main(argv=None):
           f"reduce_only_orders={result['reduce_only_orders']}, "
           f"stop_market_orders={result['stop_market_orders']}; "
           f"{decision.status}; no trade authority")
-    return 0 if decision.status in ("HOLD", "READY_FOR_REVIEW") else 2
+    # This is a diagnostic, NEVER a deployment or order authorization gate.
+    # Return nonzero even when read-only diagnostics were collected normally.
+    # A CI shell must not accidentally interpret a HOLD as an order go-ahead.
+    return 2
 
 
 if __name__ == "__main__":
