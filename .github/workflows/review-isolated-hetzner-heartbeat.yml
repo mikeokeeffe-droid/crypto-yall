@@ -1,0 +1,25 @@
+name: Review Isolated Hetzner SSH Heartbeat (offline only)
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'sender_review/github_to_hetzner_heartbeat_probe_review_only.py'
+      - 'sender_review/test_github_to_hetzner_heartbeat_probe_review_only.py'
+      - '.github/workflows/manual-hetzner-ssh-heartbeat-review.yml'
+      - '.github/workflows/review-isolated-hetzner-heartbeat.yml'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  offline-heartbeat-review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Verify heartbeat probe via mocks only — no SSH, no secrets
+        run: python3 -m unittest sender_review.test_github_to_hetzner_heartbeat_probe_review_only -v
