@@ -45,6 +45,14 @@ jobs:
           if result['decision'].status != 'HOLD' or result['decision'].allows_order:
               print('HOLD: unexpected non-blocking verdict')
               raise SystemExit(2)
+          from testnet_paper_review.testnet_spot_funds_probe import fetch_spot, review_usdc_spot
+          try:
+              spot = review_usdc_spot(fetch_spot())
+          except Exception as error:
+              print('HOLD: Testnet spot USDC public balance not verified')
+              raise SystemExit(2) from error
+          print('testnet_spot_usdc_total=' + spot['total'])
+          print('testnet_spot_usdc_available=' + spot['available'])
           print('testnet_equity_usdc=' + result['equity_usdc'])
           print('testnet_withdrawable_usdc=' + result['withdrawable_usdc'])
           print('positions=' + str(result['positions']))
