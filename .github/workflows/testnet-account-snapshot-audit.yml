@@ -66,5 +66,14 @@ jobs:
           print('open_orders=' + str(result['open_orders']))
           print('reduce_only_orders=' + str(result['reduce_only_orders']))
           print('stop_market_orders=' + str(result['stop_market_orders']))
+          from testnet_paper_review.testnet_public_agent_review import review_public_agents
+          try:
+              agent_review = review_public_agents()
+          except Exception as error:
+              print('HOLD: public TESTNET named signer list unverifiable')
+              raise SystemExit(2) from error
+          print('testnet_named_api_agents=' + str(len(agent_review['agents'])))
+          print('testnet_named_agents_role_verified=' + str(agent_review['active_named_owner_agents']))
+          print('HOLD: listed agents are not approved for this isolated sender')
           print('HOLD: this snapshot provides no permission to sign or send orders')
           PY
