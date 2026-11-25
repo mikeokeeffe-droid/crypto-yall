@@ -54,3 +54,29 @@ This is **not a live trading workflow**, not proof of correct live
 signing/cross-bot order ownership, and not an authorization to use
 an existing Mainnet-capable agent wallet or to unpause the original bots.
 The new test branch does not contain any actual order-sending entrypoint.
+
+
+## Latest 25 November review: SDK order encoding, still NO-GO
+
+- `testnet_sdk_wire_adapter.py` translates the previously validated SOL
+  one-parent-plus-TP/SL review bundle to the official
+  `hyperliquid-python-sdk==0.24.0` **unsigned order wire**. It validates the
+  Testnet SOL asset ID from supplied metadata, IOC entry, reduce-only market
+  take-profit and stop-loss triggers, exact wire prices/sizes, and three
+  distinct deterministic client order IDs.
+- The PR-only `sdk-wire-offline` GitHub job installs the pinned public SDK
+  **without any keys or exchange calls** and checks its exact serialization.
+  No signer, `Exchange` object, durable shared trading journal, trading
+  credential, scheduled trading runner or order-submission capability was
+  added. SDK wire validity is **not** live order safety.
+- Public TESTNET owner audit on 25 November showed `userAbstraction` mode
+  `unifiedAccount`, Spot USDC `1003.250563`, perp `accountValue=0.0`,
+  no positions and no orders. The Unified Account result explains why Spot
+  and perp views differ; it is **not** a verified live trading margin
+  or an agent-wallet permission check.
+- Before one controlled Testnet trade: independently verify a separate
+  trade-authorized TESTNET-only agent, test the shared durable claim and
+  fail-closed unknown-ACK recovery, implement and security-review the
+  isolated order sender and emergency exit, check true margin/venue
+  metadata, and approve an exact one-shot artifact. Never reuse the old
+  Mainnet-capable Daily, Intraday or Aggressive executor.
