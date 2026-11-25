@@ -45,6 +45,8 @@ jobs:
           if result['decision'].status != 'HOLD' or result['decision'].allows_order:
               print('HOLD: unexpected non-blocking verdict')
               raise SystemExit(2)
+          print('testnet_equity_usdc=' + result['equity_usdc'])
+          print('testnet_withdrawable_usdc=' + result['withdrawable_usdc'])
           print('positions=' + str(result['positions']))
           print('open_orders=' + str(result['open_orders']))
           print('reduce_only_orders=' + str(result['reduce_only_orders']))
