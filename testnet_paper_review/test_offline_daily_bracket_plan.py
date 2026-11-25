@@ -89,6 +89,14 @@ class BracketPlanReviewTests(unittest.TestCase):
             response=plausible,actual_positions=[],actual_open_orders=[],plan=plan
         ))
 
+    def test_high_price_orders_obey_five_significant_figures(self):
+        from testnet_paper_review.offline_daily_bracket_plan import _price
+        from decimal import Decimal
+        self.assertEqual(_price(Decimal("1234.5678"),decimals=3,round_up=True),"1234.6")
+        self.assertEqual(_price(Decimal("1234.5678"),decimals=3,round_up=False),"1234.5")
+        self.assertEqual(_price(Decimal("123.456"),decimals=3,round_up=True),"123.46")
+        self.assertEqual(_price(Decimal("0.1234567"),decimals=6,round_up=False),"0.12345")
+
     def test_no_signer_network_or_exchange_sdk(self):
         import ast
         from pathlib import Path
