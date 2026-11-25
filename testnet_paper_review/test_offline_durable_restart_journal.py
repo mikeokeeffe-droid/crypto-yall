@@ -16,6 +16,8 @@ class DurableOfflineReviewTests(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory(prefix=TMP_PREFIX)
         self.path = Path(self.tmp.name) / FILENAME
+        with DisposableReviewJournal(self.path, initialize=True):
+            pass
 
     def tearDown(self):
         self.tmp.cleanup()
@@ -123,6 +125,59 @@ class DurableOfflineReviewTests(unittest.TestCase):
             with self.assertRaises(HoldError):
                 j.simulated_ack(good_intent().request_id,"unknown")
             self.assertEqual(j.view()[-1], "UNKNOWN_ACK_HOLD")
+
+    def test_missing_file_cannot_silently_reinitialize(self):
+        # A deleted or missing journal must not authorize another claim.
+        self.path.unlink()
+        with self.assertRaises(HoldError):
+            DisposableReviewJournal(self.path)
+        self.assertFalse(self.path.exists())
+        with DisposableReviewJournal(self.path, initialize=True) as fresh:
+            # Only explicitly initialized disposable files are creatable.
+            self.assertIsNone(fresh.view())
+        with self.assertRaises(HoldError):
+            DisposableReviewJournal(self.path, initialize=True)
+
+    def test_existing_empty_sqlite_file_cannot_autocreate_schema(self):
+        self.path.unlink()
+        self.path.touch()
+        with self.assertRaises(HoldError):
+            DisposableReviewJournal(self.path)
+        with self.assertRaises(HoldError):
+            DisposableReviewJournal(self.path, initialize=True)
+
+    def test_corrupt_file_remains_held_after_restart(self):
+        with self.path.open("wb") as file:
+            file.write(b"not a sqlite database")
+        with self.assertRaises(HoldError):
+            DisposableReviewJournal(self.path)
+        with self.assertRaises(HoldError):
+            DisposableReviewJournal(self.path, initialize=True)
+        self.assertEqual(self.path.read_bytes(),b"not a sqlite database")
+
+    def test_missing_freeze_row_is_not_recreated(self):
+        import sqlite3
+        with sqlite3.connect(self.path) as raw:
+            raw.execute("DELETE FROM review_only_control WHERE id=1")
+            raw.commit()
+        with self.assertRaises(HoldError):
+            DisposableReviewJournal(self.path)
+
+    def test_missing_schema_is_not_recreated(self):
+        import sqlite3
+        with sqlite3.connect(self.path) as raw:
+            raw.execute("DROP TABLE review_only_claim")
+            raw.commit()
+        with self.assertRaises(HoldError):
+            DisposableReviewJournal(self.path)
+
+    def test_missing_journal_after_claim_is_hold(self):
+        with DisposableReviewJournal(self.path) as j:
+            j.stage(good_intent(),good_snapshot(),now_s=NOW,writer_id=REVIEW_WRITER)
+        self.path.unlink()
+        with self.assertRaises(HoldError):
+            DisposableReviewJournal(self.path)
+        self.assertFalse(self.path.exists())
 
     def test_no_order_execution_surface(self):
         import ast
