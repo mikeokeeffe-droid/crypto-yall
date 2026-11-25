@@ -51,6 +51,13 @@ jobs:
           except Exception as error:
               print('HOLD: Testnet spot USDC public balance not verified')
               raise SystemExit(2) from error
+          from testnet_paper_review.testnet_spot_funds_probe import read_account_mode
+          try:
+              mode = read_account_mode()
+          except Exception as error:
+              print('HOLD: Testnet account mode unavailable')
+              raise SystemExit(2) from error
+          print('testnet_account_mode=' + mode)
           print('testnet_spot_usdc_total=' + spot['total'])
           print('testnet_spot_usdc_available=' + spot['available'])
           print('testnet_equity_usdc=' + result['equity_usdc'])
