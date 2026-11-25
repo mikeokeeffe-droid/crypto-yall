@@ -58,7 +58,12 @@ def _decimal(text, label):
 
 
 def _price(value, *, decimals, round_up):
-    q = Decimal(1).scaleb(-decimals)
+    # Hyperliquid perp prices require at most 5 significant figures AND
+    # at most (6 - szDecimals) decimal places. Retaining extra figures in a
+    # protective stop can make the whole grouped submission invalid.
+    # A price above 1 may require FEWER decimals than metadata alone permits.
+    allowable_decimals = min(decimals, 4 - value.adjusted())
+    q = Decimal(1).scaleb(-allowable_decimals)
     out = value.quantize(q, rounding=ROUND_UP if round_up else ROUND_DOWN)
     if not out.is_finite() or out <= 0:
         raise BracketHold("HOLD: invalid rounded price")
