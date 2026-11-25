@@ -31,6 +31,23 @@ class ManualTestnetStatusWorkflowTests(unittest.TestCase):
             with self.subTest(item=item):
                 self.assertNotIn(item, raw)
 
+    def test_pr_only_testnet_account_audit_cannot_sign_or_trade(self):
+        raw = (ROOT / ".github/workflows/testnet-account-snapshot-audit.yml").read_text(encoding="utf-8")
+        self.assertIn("  pull_request:", raw)
+        self.assertIn("  contents: read", raw)
+        self.assertIn("persist-credentials: false", raw)
+        self.assertIn("review_once", raw)
+        self.assertIn("HOLD: this snapshot provides no permission", raw)
+        for forbidden in (
+            "workflow_dispatch:", "  schedule:", "  push:",
+            "secrets.", "HL_PRIVATE_KEY", "HL_ACCOUNT_ADDRESS",
+            "market_open(", "market_close(", "bulk_orders(",
+            "Exchange(", "execute_trade(", "/exchange",
+            "https://api.hyperliquid.xyz",
+        ):
+            with self.subTest(forbidden=forbidden):
+                self.assertNotIn(forbidden, raw)
+
     def test_no_trading_authorization(self):
         raw = WORKFLOW.read_text(encoding="utf-8")
         for item in ("may_send", "may_sign", "permits_submission"):
