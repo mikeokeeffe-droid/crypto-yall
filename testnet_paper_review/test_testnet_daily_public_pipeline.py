@@ -35,11 +35,17 @@ class Account:
         return self.orders if kind=="openOrders" else self.detailed
 
 
+def spot_balance(total="1003.250563", hold="0"):
+    return {"balances":[{"coin":"USDC","total":total,"hold":hold}]}
+
+
 def trial(account=None, facts=None, market_reader=market, clock=None, **kwargs):
     return review_testnet_daily_once(
         signal_fact=signal() if facts is None else facts,
         fetch_account=Account() if account is None else account,
         fetch_market=market_reader,clock=clock or (lambda:OBS+1),
+        fetch_mode=kwargs.pop("fetch_mode",lambda:"unifiedAccount"),
+        fetch_spot_state=kwargs.pop("fetch_spot_state",lambda:spot_balance()),
         **kwargs
     )
 
@@ -55,6 +61,43 @@ class TestTestnetDailyPublicPipeline(unittest.TestCase):
         self.assertEqual(result.observed_orders,0)
         self.assertLessEqual(float(result.planned_notional),20)
         self.assertEqual(acc.calls,["clearinghouseState","openOrders","frontendOpenOrders"]*2)
+
+    def test_unified_mode_with_zero_perp_balance_is_review_only(self):
+        class UnifiedAccount(Account):
+            def __call__(self,kind):
+                x=super().__call__(kind)
+                if kind=="clearinghouseState":
+                    x["marginSummary"]["accountValue"]="0.0"
+                    x["withdrawable"]="0.0"
+                return x
+        receipt=trial(account=UnifiedAccount(),fetch_spot_state=lambda:spot_balance())
+        self.assertEqual(receipt.status,"READY_FOR_HUMAN_REVIEW_ONLY")
+        self.assertFalse(receipt.permits_submission)
+
+    def test_unified_missing_changed_insufficient_or_held_funds_block(self):
+        snapshots=[
+            lambda:{"balances":[]},
+            lambda:spot_balance("19.99"),
+            lambda:spot_balance("100","holded"),
+            lambda:spot_balance("20","1"),
+            lambda:{"balances":None},
+        ]
+        for reader in snapshots:
+            with self.subTest(reader=reader),self.assertRaises(TestnetPipelineHold):
+                trial(fetch_spot_state=reader)
+        calls=[0]
+        def changing():
+            calls[0]+=1
+            return spot_balance("1000" if calls[0]==1 else "1001")
+        with self.assertRaises(TestnetPipelineHold):
+            trial(fetch_spot_state=changing)
+        states=iter(("unifiedAccount","disabled"))
+        with self.assertRaises(TestnetPipelineHold):
+            trial(fetch_mode=lambda:next(states))
+        with self.assertRaises(TestnetPipelineHold):
+            trial(fetch_mode=lambda:"portfolioMargin")
+        with self.assertRaises(TestnetPipelineHold):
+            trial(fetch_spot_state=lambda:(_ for _ in ()).throw(TimeoutError()))
 
     def test_manual_positions_or_existing_protection_block(self):
         for coin in ("SOL","ETH","BTC"):
