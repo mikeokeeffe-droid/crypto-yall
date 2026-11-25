@@ -1,0 +1,26 @@
+name: Crypto Yall Testnet Daily rehearsal (offline only)
+
+# PR-only. Never dispatch, schedule, deploy or authorize actual orders.
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'testnet_paper_review/**'
+      - '.github/workflows/crypto-yall-testnet-daily-rehearsal.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  fake-exchange-only:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Check original Daily bot order path with fake exchange and pinned source
+        env:
+          HL_TESTNET: 'false'
+          KILL_SWITCH: 'off'
+        run: python3 -B -m unittest testnet_paper_review.test_offline_daily_testnet_rehearsal -v
