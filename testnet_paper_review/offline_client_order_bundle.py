@@ -26,6 +26,8 @@ class OfflineClientOrderBundle:
     plan_hash: str
     account: str
     endpoint: str
+    request_id: str
+    code_sha: str
     grouping: str
     orders: tuple[dict, dict, dict]
     status: str = "HOLD_OFFLINE_SDK_SHAPE_ONLY"
@@ -63,6 +65,8 @@ def build_offline_client_order_bundle(*, plan, intent, code_sha, now_s):
         plan_hash=envelope.plan_hash,
         account=envelope.account,
         endpoint=envelope.endpoint,
+        request_id=envelope.request_id,
+        code_sha=envelope.code_sha,
         grouping=plan.grouping,
         orders=tuple(items),
     )
