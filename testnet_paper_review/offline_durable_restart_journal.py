@@ -27,7 +27,7 @@ UNCERTAIN_STATES = frozenset(ACK_STATES.values())
 
 def _safe_path(path):
     """Reject normal repository/host DB paths and symlink redirection."""
-    if type(path) not in (str, Path):
+    if not isinstance(path, (str, Path)):
         raise HoldError("HOLD: invalid disposable journal path")
     candidate = Path(path)
     root = Path(tempfile.gettempdir()).resolve()
