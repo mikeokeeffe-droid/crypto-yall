@@ -55,3 +55,24 @@ public account receipt authorizes live Testnet execution.
 
 **Do not** merge the PR or change `ACTIVATION_HOLD=True` as part of
 this check. Never run the original Mainnet-capable executors for this trial.
+
+
+## Local host inventory (separate from GitHub checks)
+
+On the **actual dedicated Ubuntu host** only, from the checked-out review
+branch's repository root, this command inspects the pre-existing collector
+and the possible one-shot sender unit via **read-only** systemd properties:
+
+```sh
+python3 -B -m testnet_paper_review.testnet_local_host_inventory --read-only-check
+```
+
+It prints only a boolean summary. It never starts or installs anything,
+does not use sudo, reads no environment values, and refuses a running
+collector or sender. The sender unit being **not installed** is expected
+at this stage. GitHub CI tests use a fake systemd reader, **not this server**.
+This targeted unit inspection is **not** a host-wide process audit and
+must not be interpreted as evidence that all other services are inactive.
+
+If the command reports HOLD, leave services untouched and inspect the
+error; do **not** relax the service checks or enable trading to make it green.
