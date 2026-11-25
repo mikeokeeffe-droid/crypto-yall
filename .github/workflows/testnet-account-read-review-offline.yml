@@ -37,3 +37,5 @@ jobs:
         run: python3 -B -m unittest readonly_connection_review.test_offline_gateway_integration_review -v
       - name: Verify local Unix socket protocol with mock-only replies
         run: python3 -B -m unittest readonly_connection_review.test_unix_gateway_protocol_review_offline -v
+      - name: Verify fixed HTTPS adapter with mocked connections and no default network
+        run: python3 -B -m unittest readonly_connection_review.test_https_gateway_transport_review -v
