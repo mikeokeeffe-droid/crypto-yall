@@ -69,6 +69,14 @@ class DisposableReviewJournal:
                 )
                 """
             )
+            self.db.execute(
+                "CREATE TABLE IF NOT EXISTS review_only_control ("
+                "id INTEGER PRIMARY KEY CHECK(id=1),"
+                "frozen INTEGER NOT NULL CHECK(frozen IN (0,1)))"
+            )
+            self.db.execute(
+                "INSERT OR IGNORE INTO review_only_control(id,frozen) VALUES(1,0)"
+            )
         except sqlite3.DatabaseError as exc:
             raise HoldError("HOLD: unreadable or locked disposable SQLite fixture") from exc
 
@@ -94,12 +102,44 @@ class DisposableReviewJournal:
             raise HoldError("HOLD: ambiguous fixture claims")
         return rows[0] if rows else None
 
+    def is_frozen(self):
+        """A missing or corrupt freeze record is HOLD, never permission."""
+        try:
+            row = self.db.execute(
+                "SELECT frozen FROM review_only_control WHERE id=1"
+            ).fetchone()
+        except sqlite3.DatabaseError as exc:
+            raise HoldError("HOLD: cannot inspect disposable freeze latch") from exc
+        if row not in ((0,), (1,)):
+            raise HoldError("HOLD: invalid or missing disposable freeze latch")
+        return row == (1,)
+
+    def freeze_review(self):
+        """One-way, durable STOP for the local synthetic fixture; no unfreeze."""
+        try:
+            self.db.execute("BEGIN IMMEDIATE")
+            self.db.execute("UPDATE review_only_control SET frozen=1 WHERE id=1")
+            if self.db.execute(
+                "SELECT frozen FROM review_only_control WHERE id=1"
+            ).fetchone() != (1,):
+                self.db.execute("ROLLBACK")
+                raise HoldError("HOLD: freeze latch could not be verified")
+            self.db.execute("COMMIT")
+        except sqlite3.DatabaseError as exc:
+            if self.db.in_transaction:
+                self.db.execute("ROLLBACK")
+            raise HoldError("HOLD: could not persist review-only freeze") from exc
+        return "HOLD: disposable review permanently frozen; no new fixture claim"
+
     def stage(self, intent, snapshot, *, now_s, writer_id):
         if writer_id != REVIEW_WRITER:
             raise HoldError("HOLD: writer does not match offline review fixture")
         verdict = inspect_synthetic(intent, snapshot, now_s=now_s)
         try:
             self.db.execute("BEGIN IMMEDIATE")
+            if self.is_frozen():
+                self.db.execute("ROLLBACK")
+                raise HoldError("HOLD: review-only emergency freeze already latched")
             self.db.execute(
                 "INSERT INTO review_only_claim(account,request_id,symbol,writer,state)"
                 " VALUES (?,?,?,?,?)",
