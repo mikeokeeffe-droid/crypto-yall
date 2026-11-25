@@ -7,6 +7,7 @@ claim is NEVER reusable, even after a synthetic acknowledgment/reconciliation.
 A real sender requires a separate design and independent security review.
 """
 from pathlib import Path
+import os
 import sqlite3
 import tempfile
 
@@ -48,37 +49,89 @@ def _safe_path(path):
 class DisposableReviewJournal:
     """Local crash/restart fixture with SQLite transactional uniqueness."""
 
-    def __init__(self, path):
+    def __init__(self, path, *, initialize=False):
+        """Open existing journal, or explicitly create a NEW disposable fixture.
+
+        Ordinary reopen MUST NOT create missing state. Initialization requires
+        an exclusively new file; a lost or corrupt record always means HOLD.
+        """
         self.path = _safe_path(path)
+        if type(initialize) is not bool:
+            raise HoldError("HOLD: explicit fixture initialization must be boolean")
+        if initialize:
+            if self.path.exists() or self.path.is_symlink():
+                raise HoldError("HOLD: cannot reinitialize an existing review journal")
+            try:
+                flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
+                flags |= getattr(os, "O_NOFOLLOW", 0)
+                descriptor = os.open(self.path, flags, 0o600)
+                os.close(descriptor)
+            except OSError as exc:
+                raise HoldError("HOLD: could not exclusively initialize disposable fixture") from exc
+        elif not self.path.is_file() or self.path.is_symlink():
+            raise HoldError("HOLD: missing or invalid journal; never replace with a fresh one")
         try:
-            self.db = sqlite3.connect(str(self.path), isolation_level=None, timeout=5)
+            # mode=rw refuses to create a missing file even if removed after
+            # the initial path check. This is an offline test, not host isolation.
+            self.db = sqlite3.connect(
+                self.path.as_uri() + "?mode=rw", uri=True,
+                isolation_level=None, timeout=5
+            )
             self.db.execute("PRAGMA busy_timeout=5000")
             self.db.execute("PRAGMA synchronous=FULL")
-            self.db.execute(
-                """
-                CREATE TABLE IF NOT EXISTS review_only_claim (
-                    account TEXT PRIMARY KEY,
-                    request_id TEXT UNIQUE NOT NULL,
-                    symbol TEXT NOT NULL,
-                    writer TEXT NOT NULL,
-                    state TEXT NOT NULL CHECK(state IN (
-                        'STAGED_HOLD', 'UNKNOWN_ACK_HOLD',
-                        'UNVERIFIED_FILL_HOLD', 'UNVERIFIED_REJECTION_HOLD',
-                        'RECONCILED_HOLD', 'UNRESOLVED_HOLD'
-                    ))
+            if initialize:
+                self.db.execute("BEGIN IMMEDIATE")
+                self.db.execute(
+                    """
+                    CREATE TABLE review_only_claim (
+                        account TEXT PRIMARY KEY,
+                        request_id TEXT UNIQUE NOT NULL,
+                        symbol TEXT NOT NULL,
+                        writer TEXT NOT NULL,
+                        state TEXT NOT NULL CHECK(state IN (
+                            'STAGED_HOLD', 'UNKNOWN_ACK_HOLD',
+                            'UNVERIFIED_FILL_HOLD', 'UNVERIFIED_REJECTION_HOLD',
+                            'RECONCILED_HOLD', 'UNRESOLVED_HOLD'
+                        ))
+                    )
+                    """
                 )
-                """
-            )
-            self.db.execute(
-                "CREATE TABLE IF NOT EXISTS review_only_control ("
-                "id INTEGER PRIMARY KEY CHECK(id=1),"
-                "frozen INTEGER NOT NULL CHECK(frozen IN (0,1)))"
-            )
-            self.db.execute(
-                "INSERT OR IGNORE INTO review_only_control(id,frozen) VALUES(1,0)"
-            )
-        except sqlite3.DatabaseError as exc:
-            raise HoldError("HOLD: unreadable or locked disposable SQLite fixture") from exc
+                self.db.execute(
+                    "CREATE TABLE review_only_control ("
+                    "id INTEGER PRIMARY KEY CHECK(id=1),"
+                    "frozen INTEGER NOT NULL CHECK(frozen IN (0,1)))"
+                )
+                self.db.execute(
+                    "INSERT INTO review_only_control(id,frozen) VALUES(1,0)"
+                )
+                self.db.execute("COMMIT")
+
+            # A previously existing empty, truncated, malformed, or tampered
+            # database must not receive a new schema or a default unfrozen row.
+            if self.db.execute("PRAGMA quick_check").fetchone() != ("ok",):
+                raise HoldError("HOLD: disposable journal integrity check failed")
+            for name in ("review_only_claim", "review_only_control"):
+                if self.db.execute(
+                    "SELECT name FROM sqlite_master WHERE type='table' AND name=?",
+                    (name,),
+                ).fetchone() != (name,):
+                    raise HoldError("HOLD: missing disposable journal schema")
+            controls = self.db.execute(
+                "SELECT id, frozen FROM review_only_control"
+            ).fetchall()
+            if controls not in ([(1, 0)], [(1, 1)]):
+                raise HoldError("HOLD: missing or invalid persisted freeze control")
+            claims = self.db.execute(
+                "SELECT account FROM review_only_claim"
+            ).fetchall()
+            if len(claims) > 1 or any(row != (ACCOUNT,) for row in claims):
+                raise HoldError("HOLD: foreign or ambiguous journal claim")
+        except (sqlite3.DatabaseError, OSError, HoldError) as exc:
+            if hasattr(self, "db"):
+                if self.db.in_transaction:
+                    self.db.execute("ROLLBACK")
+                self.db.close()
+            raise HoldError("HOLD: journal missing, invalid or corrupted; no recovery by reset") from exc
 
     def close(self):
         self.db.close()
