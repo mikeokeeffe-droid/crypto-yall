@@ -51,6 +51,45 @@ class TestDisabledSender(unittest.TestCase):
             with self.subTest(v=v),self.assertRaises(SenderHold):
                 verify_exact_request(bundle=bundle,
                                      approval=replace(approval,**v),now_s=now_s)
+    def test_protected_ack_requires_full_entry_and_both_exit_orders(self):
+        from testnet_paper_review.isolated_testnet_sender import acknowledge_exact_protected_order
+        bundle,approval,now_s=sample()
+        size=bundle.orders[0]["sz"]
+        response={"status":"ok","response":{"data":{"statuses":[
+            {"filled":{"oid":101,"totalSz":size}},
+            {"resting":{"oid":102}},
+            {"resting":{"oid":103}}
+        ]}}}
+        self.assertTrue(acknowledge_exact_protected_order(response=response,bundle=bundle))
+        from copy import deepcopy
+        variants=[]
+        for change in ("partial","missing_stop","duplicate_oid","missing_tp","error",
+                       "unknown","bad_total","extra","wrong_type"):
+            x=deepcopy(response)
+            rows=x["response"]["data"]["statuses"]
+            if change=="partial":rows[0]["filled"]["totalSz"]="0.001"
+            if change=="missing_stop":rows.pop()
+            if change=="duplicate_oid":rows[2]["resting"]["oid"]=102
+            if change=="missing_tp":rows[1]={"error":"rejected"}
+            if change=="error":x["status"]="err"
+            if change=="unknown":x["response"]={}
+            if change=="bad_total":rows[0]["filled"]["totalSz"]="NaN"
+            if change=="extra":rows.append({"resting":{"oid":104}})
+            if change=="wrong_type":rows[2]["resting"]["oid"]="103"
+            variants.append((change,x))
+        for reason,bad in variants:
+            with self.subTest(reason=reason):
+                self.assertFalse(acknowledge_exact_protected_order(response=bad,bundle=bundle))
+
+    def test_approval_must_match_bundle_request_identity_and_commit(self):
+        bundle,approval,now_s=sample()
+        with self.assertRaises(SenderHold):
+            verify_exact_request(bundle=bundle,
+                approval=replace(approval,request_id="other-request-0001"),now_s=now_s)
+        with self.assertRaises(SenderHold):
+            verify_exact_request(bundle=bundle,
+                approval=replace(approval,code_sha="e"*40),now_s=now_s)
+
     def test_no_secret_loading_or_entrypoint(self):
         import ast
         from pathlib import Path
