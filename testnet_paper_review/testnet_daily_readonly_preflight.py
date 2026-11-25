@@ -27,7 +27,7 @@ class ReadOnlyError(RuntimeError):
 
 
 def query_body(kind):
-    if kind not in ("clearinghouseState", "openOrders"):
+    if kind not in ("clearinghouseState", "openOrders", "frontendOpenOrders"):
         raise ReadOnlyError("HOLD: unapproved Testnet public /info request")
     return json.dumps(
         {"type": kind, "user": EXPECTED_ACCOUNT, "dex": ""},
@@ -82,17 +82,55 @@ def fetch_public_info(kind, *, connection_factory=None):
         connection.close()
 
 
+def _oid_index(rows, source):
+    """Fail closed if an account order view is incomplete or ambiguous."""
+    if type(rows) is not list:
+        raise ReadOnlyError(f"HOLD: missing {source} view")
+    indexed = {}
+    for order in rows:
+        if type(order) is not dict:
+            raise ReadOnlyError(f"HOLD: malformed {source} order")
+        oid = order.get("oid")
+        if type(oid) is not int or oid <= 0 or oid in indexed:
+            raise ReadOnlyError(f"HOLD: invalid or duplicated {source} order id")
+        indexed[oid] = order
+    return indexed
+
+
+def verify_consistent_order_views(basic, detailed):
+    """Compare account-wide /info order views; never authorize a trade."""
+    a, b = _oid_index(basic, "openOrders"), _oid_index(detailed, "frontendOpenOrders")
+    if set(a) != set(b):
+        raise ReadOnlyError("HOLD: basic and detailed Testnet order views disagree")
+    for oid in a:
+        x, y = a[oid], b[oid]
+        if (x.get("coin") != y.get("coin")
+                or x.get("side") != y.get("side")
+                or x.get("sz") != y.get("sz")):
+            raise ReadOnlyError("HOLD: order coin/side/size views disagree")
+        if (type(y.get("reduceOnly")) is not bool
+                or type(y.get("isTrigger")) is not bool
+                or type(y.get("orderType")) is not str
+                or not y["orderType"]
+                or type(y.get("triggerPx")) is not str):
+            raise ReadOnlyError("HOLD: incomplete order protection metadata")
+    return len(a)
+
+
 def review_once(*, fetcher=fetch_public_info, clock=None):
-    """Read both public snapshots then always require separate Daily signal approval."""
+    """Read three public snapshots then always require separate Daily signal approval."""
     if clock is None:
         clock = lambda: int(time.time())
+    # Three bounded public /info reads; no signing or order submission.
     # An interrupted read is HOLD: never assume zero orders or positions.
     start = clock()
     state = fetcher("clearinghouseState")
     orders = fetcher("openOrders")
+    detailed = fetcher("frontendOpenOrders")
     end = clock()
     if type(start) is not int or type(end) is not int or end - start > 15 or end < start:
         raise ReadOnlyError("HOLD: inconsistent/stale Testnet snapshot")
+    verified_order_count = verify_consistent_order_views(orders, detailed)
     decision = assess(
         account=EXPECTED_ACCOUNT,
         network=EXPECTED_NETWORK,
@@ -107,7 +145,9 @@ def review_once(*, fetcher=fetch_public_info, clock=None):
     return {
         "decision": decision,
         "positions": len(state["assetPositions"]),
-        "open_orders": len(orders),
+        "open_orders": verified_order_count,
+        "reduce_only_orders": sum(1 for item in detailed if item["reduceOnly"]),
+        "stop_market_orders": sum(1 for item in detailed if item["orderType"] == "Stop Market" and item["reduceOnly"]),
     }
 
 
@@ -125,7 +165,9 @@ def main(argv=None):
         return 2
     decision = result["decision"]
     print(f"TESTNET READ ONLY: positions={result['positions']}, "
-          f"open_orders={result['open_orders']}; "
+          f"open_orders={result['open_orders']}, "
+          f"reduce_only_orders={result['reduce_only_orders']}, "
+          f"stop_market_orders={result['stop_market_orders']}; "
           f"{decision.status}; no trade authority")
     return 0 if decision.status in ("HOLD", "READY_FOR_REVIEW") else 2
 
