@@ -35,3 +35,5 @@ jobs:
         run: python3 -B -m unittest readonly_connection_review.test_linux_process_provenance_review_offline -v
       - name: Verify offline integration of kernel peer and two fixed Testnet frames
         run: python3 -B -m unittest readonly_connection_review.test_offline_gateway_integration_review -v
+      - name: Verify local Unix socket protocol with mock-only replies
+        run: python3 -B -m unittest readonly_connection_review.test_unix_gateway_protocol_review_offline -v
