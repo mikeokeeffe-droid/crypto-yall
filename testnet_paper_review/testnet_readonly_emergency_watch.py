@@ -24,6 +24,9 @@ from testnet_paper_review.single_host_live_journal import (
     SingleHostOneShotJournal, PersistentHold
 )
 from testnet_paper_review.testnet_one_shot_operator_preview import JOURNAL_PATH
+from testnet_paper_review.emergency_close_one_shot_journal import (
+    EmergencyCloseJournal, EmergencyJournalHold, JOURNAL_PATH as RESCUE_PATH
+)
 from testnet_paper_review.testnet_post_ack_public_reconciliation import (
     _read_public_snapshot,PostAckPublicHold,MAX_READ_SPAN_S
 )
@@ -55,6 +58,7 @@ def inspect_one_shot_exposure(*,
                               reader=fetch_public_info,
                               journal_factory=SingleHostOneShotJournal,
                               evidence_factory=WriteOnceProtectionEvidence,
+                              emergency_factory=EmergencyCloseJournal,
                               clock=None,
                               evidence_root=None):
     """Observe public owner even if local journal says empty (foreign exposure)."""
@@ -81,6 +85,18 @@ def inspect_one_shot_exposure(*,
             raise ExposureWatchHold("HOLD: invalid entry journal")
         claim=state["claim"]
         clean=(len(positions)==0 and len(orders)==0)
+        with emergency_factory(RESCUE_PATH,read_only=True) as rescue:
+            rescue_claim=rescue.view()
+        if rescue_claim is not None:
+            # Even a filled rescue ACK is not proof of final flatness or
+            # resolution. Never clear a consumed rescue on a flat snapshot.
+            return ExposureWatchResult(
+                account=TESTNET_ACCOUNT,coin="SOL",
+                position_count=len(positions),open_order_count=len(orders),
+                stage="EMERGENCY_ATTEMPT_REQUIRES_REVIEW",
+                observed_bracket=False,needs_operator=True,
+                action="INSPECT_TESTNET_POSITION_AND_ORDERS_NO_RESCUE_RETRY"
+            )
         if claim is None:
             if state["frozen"] is not False:
                 raise ExposureWatchHold("HOLD: frozen journal without a claim")
@@ -160,7 +176,7 @@ def inspect_one_shot_exposure(*,
             observed_bracket=True,needs_operator=True,
             action="KEEP_WATCHING_NO_STOP_GUARANTEE_NO_NEW_ENTRY"
         )
-    except (ExposureWatchHold,PersistentHold,EvidenceHold,PostAckPublicHold,
+    except (ExposureWatchHold,PersistentHold,EmergencyJournalHold,EvidenceHold,PostAckPublicHold,
             ReadOnlyError,OSError,TimeoutError,AttributeError,KeyError,
             ValueError,TypeError) as exc:
         raise ExposureWatchHold(
