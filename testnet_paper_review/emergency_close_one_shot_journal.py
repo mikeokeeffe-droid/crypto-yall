@@ -21,8 +21,9 @@ class EmergencyJournalHold(RuntimeError):
 
 
 class EmergencyCloseJournal:
-    def __init__(self,path=JOURNAL_PATH,*,initialize=False):
-        if path != JOURNAL_PATH or type(initialize) is not bool:
+    def __init__(self,path=JOURNAL_PATH,*,initialize=False,read_only=False):
+        if (path != JOURNAL_PATH or type(initialize) is not bool
+                or type(read_only) is not bool or (initialize and read_only)):
             raise EmergencyJournalHold("HOLD: unapproved emergency journal path")
         p=Path(path)
         root=p.parent
@@ -44,11 +45,14 @@ class EmergencyCloseJournal:
                 or stat.S_IMODE(p.stat().st_mode)!=0o600):
             raise EmergencyJournalHold("HOLD: emergency journal permissions unsafe")
         try:
-            self.db=sqlite3.connect(p.as_uri()+"?mode=rw",uri=True,
-                                   isolation_level=None,timeout=3)
+            self.db=sqlite3.connect(p.as_uri()+("?mode=ro" if read_only else "?mode=rw"),
+                                   uri=True,isolation_level=None,timeout=3)
             self.db.execute("PRAGMA busy_timeout=3000")
-            self.db.execute("PRAGMA synchronous=FULL")
-            self.db.execute("PRAGMA journal_mode=DELETE")
+            if read_only:
+                self.db.execute("PRAGMA query_only=ON")
+            else:
+                self.db.execute("PRAGMA synchronous=FULL")
+                self.db.execute("PRAGMA journal_mode=DELETE")
             if initialize:
                 self.db.execute("BEGIN IMMEDIATE")
                 self.db.execute(
