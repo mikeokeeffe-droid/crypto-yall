@@ -143,14 +143,14 @@ def send_emergency_once(*, exchange, proposal, approval, entry_journal,
         ) from exc
     statuses=(response.get("response",{}).get("data",{}).get("statuses")
               if type(response) is dict else None)
-    if (response.get("status")!="ok"
+    if (type(response) is not dict or response.get("status")!="ok"
             or type(statuses) is not list or len(statuses)!=1
             or type(statuses[0]) is not dict
             or set(statuses[0])!={"filled"}
             or type(statuses[0]["filled"]) is not dict
             or type(statuses[0]["filled"].get("oid")) is not int
-            or Decimal(str(statuses[0]["filled"].get("totalSz","-1")))
-                !=Decimal(o["sz"])):
+            or type(statuses[0]["filled"].get("totalSz")) is not str
+            or statuses[0]["filled"]["totalSz"] != o["sz"]):
         emergency_journal.note_ack(request_id=approval.request_id,known_ack=False)
         raise EmergencySenderHold(
             "HOLD: close not confirmed; inspect account, do NOT retry"
