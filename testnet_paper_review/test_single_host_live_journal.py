@@ -81,6 +81,24 @@ class OneShotJournalTests(unittest.TestCase):
         with self.assertRaises(PersistentHold):
             SingleHostOneShotJournal(self.path)
 
+    def test_read_only_connection_cannot_mutate_claim_or_freeze(self):
+        with self.initialize() as j:
+            self.reserve(j)
+        with SingleHostOneShotJournal(self.path,read_only=True) as j:
+            self.assertEqual(j.view()["claim"][3],"RESERVED")
+            with self.assertRaises(PersistentHold):
+                j.report_response(request_id="manual-sol-000001",known_success=True)
+            with self.assertRaises(PersistentHold):
+                j.freeze()
+        with SingleHostOneShotJournal(self.path) as j:
+            self.assertFalse(j.view()["frozen"])
+            self.assertEqual(j.view()["claim"][3],"RESERVED")
+
+    def test_read_only_never_initializes(self):
+        with self.assertRaises(PersistentHold):
+            SingleHostOneShotJournal(self.path,initialize=True,read_only=True)
+        self.assertFalse(self.path.exists())
+
     def test_safety_requires_private_parent(self):
         os.chmod(self.root,0o755)
         with self.assertRaises(PersistentHold):
