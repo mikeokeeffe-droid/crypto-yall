@@ -32,6 +32,7 @@ from testnet_paper_review.testnet_daily_admission_gate import EXPECTED_ACCOUNT
 
 MAX_SPAN_S=18
 MIN_USDC=Decimal("20")
+EXPECTED_NEW_AGENT="0xa65e6f1495c95300E7364A1e68D8cfF3d2954FcC"
 
 
 class HostPredeployHold(RuntimeError):
@@ -90,10 +91,20 @@ def inspect_server_public_testnet(*, account_reader=review_once,
         available=Decimal(spot["available"])
         if not available.is_finite() or available < MIN_USDC:
             raise HostPredeployHold("HOLD: Testnet Unified USDC below $20")
-        if (agents["trading_authorized"] is not False
-                or type(agents["active_named_owner_agents"]) is not int
-                or agents["active_named_owner_agents"] != 1):
-            raise HostPredeployHold("HOLD: no unique publicly verified Testnet owner agent")
+        entries=agents.get("agents")
+        if (agents.get("trading_authorized") is not False
+                or type(entries) is not list or not 1 <= len(entries) <= 10):
+            raise HostPredeployHold("HOLD: Testnet named signer inventory unavailable")
+        expected=[
+            e for e in entries if type(e) is dict
+            and type(e.get("address")) is str
+            and e["address"].lower()==EXPECTED_NEW_AGENT.lower()
+        ]
+        if (len(expected) != 1
+                or expected[0].get("role_matches_owner") is not True
+                or type(expected[0].get("valid_until_ms")) is not int
+                or expected[0]["valid_until_ms"] <= ended*1000):
+            raise HostPredeployHold("HOLD: pinned new Testnet agent not verified active")
         if market.symbol != "SOL" or market.allows_trading \
                 or not 0 <= market.size_decimals <= 5:
             raise HostPredeployHold("HOLD: public SOL market not verified")
@@ -101,7 +112,7 @@ def inspect_server_public_testnet(*, account_reader=review_once,
             owner=EXPECTED_ACCOUNT,mode=mode,
             spot_usdc_available=spot["available"],
             positions=0,open_orders=0,
-            testnet_named_owner_agents=1,
+            testnet_named_owner_agents=len(entries),
             sol_mid=market.mid_price,
             sol_size_decimals=market.size_decimals
         )
