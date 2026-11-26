@@ -79,7 +79,7 @@ def inspect_one_shot_exposure(*,
             raise ExposureWatchHold("HOLD: stale or changing Testnet exposure")
         positions=b["positions"]
         orders=b["basic_orders"]
-        with journal_factory(JOURNAL_PATH) as journal:
+        with journal_factory(JOURNAL_PATH,read_only=True) as journal:
             state=journal.view()
         if type(state) is not dict or set(state)!={"frozen","claim"}:
             raise ExposureWatchHold("HOLD: invalid entry journal")
