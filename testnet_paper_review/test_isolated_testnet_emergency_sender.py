@@ -81,7 +81,7 @@ class EmergencySenderTests(unittest.TestCase):
         entry=SingleHostOneShotJournal(self.entry_path,initialize=True)
         entry.reserve(request_id=ORIGINAL,request_hash=HASH,code_sha="f"*40)
         entry.freeze()
-        emergency=ej.EmergencyCloseJournal(initialize=True)
+        emergency=ej.EmergencyCloseJournal(self.emergency_path,initialize=True)
         return entry,emergency
 
     def fake_run(self,exchange,entry,rescue,*,prop=None,app=None):
@@ -127,7 +127,7 @@ class EmergencySenderTests(unittest.TestCase):
             self.assertEqual(len(exchange.calls),1)
         finally:
             rescue.close();entry.close()
-        with ej.EmergencyCloseJournal() as after:
+        with ej.EmergencyCloseJournal(self.emergency_path) as after:
             self.assertEqual(after.view()[2],"ACK_SEEN")
 
     def test_fake_timeout_and_missing_fill_are_permanently_spent(self):
