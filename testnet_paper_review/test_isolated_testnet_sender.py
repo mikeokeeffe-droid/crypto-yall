@@ -82,6 +82,22 @@ class TestDisabledSender(unittest.TestCase):
             with self.subTest(reason=reason):
                 self.assertFalse(acknowledge_exact_protected_order(response=bad,bundle=bundle))
 
+    def test_unpinned_signer_and_short_entry_are_never_valid_approvals(self):
+        bundle,approval,now_s=sample()
+        with self.assertRaises(SenderHold):
+            verify_exact_request(
+                bundle=bundle,
+                approval=replace(
+                    approval,signer_address="0x1234567890abcdef1234567890ABCDEF12345678"
+                ),now_s=now_s
+            )
+        altered=replace(bundle,orders=(
+            {**bundle.orders[0],"is_buy":False},
+            bundle.orders[1],bundle.orders[2]
+        ))
+        with self.assertRaises(SenderHold):
+            verify_exact_request(bundle=altered,approval=approval,now_s=now_s)
+
     def test_approval_must_match_bundle_request_identity_and_commit(self):
         bundle,approval,now_s=sample()
         with self.assertRaises(SenderHold):
