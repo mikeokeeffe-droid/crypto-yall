@@ -1,0 +1,65 @@
+name: Testnet watchdog Telegram notification test
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: Send one clearly labelled Telegram test message (no trading)
+        type: boolean
+        required: true
+        default: false
+
+permissions: {}
+
+jobs:
+  notification-only:
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.confirm }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Send one notification using existing Telegram secrets
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          python3 -I - <<'PY'
+          import http.client
+          import json
+          import os
+          import re
+          import ssl
+          import sys
+
+          token = os.environ.get("TELEGRAM_BOT_TOKEN", "")
+          chat = os.environ.get("TELEGRAM_CHAT_ID", "")
+          if not re.fullmatch(r"[0-9]+:[A-Za-z0-9_-]+", token) or not re.fullmatch(r"-?[0-9]+", chat):
+              sys.exit("FAIL: Telegram configuration missing or invalid")
+
+          conn = None
+          try:
+              body = json.dumps({
+                  "chat_id": chat,
+                  "text": "TEST ONLY — Crypto Yall Testnet watchdog notification check. No trade placed. Please confirm receipt.",
+              }).encode("utf-8")
+              conn = http.client.HTTPSConnection("api.telegram.org", 443,
+                  timeout=10, context=ssl.create_default_context())
+              conn.request("POST", "/bot" + token + "/sendMessage", body,
+                           {"Content-Type": "application/json"})
+              response = conn.getresponse()
+              raw = response.read(65537)
+              if response.status != 200 or len(raw) > 65536:
+                  sys.exit("FAIL: delivery not confirmed; inspect manually, no automatic retry")
+              result = json.loads(raw)
+              if (type(result) is not dict or result.get("ok") is not True
+                  or type(result.get("result")) is not dict
+                  or type(result["result"].get("message_id")) is not int
+                  or type(result["result"].get("chat")) is not dict
+                  or str(result["result"]["chat"].get("id")) != chat):
+                  sys.exit("FAIL: Telegram acknowledgement unverified")
+              print("TELEGRAM_TRANSPORT_ACK_OK — human receipt confirmation still required")
+          except Exception:
+              sys.exit("FAIL: delivery unknown; inspect manually, no automatic retry")
+          finally:
+              if conn is not None:
+                  conn.close()
+          PY
