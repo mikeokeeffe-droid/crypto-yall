@@ -1,0 +1,13 @@
+# REVIEW ONLY. No enablement or deployment authorization.
+[Unit]
+Description=Schedule independent Testnet read-only watchdog checks
+
+[Timer]
+OnBootSec=15s
+OnUnitActiveSec=15s
+AccuracySec=1s
+RandomizedDelaySec=0
+Unit=testnet-readonly-watchdog.service
+
+[Install]
+WantedBy=timers.target
