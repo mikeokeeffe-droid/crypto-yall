@@ -26,10 +26,11 @@ from testnet_paper_review.offline_order_guard import TESTNET_ENDPOINT, TESTNET_A
 
 class FakeExchange:
     def __init__(self, bundle, approval, outcome="full", *, host=TESTNET_ENDPOINT,
-                 owner=TESTNET_ACCOUNT, signer=None):
+                 owner=TESTNET_ACCOUNT, signer=None, vault_address=None):
         self.base_url=host
         self.info=SimpleNamespace(base_url=host)
         self.account_address=owner
+        self.vault_address=vault_address
         self.wallet=SimpleNamespace(address=signer or approval.signer_address)
         self.bundle=bundle
         self.outcome=outcome
@@ -163,6 +164,7 @@ class FullFakeSenderPathTests(unittest.TestCase):
             {"host":"https://api.hyperliquid.xyz"},
             {"owner":"0x"+"0"*40},
             {"signer":"0x"+"1"*40},
+            {"vault_address":"0x"+"2"*40},
         )
         for change in variants:
             with self.subTest(change=change):
