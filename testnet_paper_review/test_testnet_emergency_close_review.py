@@ -81,6 +81,14 @@ class EmergencyPlanTests(unittest.TestCase):
         with self.assertRaises(EmergencyHold):
             review_missing_stop_close(**d)
 
+    def test_invalid_trigger_values_raise_review_hold(self):
+        for value in (None, "", "NaN", "Infinity", "-1", "0", 99, {}, []):
+            d=scenario()
+            d["open_orders"][0]["triggerPx"]=value
+            d["frontend_open_orders"][0]["triggerPx"]=value
+            with self.subTest(value=value), self.assertRaises(EmergencyHold):
+                review_missing_stop_close(**d)
+
     def test_no_wallet_or_sender_imports(self):
         import ast
         from pathlib import Path
