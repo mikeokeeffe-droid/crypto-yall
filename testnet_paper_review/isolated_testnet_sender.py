@@ -18,7 +18,12 @@ from dataclasses import dataclass
 from decimal import Decimal
 import re
 
-from testnet_paper_review.offline_client_order_bundle import OfflineClientOrderBundle
+from testnet_paper_review.offline_client_order_bundle import (
+    OfflineClientOrderBundle, build_offline_client_order_bundle
+)
+from testnet_paper_review.offline_daily_bracket_plan import BracketHold
+from testnet_paper_review.offline_order_guard import SyntheticIntent
+from testnet_paper_review.testnet_sdk_server_client_preflight import AGENT_ADDRESS
 from testnet_paper_review.one_shot_protection_evidence import (
     WriteOnceProtectionEvidence, EvidenceHold, _validate_pair,
 )
@@ -65,9 +70,10 @@ def verify_exact_request(*, bundle, approval, now_s):
     if (bundle.request_id != approval.request_id
             or bundle.code_sha != approval.code_sha):
         raise SenderHold("HOLD: approval request/code identity differs from order bundle")
-    if not HEX_ADDRESS_RE.fullmatch(approval.signer_address) \
-            or approval.signer_address.lower() == TESTNET_ACCOUNT.lower():
-        raise SenderHold("HOLD: dedicated non-owner Testnet signer required")
+    if (type(approval.signer_address) is not str
+            or not HEX_ADDRESS_RE.fullmatch(approval.signer_address)
+            or approval.signer_address.lower() != AGENT_ADDRESS.lower()):
+        raise SenderHold("HOLD: expected pinned Testnet signer required")
     if type(approval.code_sha) is not str or not CODE_SHA_RE.fullmatch(approval.code_sha):
         raise SenderHold("HOLD: unknown executable revision")
     if type(approval.plan_hash) is not str or approval.plan_hash != bundle.plan_hash:
@@ -81,9 +87,10 @@ def verify_exact_request(*, bundle, approval, now_s):
     if type(bundle.orders) is not tuple or len(bundle.orders) != 3 \
             or bundle.grouping != "normalTpsl":
         raise SenderHold("HOLD: must group exact protected SOL order")
-    if [o.get("reduce_only") for o in bundle.orders] != [False, True, True] \
-            or any(o.get("coin") != "SOL" for o in bundle.orders):
-        raise SenderHold("HOLD: entry and both reduce-only SOL exits required")
+    if ([o.get("reduce_only") for o in bundle.orders] != [False, True, True]
+            or any(o.get("coin") != "SOL" for o in bundle.orders)
+            or bundle.orders[0].get("is_buy") is not True):
+        raise SenderHold("HOLD: original Daily SOL permits only protected longs")
     try:
         requested = Decimal(approval.max_notional)
         entry_size = Decimal(bundle.orders[0]["sz"])
@@ -144,7 +151,8 @@ def send_once(*, exchange, journal, bundle, approval, now_s, plan=None, evidence
     if (exchange.base_url != TESTNET_ENDPOINT
             or exchange.info.base_url != TESTNET_ENDPOINT
             or exchange.account_address.lower() != TESTNET_ACCOUNT.lower()
-            or exchange.wallet.address.lower() != approval.signer_address.lower()):
+            or exchange.wallet.address.lower() != approval.signer_address.lower()
+            or exchange.vault_address is not None):
         raise SenderHold("HOLD: SDK endpoint/owner/signer mismatch")
     if type(journal) is not SingleHostOneShotJournal:
         raise SenderHold("HOLD: dedicated permanent journal missing")
@@ -157,8 +165,26 @@ def send_once(*, exchange, journal, bundle, approval, now_s, plan=None, evidence
         raise SenderHold("HOLD: missing private write-once protection evidence")
     try:
         _validate_pair(plan, bundle)
-    except EvidenceHold as exc:
-        raise SenderHold("HOLD: invalid SOL Daily plan/evidence pairing") from exc
+        # Reconstruct the *entire* exact original Daily SOL protected bracket,
+        # request fingerprint, code SHA, 1x cap and all three deterministic
+        # cloids. A caller-supplied plan_hash and approval boolean cannot
+        # stand in for this boundary validation.
+        intent = SyntheticIntent(
+            request_id=approval.request_id, account=TESTNET_ACCOUNT,
+            endpoint=TESTNET_ENDPOINT, symbol="SOL", side="buy",
+            notional_usdc=approval.max_notional, leverage=1,
+            expires_at_s=approval.expires_at_s
+        )
+        expected = build_offline_client_order_bundle(
+            plan=plan, intent=intent, code_sha=approval.code_sha,
+            now_s=now_s
+        )
+        if expected != bundle:
+            raise SenderHold("HOLD: grouped order differs from exact reviewed plan")
+    except (EvidenceHold, BracketHold) as exc:
+        raise SenderHold(
+            "HOLD: original Daily SOL plan/approval identity not verified"
+        ) from exc
     orders = _sdk_order_list(bundle)
     # Persist the irreversible database claim BEFORE writing the plan witness.
     # Any failure from here onwards consumes the single allowed attempt;
