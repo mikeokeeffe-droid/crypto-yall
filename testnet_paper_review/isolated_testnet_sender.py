@@ -10,6 +10,7 @@ Requirements before a separate security-reviewed cutover:
 - verified public balance/margin, no foreign/manual positions and no orders;
 - exact immutable operator approval, runbook and emergency exit;
 - single-host permanent journal on dedicated server (not GitHub Actions);
+- write-once prepare+ack evidence before/after the ONE actual order submission;
 - live post-ACK independent fill + reduce-only TP/SL reconciliation.
 Never set ACTIVATION_HOLD false just because offline CI passes.
 """
@@ -18,6 +19,9 @@ from decimal import Decimal
 import re
 
 from testnet_paper_review.offline_client_order_bundle import OfflineClientOrderBundle
+from testnet_paper_review.one_shot_protection_evidence import (
+    WriteOnceProtectionEvidence, EvidenceHold, _validate_pair,
+)
 from testnet_paper_review.offline_order_guard import TESTNET_ACCOUNT, TESTNET_ENDPOINT
 from testnet_paper_review.single_host_live_journal import (
     SingleHostOneShotJournal, PersistentHold
@@ -121,7 +125,7 @@ def _sdk_order_list(bundle):
     return out
 
 
-def send_once(*, exchange, journal, bundle, approval, now_s):
+def send_once(*, exchange, journal, bundle, approval, now_s, plan=None, evidence=None):
     """REAL SDK bulk_orders path, ALWAYS BLOCKED while ACTIVATION_HOLD=True.
 
     The method is deliberately not a runnable entrypoint. Future operator
@@ -146,26 +150,69 @@ def send_once(*, exchange, journal, bundle, approval, now_s):
         raise SenderHold("HOLD: dedicated permanent journal missing")
     if journal.view()["frozen"] or journal.view()["claim"] is not None:
         raise SenderHold("HOLD: persistent one-shot already consumed")
+    # Require the immutable original SOL Daily long-only three-order plan.
+    # A filesystem witness is mandatory: a response without complete order
+    # identities is impossible to audit safely after a crash.
+    if type(evidence) is not WriteOnceProtectionEvidence:
+        raise SenderHold("HOLD: missing private write-once protection evidence")
+    try:
+        _validate_pair(plan, bundle)
+    except EvidenceHold as exc:
+        raise SenderHold("HOLD: invalid SOL Daily plan/evidence pairing") from exc
     orders = _sdk_order_list(bundle)
-    # Persist the irreversible claim BEFORE any actual POST /exchange.
+    # Persist the irreversible database claim BEFORE writing the plan witness.
+    # Any failure from here onwards consumes the single allowed attempt;
+    # neither a missing witness nor an unknown ACK permits a retry.
     journal.reserve(request_id=approval.request_id,
                     request_hash=bundle.plan_hash, code_sha=approval.code_sha)
+    try:
+        written = evidence.prepare_before_order(plan=plan, bundle=bundle)
+        if written != "PREPARED_DURABLE_BEFORE_ORDER_NO_RETRY":
+            raise EvidenceHold("HOLD: witness not durably prepared")
+    except Exception as exc:
+        journal.freeze()
+        raise SenderHold(
+            "HOLD: pre-send durable evidence failed; order NOT sent; no retry"
+        ) from exc
     try:
         # Exactly one grouped submission; NEVER retry on unknown ACK/timeout.
         response = exchange.bulk_orders(orders, grouping="normalTpsl")
     except Exception as exc:
-        journal.report_response(request_id=approval.request_id, known_success=False)
-        journal.freeze()
-        raise SenderHold("HOLD: send outcome unknown; independently reconcile, never retry") from exc
-    # An apparent OK is not confirmation that both exits are active.
+        try:
+            journal.report_response(request_id=approval.request_id, known_success=False)
+        finally:
+            journal.freeze()
+        raise SenderHold(
+            "HOLD: send outcome unknown; examine prepared witness, never retry"
+        ) from exc
+    # An apparent OK is NOT confirmation that both exits are active.
     if not acknowledge_exact_protected_order(response=response,bundle=bundle):
-        journal.report_response(request_id=approval.request_id, known_success=False)
-        journal.freeze()
+        try:
+            journal.report_response(request_id=approval.request_id, known_success=False)
+        finally:
+            journal.freeze()
         raise SenderHold("HOLD: exchange response ambiguous; no retry")
-    journal.report_response(request_id=approval.request_id, known_success=True)
-    journal.freeze()
+    try:
+        # ACK is written ONCE and fsynced; still requires independent /info
+        # validation of the live position and both reduce-only exits.
+        stored=evidence.write_exact_ack(bundle=bundle,response=response)
+        if stored != "ACK_DURABLE_NOT_PROOF_OF_LIVE_STOPS":
+            raise EvidenceHold("HOLD: acknowledgement witness not durable")
+    except Exception as exc:
+        try:
+            journal.report_response(request_id=approval.request_id, known_success=False)
+        finally:
+            journal.freeze()
+        raise SenderHold(
+            "HOLD: ACK evidence storage unknown; never retry the entry"
+        ) from exc
+    try:
+        journal.report_response(request_id=approval.request_id, known_success=True)
+    finally:
+        journal.freeze()
     return {
         "status":"POST_ACK_HOLD_NO_MORE_ORDERS",
+        "ack_evidence_persisted":True,
         "needs_independent_position_stop_reconciliation":True
     }
 
