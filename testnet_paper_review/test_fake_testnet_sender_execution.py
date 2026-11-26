@@ -127,6 +127,37 @@ class FullFakeSenderPathTests(unittest.TestCase):
                         self.assertTrue(journal.view()["frozen"])
                         self.assertEqual(journal.view()["claim"][3],"UNKNOWN_ACK")
 
+    def test_prepared_evidence_failure_blocks_submission_and_spends_journal(self):
+        fake=FakeExchange(self.bundle,self.approval)
+        with SingleHostOneShotJournal(self.path,initialize=True) as journal:
+            with patch.object(evidence_module.WriteOnceProtectionEvidence,
+                              "prepare_before_order",side_effect=OSError("disk full")):
+                with self.assertRaises(SenderHold):
+                    self.exercise_fake(journal,fake)
+            self.assertEqual(len(fake.calls),0)
+            self.assertTrue(journal.view()["frozen"])
+            self.assertEqual(journal.view()["claim"][3],"RESERVED")
+            with self.assertRaises(SenderHold):
+                self.exercise_fake(journal,fake)
+            self.assertEqual(len(fake.calls),0)
+
+    def test_ack_evidence_failure_after_fake_submission_never_retries(self):
+        fake=FakeExchange(self.bundle,self.approval)
+        with SingleHostOneShotJournal(self.path,initialize=True) as journal:
+            with patch.object(evidence_module.WriteOnceProtectionEvidence,
+                              "write_exact_ack",side_effect=OSError("disk full")):
+                with self.assertRaises(SenderHold):
+                    self.exercise_fake(journal,fake)
+            self.assertEqual(len(fake.calls),1)
+            self.assertTrue(journal.view()["frozen"])
+            self.assertEqual(journal.view()["claim"][3],"UNKNOWN_ACK")
+            with patch.object(evidence_module,"ROOT",str(self.root)):
+                witness=evidence_module.WriteOnceProtectionEvidence()
+                self.assertFalse(witness.read_restart_state().ack_present)
+            with self.assertRaises(SenderHold):
+                self.exercise_fake(journal,fake)
+            self.assertEqual(len(fake.calls),1)
+
     def test_mainnet_mismatched_owner_or_signer_sends_nothing(self):
         variants=(
             {"host":"https://api.hyperliquid.xyz"},
