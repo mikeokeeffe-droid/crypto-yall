@@ -10,11 +10,15 @@ Type=oneshot
 User=testadmin
 Group=testadmin
 WorkingDirectory=/opt/crypto-yall/testnet_watchdog
+ExecStartPre=/usr/bin/python3 -I -B -c "import os, sys; sys.exit(1 if os.access('/home/testadmin/crypto-yall-testnet-state/testnet-agent.key', os.R_OK) else 0)"
 ExecStart=/usr/bin/python3 -I -B -c "import sys; sys.path.insert(0, '/opt/crypto-yall/testnet_watchdog'); from testnet_paper_review.testnet_durable_watchdog_cycle import main; raise SystemExit(main(['--read-only-cycle']))"
 NoNewPrivileges=yes
 ProtectSystem=strict
 ProtectHome=tmpfs
 BindReadOnlyPaths=/home/testadmin/crypto-yall-testnet-state
+# The directory also contains a signer key: mask it, never bind it visibly.
+InaccessiblePaths=/home/testadmin/crypto-yall-testnet-state/testnet-agent.key /proc
+SystemCallFilter=~@debug pidfd_getfd
 BindPaths=/home/testadmin/crypto-yall-watchdog-state
 ReadWritePaths=/home/testadmin/crypto-yall-watchdog-state
 PrivateDevices=yes
