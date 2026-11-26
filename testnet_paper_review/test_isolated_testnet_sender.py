@@ -8,7 +8,8 @@ from testnet_paper_review.isolated_testnet_sender import (
 from testnet_paper_review.offline_client_order_bundle import build_offline_client_order_bundle
 from testnet_paper_review.test_offline_signer_boundary import valid
 
-SIGNER="0x1234567890abcdef1234567890ABCDEF12345678"
+from testnet_paper_review.testnet_sdk_server_client_preflight import AGENT_ADDRESS
+SIGNER=AGENT_ADDRESS
 
 def sample():
     args=valid()
