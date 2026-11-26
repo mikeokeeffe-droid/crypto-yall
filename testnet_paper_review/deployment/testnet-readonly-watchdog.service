@@ -1,0 +1,36 @@
+# REVIEW ONLY. Do not install/start until host paths and isolation are verified.
+# No signer, credentials, order permissions or automatic emergency close.
+[Unit]
+Description=Crypto Yall Testnet durable read-only watchdog
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=testadmin
+Group=testadmin
+WorkingDirectory=/opt/crypto-yall/testnet_watchdog
+ExecStart=/usr/bin/python3 -I -B -c "import sys; sys.path.insert(0, '/opt/crypto-yall/testnet_watchdog'); from testnet_paper_review.testnet_durable_watchdog_cycle import main; raise SystemExit(main(['--read-only-cycle']))"
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=tmpfs
+BindReadOnlyPaths=/home/testadmin/crypto-yall-testnet-state
+BindPaths=/home/testadmin/crypto-yall-watchdog-state
+ReadWritePaths=/home/testadmin/crypto-yall-watchdog-state
+PrivateDevices=yes
+PrivateTmp=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+CapabilityBoundingSet=
+AmbientCapabilities=
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+SystemCallArchitectures=native
+UMask=0077
+TimeoutStartSec=12s
+TimeoutStopSec=2s
+Restart=no
+StandardOutput=journal
+StandardError=journal
