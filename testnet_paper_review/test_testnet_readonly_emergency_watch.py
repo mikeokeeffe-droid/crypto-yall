@@ -73,7 +73,7 @@ class EmergencyWatchTests(unittest.TestCase):
         return watch.inspect_one_shot_exposure(
             reader=reader,
             emergency_factory=emergency_factory,
-            journal_factory=lambda _:Journal(state),
+            journal_factory=lambda _,*,read_only:Journal(state) if read_only is True else self.fail("entry journal must be read only"),
             evidence_factory=lambda:Evidence(record or self.record),
             clock=lambda:123456,
             evidence_root=str(self.root)
