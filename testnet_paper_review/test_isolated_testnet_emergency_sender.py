@@ -131,7 +131,17 @@ class EmergencySenderTests(unittest.TestCase):
             self.assertEqual(after.view()[2],"ACK_SEEN")
 
     def test_fake_timeout_and_missing_fill_are_permanently_spent(self):
-        for result in ("timeout",{"status":"err"},{"status":"ok","response":{"data":{"statuses":[]}}}):
+        for result in (
+            "timeout", {"status":"err"},
+            {"status":"ok","response":None},
+            {"status":"ok","response":"malformed"},
+            {"status":"ok","response":{"data":None}},
+            {"status":"ok","response":{"data":[]}},
+            {"status":"ok","response":{"data":{"statuses":[]}}},
+            {"status":"ok","response":{"data":{"statuses":[
+                {"filled":{"oid":0,"totalSz":"0.28"}}
+            ]}}},
+        ):
             with self.subTest(result=result):
                 # Remove the disposable fixture, NEVER a production journal.
                 if Path(self.emergency_path).exists():
