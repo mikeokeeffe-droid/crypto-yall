@@ -100,13 +100,26 @@ def review_missing_stop_close(*, plan, request_id, state, open_orders,
     if len(frontend_open_orders) > 1:
         raise EmergencyHold("HOLD: unexpected multiple outstanding orders")
     reverse = "A" if size > 0 else "B"
-    expected_tp = Decimal(plan.orders[1]["order_type"]["trigger"]["triggerPx"])
+    # Do not parse arbitrary exchange fields with Decimal directly: invalid,
+    # non-string or non-finite values must HOLD with no constructed close.
+    expected_price = plan.orders[1]["order_type"]["trigger"]["triggerPx"]
+    if type(expected_price) is not str or not SIZE.fullmatch(expected_price):
+        raise EmergencyHold("HOLD: invalid original take-profit trigger")
+    expected_tp = Decimal(expected_price)
+    if expected_tp <= 0:
+        raise EmergencyHold("HOLD: invalid original take-profit price")
     for row in frontend_open_orders:
+        if type(row) is not dict:
+            raise EmergencyHold("HOLD: malformed outstanding order")
+        seen_price = row.get("triggerPx")
         if (row.get("coin") != "SOL" or row.get("side") != reverse
                 or row.get("reduceOnly") is not True
                 or row.get("isTrigger") is not True
                 or row.get("orderType") != "Take Profit Market"
-                or Decimal(row.get("triggerPx","0")) != expected_tp):
+                or type(seen_price) is not str
+                or not SIZE.fullmatch(seen_price)
+                or Decimal(seen_price) != expected_tp
+                or Decimal(seen_price) <= 0):
             raise EmergencyHold("HOLD: unknown order or stop still present")
     # No matching stop seen in either consistent account-wide public view.
     # Never cancel protective orders before verifying the position is flat.
