@@ -16,7 +16,15 @@ def sources(*, funds="1003.10", mode="unifiedAccount", positions=0,
     def spot():
         return {"balances":[{"coin":"USDC","total":funds,"hold":"0"}]}
     def agents():
-        return {"trading_authorized":False,"active_named_owner_agents":agent_count}
+        rows=[{"address":"0xa65e6f1495c95300E7364A1e68D8cfF3d2954FcC",
+               "valid_until_ms":2000000000000,"role_matches_owner":True}]
+        if agent_count>=2:
+            rows.append({"address":"0x"+"1"*40,
+                         "valid_until_ms":2000000000000,"role_matches_owner":True})
+        if agent_count==0:
+            rows=[]
+        return {"trading_authorized":False,"agents":rows,
+                "active_named_owner_agents":len(rows)}
     def market():
         return SimpleNamespace(symbol=market_coin,allows_trading=False,
                                size_decimals=3,mid_price="66.40")
@@ -34,17 +42,33 @@ class ServerPreparationTests(unittest.TestCase):
         self.assertEqual(v.open_orders,0)
         self.assertFalse(v.may_send)
         self.assertFalse(v.verifies_private_signer)
+        self.assertEqual(inspect_server_public_testnet(**sources(agent_count=2)).testnet_named_owner_agents,2)
 
     def test_missing_funds_agents_or_clear_position_holds(self):
         changes=(
             {"funds":"19.99"},{"funds":"NaN"},{"mode":"portfolioMargin"},
             {"mode":"disabled"},{"positions":1},{"orders":1},
-            {"agent_count":0},{"agent_count":2},
+            {"agent_count":0},
             {"market_coin":"ETH"},{"delta":19},
         )
         for change in changes:
             with self.subTest(change=change),self.assertRaises(HostPredeployHold):
                 inspect_server_public_testnet(**sources(**change))
+
+    def test_only_unverified_or_expired_new_agent_holds(self):
+        for variant in ("missing","mismatch","expired"):
+            args=sources(agent_count=2)
+            old=args["agent_reader"]
+            def bad(variant=variant):
+                data=old()
+                new=data["agents"][0]
+                if variant=="missing":new["address"]="0x"+"2"*40
+                if variant=="mismatch":new["role_matches_owner"]=False
+                if variant=="expired":new["valid_until_ms"]=99999
+                return data
+            args["agent_reader"]=bad
+            with self.subTest(variant=variant),self.assertRaises(HostPredeployHold):
+                inspect_server_public_testnet(**args)
 
     def test_read_failure_holds(self):
         args=sources()
