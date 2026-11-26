@@ -41,9 +41,10 @@ def _safe_existing_parent(path):
 
 
 class SingleHostOneShotJournal:
-    def __init__(self, path, *, initialize=False):
+    def __init__(self, path, *, initialize=False, read_only=False):
         self.path = _safe_existing_parent(path)
-        if type(initialize) is not bool:
+        if (type(initialize) is not bool or type(read_only) is not bool
+                or (initialize and read_only)):
             raise PersistentHold("HOLD: explicit initialization required")
         if initialize:
             if self.path.exists():
@@ -65,12 +66,15 @@ class SingleHostOneShotJournal:
             raise PersistentHold("HOLD: journal owner/mode not private")
         try:
             self.db = sqlite3.connect(
-                self.path.as_uri() + "?mode=rw", uri=True,
+                self.path.as_uri() + ("?mode=ro" if read_only else "?mode=rw"), uri=True,
                 isolation_level=None, timeout=3
             )
             self.db.execute("PRAGMA busy_timeout=3000")
-            self.db.execute("PRAGMA journal_mode=DELETE")
-            self.db.execute("PRAGMA synchronous=FULL")
+            if read_only:
+                self.db.execute("PRAGMA query_only=ON")
+            else:
+                self.db.execute("PRAGMA journal_mode=DELETE")
+                self.db.execute("PRAGMA synchronous=FULL")
             if initialize:
                 self.db.execute("BEGIN IMMEDIATE")
                 self.db.execute("CREATE TABLE control (id INTEGER PRIMARY KEY CHECK(id=1),"
