@@ -19,6 +19,8 @@ from testnet_paper_review.single_host_live_journal import (
     SingleHostOneShotJournal, PersistentHold
 )
 from testnet_paper_review.test_isolated_testnet_sender import sample
+from testnet_paper_review.test_offline_signer_boundary import valid
+import testnet_paper_review.one_shot_protection_evidence as evidence_module
 from testnet_paper_review.offline_order_guard import TESTNET_ENDPOINT, TESTNET_ACCOUNT
 
 
@@ -56,18 +58,22 @@ class FullFakeSenderPathTests(unittest.TestCase):
         os.chmod(self.root,0o700)
         self.path=self.root/"testnet-one-shot.sqlite3"
         self.bundle,self.approval,self.now_s=sample()
+        self.plan=valid()["plan"]
 
     def tearDown(self):
         self.temp.cleanup()
 
-    def exercise_fake(self, journal, fake):
+    def exercise_fake(self, journal, fake, *, witness_root=None):
         # Both patches have scope only to this one test invocation.
         # Absolutely no real Exchange object can enter the order sender.
         with patch.object(hyperliquid.exchange,"Exchange",FakeExchange), \
-                patch("testnet_paper_review.isolated_testnet_sender.ACTIVATION_HOLD",False):
+                patch("testnet_paper_review.isolated_testnet_sender.ACTIVATION_HOLD",False), \
+                patch.object(evidence_module,"ROOT",str(witness_root or self.root)):
+            witness=evidence_module.WriteOnceProtectionEvidence()
             return send_once(
                 exchange=fake,journal=journal,bundle=self.bundle,
-                approval=self.approval,now_s=self.now_s
+                approval=self.approval,now_s=self.now_s,
+                plan=self.plan,evidence=witness
             )
 
     def test_success_requires_one_group_and_immutable_journal_claim(self):
@@ -76,6 +82,13 @@ class FullFakeSenderPathTests(unittest.TestCase):
             result=self.exercise_fake(journal,fake)
             self.assertEqual(result["status"],"POST_ACK_HOLD_NO_MORE_ORDERS")
             self.assertTrue(result["needs_independent_position_stop_reconciliation"])
+            self.assertTrue(result["ack_evidence_persisted"])
+            with patch.object(evidence_module,"ROOT",str(self.root)):
+                witness=evidence_module.WriteOnceProtectionEvidence()
+                proof=witness.read_restart_state()
+                self.assertTrue(proof.ack_present)
+                self.assertEqual(proof.response["status"],"ok")
+                self.assertFalse(proof.may_trade)
             self.assertEqual(len(fake.calls),1)
             orders,grouping=fake.calls[0]
             self.assertEqual(grouping,"normalTpsl")
@@ -100,12 +113,15 @@ class FullFakeSenderPathTests(unittest.TestCase):
                     fake=FakeExchange(self.bundle,self.approval,outcome=outcome)
                     with SingleHostOneShotJournal(path,initialize=True) as journal:
                         with self.assertRaises(SenderHold):
-                            self.exercise_fake(journal,fake)
+                            self.exercise_fake(journal,fake,witness_root=Path(root))
                         self.assertEqual(len(fake.calls),1)
                         self.assertTrue(journal.view()["frozen"])
                         self.assertEqual(journal.view()["claim"][3],"UNKNOWN_ACK")
+                        with patch.object(evidence_module,"ROOT",str(root)):
+                            proof=evidence_module.WriteOnceProtectionEvidence().read_restart_state()
+                            self.assertFalse(proof.ack_present)
                         with self.assertRaises(SenderHold):
-                            self.exercise_fake(journal,fake)
+                            self.exercise_fake(journal,fake,witness_root=Path(root))
                         self.assertEqual(len(fake.calls),1)
                     with SingleHostOneShotJournal(path) as journal:
                         self.assertTrue(journal.view()["frozen"])
