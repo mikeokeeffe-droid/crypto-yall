@@ -58,14 +58,21 @@ class EmergencyWatchTests(unittest.TestCase):
         self.claim=(self.bundle.request_id,self.bundle.plan_hash,
                     self.bundle.code_sha,"RESPONSE_SEEN")
 
-    def check(self,*,case=None,state=None,record=None,reader=None):
+    def check(self,*,case=None,state=None,record=None,reader=None,rescue_claim=None,
+              emergency_factory=None):
         data=case if case is not None else {
             "positions":[],"open_orders":[],"frontend_open_orders":[]
         }
         if state is None:state={"frozen":False,"claim":None}
         if reader is None:reader=FakeReader(data)
+        if emergency_factory is None:
+            def emergency_factory(path,*,read_only):
+                self.assertEqual(path,watch.RESCUE_PATH)
+                self.assertIs(read_only,True)
+                return Journal(rescue_claim)
         return watch.inspect_one_shot_exposure(
             reader=reader,
+            emergency_factory=emergency_factory,
             journal_factory=lambda _:Journal(state),
             evidence_factory=lambda:Evidence(record or self.record),
             clock=lambda:123456,
@@ -94,6 +101,21 @@ class EmergencyWatchTests(unittest.TestCase):
                 got,_=self.check(case=case)
                 self.assertTrue(got.needs_operator)
                 self.assertEqual(got.stage,"UNOWNED_EXPOSURE")
+
+    def test_consumed_emergency_claim_is_urgent_even_when_flat(self):
+        for status in ("RESERVED","UNKNOWN_ACK","ACK_SEEN"):
+            with self.subTest(status=status):
+                got,_=self.check(rescue_claim=("rescue-123","a"*64,status))
+                self.assertTrue(got.needs_operator)
+                self.assertFalse(got.may_trade)
+                self.assertFalse(got.may_close)
+                self.assertEqual(got.stage,"EMERGENCY_ATTEMPT_REQUIRES_REVIEW")
+
+    def test_missing_emergency_journal_never_reports_safe_flat(self):
+        def missing(*args,**kwargs):
+            raise watch.EmergencyJournalHold("synthetic missing rescue journal")
+        with self.assertRaises(watch.ExposureWatchHold):
+            self.check(emergency_factory=missing)
 
     def test_unknown_ack_is_urgent_even_when_flat(self):
         for stage in ("UNKNOWN_ACK","RESERVED","FROZEN"):
