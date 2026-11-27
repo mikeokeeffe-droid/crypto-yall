@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "kind": "testnet_paper_activation_review_only",
+  "deployment_authorized": false,
+  "network_authorized": false,
+  "order_placement_authorized": false,
+  "workflow_automation_authorized": false,
+  "mainnet_authorized": false,
+  "testnet_endpoint": "https://api.hyperliquid-testnet.xyz",
+  "maximum_orders_per_manual_run": 1,
+  "checks": {
+    "single_manual_run_only": "UNVERIFIED",
+    "separate_testnet_only_signing_identity": "UNVERIFIED",
+    "independently_verified_testnet_endpoint": "UNVERIFIED",
+    "confirmed_public_account_testnet_collateral": "UNVERIFIED",
+    "exclusive_order_sender_and_position_ownership": "UNVERIFIED",
+    "duplicate_and_unknown_ack_protection": "UNVERIFIED",
+    "small_order_notional_and_leverage_cap": "UNVERIFIED",
+    "maximum_loss_and_emergency_halt": "UNVERIFIED",
+    "independent_security_review": "UNVERIFIED",
+    "exact_artifact_and_operator_approval": "UNVERIFIED"
+  }
+}

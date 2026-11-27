@@ -1,0 +1,32 @@
+# Offline service rehearsal only. No installation target, no timer,
+# no account access, no notifications and no order authority.
+[Unit]
+Description=Crypto Yall Testnet watchdog offline service rehearsal
+ConditionPathIsDirectory=/opt/crypto-yall/watchdog_review
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/crypto-yall/watchdog_review
+ExecStart=/usr/bin/python3 -E -s -B -m unittest testnet_paper_review.test_offline_watchdog_policy testnet_paper_review.test_offline_watchdog_receipt_bridge testnet_paper_review.test_offline_watchdog_alert_rehearsal -v
+DynamicUser=yes
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateDevices=yes
+PrivateTmp=yes
+PrivateNetwork=yes
+RestrictAddressFamilies=AF_UNIX
+IPAddressDeny=any
+CapabilityBoundingSet=
+AmbientCapabilities=
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+SystemCallArchitectures=native
+UMask=0077
+TimeoutStartSec=60
+Restart=no
+StandardOutput=journal
+StandardError=journal

@@ -1,0 +1,86 @@
+name: TESTNET account snapshot audit (PR, read only)
+
+# A one-shot security review check. It cannot submit, cancel or sign orders.
+# It sees public Hyperliquid Testnet info for the single pinned owner.
+# No schedule, no workflow_dispatch, no exchange keys or writes.
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/testnet-account-snapshot-audit.yml'
+      - 'testnet_paper_review/**'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: testnet-readonly-snapshot-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  account-observation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Public Hyperliquid TESTNET account observation (no orders)
+        shell: bash
+        env:
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: |
+          set -euo pipefail
+          python3 -B - <<'PY'
+          from testnet_paper_review.testnet_daily_readonly_preflight import (
+              EXPECTED_ACCOUNT, review_once, ReadOnlyError
+          )
+          print('TESTNET ACCOUNT OBSERVATION — PUBLIC READ ONLY')
+          print('Fixed public account: ' + EXPECTED_ACCOUNT)
+          try:
+              result = review_once()
+          except (ReadOnlyError, ValueError, KeyError, TypeError, OSError) as e:
+              print('HOLD: independent Testnet account snapshot unavailable or ambiguous')
+              raise SystemExit(2) from e
+          if result['decision'].status != 'HOLD' or result['decision'].allows_order:
+              print('HOLD: unexpected non-blocking verdict')
+              raise SystemExit(2)
+          from testnet_paper_review.testnet_spot_funds_probe import fetch_spot, review_usdc_spot
+          try:
+              spot = review_usdc_spot(fetch_spot())
+          except Exception as error:
+              print('HOLD: Testnet spot USDC public balance not verified')
+              raise SystemExit(2) from error
+          from testnet_paper_review.testnet_spot_funds_probe import read_account_mode
+          try:
+              mode = read_account_mode()
+          except Exception as error:
+              print('HOLD: Testnet account mode unavailable')
+              raise SystemExit(2) from error
+          print('testnet_account_mode=' + mode)
+          print('testnet_spot_usdc_total=' + spot['total'])
+          print('testnet_spot_usdc_available=' + spot['available'])
+          print('testnet_equity_usdc=' + result['equity_usdc'])
+          print('testnet_withdrawable_usdc=' + result['withdrawable_usdc'])
+          print('positions=' + str(result['positions']))
+          print('open_orders=' + str(result['open_orders']))
+          print('reduce_only_orders=' + str(result['reduce_only_orders']))
+          print('stop_market_orders=' + str(result['stop_market_orders']))
+          from testnet_paper_review.testnet_public_agent_review import review_public_agents
+          try:
+              agent_review = review_public_agents()
+          except Exception as error:
+              print('HOLD: public TESTNET named signer list unverifiable')
+              raise SystemExit(2) from error
+          print('testnet_named_api_agents=' + str(len(agent_review['agents'])))
+          print('testnet_named_agents_role_verified=' + str(agent_review['active_named_owner_agents']))
+          print('HOLD: listed agents are not approved for this isolated sender')
+          print('HOLD: this snapshot provides no permission to sign or send orders')
+          PY
+      - name: Standalone no-key Testnet server public readiness probe (no orders)
+        shell: bash
+        env:
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: |
+          set -euo pipefail
+          python3 -B -m testnet_paper_review.testnet_server_deployment_check --read-only-check
